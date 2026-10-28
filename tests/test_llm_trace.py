@@ -1,0 +1,142 @@
+from types import SimpleNamespace
+
+import httpx
+import openai
+import pytest
+
+from dv_agent.llm import LLMError, MetaClient
+from dv_agent.trace import Tracer, read_trace
+
+SCHEMA = {"type": "object", "properties": {"x": {"type": "string"}}, "required": ["x"],
+          "additionalProperties": False}
+
+
+class FakeResponses:
+    def __init__(self, outcomes):
+        self.outcomes = list(outcomes)
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return SimpleNamespace(status="completed", output_text=outcome, id="resp-1",
+                               usage=SimpleNamespace(input_tokens=10, output_tokens=5))
+
+
+def _client(outcomes):
+    return SimpleNamespace(responses=FakeResponses(outcomes))
+
+
+def _status_error(cls, code):
+    resp = httpx.Response(code, request=httpx.Request("POST", "https://example.invalid/v1/responses"))
+    return cls("boom", response=resp, body=None)
+
+
+def _call(client, **kw):
+    return client.structured(name="t", instructions="i", payload={"p": 1}, schema=SCHEMA, **kw)
+
+
+def test_structured_call_uses_strict_schema_and_caches(tmp_path):
+    fake = _client(['{"x": "ok"}'])
+    client = MetaClient(api_key="k", model="m", client=fake, cache_dir=tmp_path)
+    first = _call(client)
+    assert first.data == {"x": "ok"} and not first.cached and first.usage == {"input": 10, "output": 5}
+    fmt = fake.responses.calls[0]["text"]["format"]
+    assert fmt["strict"] is True and fmt["schema"] == SCHEMA
+    assert fake.responses.calls[0]["store"] is False
+    second = _call(client)
+    assert second.cached and second.data == {"x": "ok"} and len(fake.responses.calls) == 1
+
+
+def test_transient_errors_retry_with_backoff():
+    sleeps = []
+    fake = _client([_status_error(openai.RateLimitError, 429), '{"x": "ok"}'])
+    client = MetaClient(api_key="k", model="m", client=fake, sleep=sleeps.append)
+    assert _call(client).data == {"x": "ok"}
+    assert sleeps == [2.0]
+
+
+def test_errors_are_classified_without_leaking_details():
+    client = MetaClient(api_key="k", model="m", client=_client(
+        [_status_error(openai.AuthenticationError, 401)]))
+    with pytest.raises(LLMError) as exc:
+        _call(client)
+    assert exc.value.kind == "auth"
+    client = MetaClient(api_key="k", model="m", client=_client(["not json"]))
+    with pytest.raises(LLMError) as exc:
+        _call(client)
+    assert exc.value.kind == "parse"
+    with pytest.raises(LLMError) as exc:
+        _call(MetaClient(api_key="", model="m"))
+    assert exc.value.kind == "config"
+
+
+def test_tracer_nests_spans_and_records_errors(tmp_path):
+    sink = tmp_path / "t.jsonl"
+    with Tracer(sink, "run") as tracer:
+        with tracer.span("outer") as outer:
+            with tracer.span("inner") as inner:
+                inner.update(output={"v": 1})
+        with pytest.raises(ValueError):
+            with tracer.span("bad"):
+                raise ValueError("x")
+    recs = {r["name"]: r for r in read_trace(sink)}
+    assert recs["inner"]["parent_id"] == outer.id
+    assert recs["outer"]["parent_id"] == tracer.root.id
+    assert recs["bad"]["level"] == "ERROR"
+    assert {r["trace_id"] for r in recs.values()} == {tracer.trace_id}
+    assert not tracer.langfuse_active
+
+
+class FakeObs:
+    def __init__(self, log, name):
+        self.id = f"lf-{name}"
+        self.log = log
+
+    def update(self, **kw):
+        self.log.append(("update", self.id, kw))
+
+
+class FakeLangfuse:
+    def __init__(self, fail_on=None):
+        self.log, self.fail_on = [], fail_on
+
+    def start_as_current_observation(self, **kw):
+        if kw["name"] == self.fail_on:
+            raise RuntimeError("network down")
+        self.log.append(("start", kw))
+        log, name = self.log, kw["name"]
+
+        class CM:
+            def __enter__(self_inner):
+                return FakeObs(log, name)
+
+            def __exit__(self_inner, *a):
+                log.append(("end", name))
+        return CM()
+
+    def flush(self):
+        self.log.append(("flush",))
+
+    def get_trace_url(self, trace_id):
+        return f"https://langfuse.invalid/trace/{trace_id}"
+
+
+def test_langfuse_mirror_and_failure_isolation(tmp_path):
+    lf = FakeLangfuse()
+    with Tracer(tmp_path / "t.jsonl", "run", client=lf) as tracer:
+        with tracer.span("step", as_type="retriever") as span:
+            span.update(output={"ok": True})
+    starts = [e[1] for e in lf.log if e[0] == "start"]
+    assert starts[0]["trace_context"] == {"trace_id": tracer.trace_id}
+    assert starts[1]["as_type"] == "retriever" and span.id == "lf-step"
+    assert ("flush",) in lf.log and tracer.trace_url().endswith(tracer.trace_id)
+
+    broken = FakeLangfuse(fail_on="step")
+    with Tracer(tmp_path / "t2.jsonl", "run", client=broken) as tracer:
+        with tracer.span("step"):
+            pass
+        assert not tracer.langfuse_active and "failed" in tracer.langfuse_error
+    assert [r["name"] for r in read_trace(tmp_path / "t2.jsonl")] == ["step", "run"]

@@ -1,0 +1,171 @@
+{
+  "template_id": "quick_reference_v0",
+  "description": "Quick-reference verification test plan (user template, 2026-10-28). To be replaced by a more comprehensive template.",
+  "interfaces": {
+    "enabled": true,
+    "heading": "Interface Definitions (step 0: grouped by functionality and connected module type)"
+  },
+  "sections": [
+    {
+      "id": "title",
+      "heading": "1. Title",
+      "generator": "title"
+    },
+    {
+      "id": "feature_description",
+      "heading": "2. Feature Description",
+      "generator": "entries",
+      "queries": [
+        "{scope} overview features",
+        "{scope} operation modes",
+        "{scope} interfaces"
+      ],
+      "entry_kinds": [
+        "purpose",
+        "interface",
+        "mode",
+        "data_path",
+        "interrupt",
+        "configuration",
+        "limitation"
+      ],
+      "instructions": "Key pointers describing the feature: purpose, external interfaces, operating modes, data path, interrupts, configuration options and stated limitations. One pointer per entry."
+    },
+    {
+      "id": "register_map",
+      "heading": "3. Register Map",
+      "generator": "register_map",
+      "queries": [
+        "{scope} register map addresses",
+        "{scope} register fields bits access reset value"
+      ],
+      "include_kinds": [
+        "register",
+        "reset",
+        "configuration"
+      ],
+      "instructions": "List every register the supplied text describes with its address or offset, width, access, reset value and description, and every field with bits, name, access, reset value and description. Copy values exactly as written; use an empty string when the text does not state a value."
+    },
+    {
+      "id": "strategy",
+      "heading": "4. High Level Verification Strategy",
+      "generator": "entries",
+      "queries": [
+        "{scope} bus interface signals",
+        "{scope} external interface signals",
+        "{scope} interrupts reset",
+        "{scope} test or loopback modes"
+      ],
+      "entry_kinds": [
+        "environment",
+        "uvm_agent",
+        "sequence",
+        "reference_model",
+        "agent_scoreboard",
+        "top_level_scoreboard"
+      ],
+      "instructions": "Propose the UVM environment from the supplied interface groups: one agent per bus, serial-data or flow-control group, named after the group and stating whether it is active or passive and what it drives or monitors; say how sideband groups (single wires or bundles) are driven or monitored, either by their own small agent or by a sideband monitor, and which group they belong with. Then the sequence library (for example reset, register access, transfer, error injection, loopback, interrupt), the reference model, and how checking is split between scoreboards inside agents and a top-level scoreboard that spans several agents. These are engineering proposals: mark them INFERRED and cite the specification text that motivates them; never claim the specification mandates the testbench."
+    },
+    {
+      "id": "stimulus",
+      "heading": "5. Stimulus",
+      "generator": "entries",
+      "queries": [
+        "{scope} configuration options",
+        "{scope} data transfer",
+        "{scope} error conditions",
+        "{scope} thresholds levels and limits"
+      ],
+      "entry_kinds": [
+        "directed_test",
+        "random_sequence",
+        "configuration_sweep",
+        "error_injection",
+        "corner_case"
+      ],
+      "instructions": "Stimulus scenarios: configuration sweeps, traffic, error injection and corner cases. Each entry names the sequence it uses (from the strategy section where one applies) and the specification behaviour it exercises."
+    },
+    {
+      "id": "checks",
+      "heading": "6. Checks",
+      "generator": "entries",
+      "queries": [
+        "{scope} status indicators",
+        "{scope} interrupt conditions and clearing",
+        "{scope} reset values",
+        "{scope} error detection"
+      ],
+      "entry_kinds": [
+        "assertion",
+        "agent_scoreboard",
+        "top_level_scoreboard",
+        "register_check",
+        "protocol_check",
+        "interrupt_check"
+      ],
+      "instructions": "Checks grouped by category. Each check states the expected behaviour from the specification and where it is checked: an assertion, a scoreboard inside an agent, or the top-level scoreboard. Expected behaviour must come from cited specification text."
+    },
+    {
+      "id": "coverage",
+      "heading": "7. Coverage",
+      "generator": "entries",
+      "queries": [
+        "{scope} configuration options",
+        "{scope} interrupt types priority",
+        "{scope} error conditions"
+      ],
+      "entry_kinds": [
+        "covergroup",
+        "cross_coverage",
+        "cover_property",
+        "register_coverage"
+      ],
+      "instructions": "Functional coverage: covergroups and coverpoints with their bins, crosses, and cover properties that show each check's scenario was exercised. Put bins and crosses in details."
+    },
+    {
+      "id": "callouts",
+      "heading": "8. Callouts to Higher Testbenches",
+      "generator": "entries",
+      "queries": [
+        "{scope} external connections pads",
+        "{scope} clocks",
+        "{scope} system integration interrupt"
+      ],
+      "entry_kinds": [
+        "reuse",
+        "integration_check",
+        "verify_at_higher_level",
+        "configuration_dependency"
+      ],
+      "instructions": "What subsystem or SoC testbenches need from this plan: agents and sequences to reuse, behaviour that can only be verified at a higher level (pads, clocks, interrupt routing, bus fabric), and integration parameters or build options."
+    },
+    {
+      "id": "assumptions",
+      "heading": "9. Assumptions",
+      "generator": "entries",
+      "queries": [
+        "{scope} optional features defines",
+        "{scope} clocks reset"
+      ],
+      "entry_kinds": [
+        "assumption"
+      ],
+      "collect_assumed": true,
+      "instructions": "Assumptions this plan makes where the specification is silent or ambiguous. Every entry is ASSUMED unless a cited source states it."
+    },
+    {
+      "id": "questions",
+      "heading": "10. Questions to Designers",
+      "generator": "entries",
+      "queries": [
+        "{scope} undefined unclear behaviour",
+        "{scope} reserved bits ignored"
+      ],
+      "entry_kinds": [
+        "question"
+      ],
+      "include_conflicts": true,
+      "instructions": "Questions for the designers about ambiguous, missing or contradictory specification statements. Cite the text that raises each question."
+    }
+  ]
+}

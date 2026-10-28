@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dv_agent"
+version = "0.1.0"
+description = "Documentation-grounded DV assistant: spec ingestion, dependency GraphRAG, Langfuse lineage"
+requires-python = ">=3.11"
+dependencies = [
+  "pypdf>=6",
+  "networkx>=3.3",
+  "pydantic>=2.7",
+  "openai>=2",
+  "langfuse>=3",
+  "numpy>=1.26",
+  "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+dv-agent = "dv_agent.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dv_agent = ["templates/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: calls the real Meta API or Langfuse; needs keys and is skipped by default"]
+addopts = "-m 'not live'"

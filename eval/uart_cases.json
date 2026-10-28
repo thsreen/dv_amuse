@@ -1,0 +1,224 @@
+[
+ {
+  "id": "U01",
+  "type": "lexical",
+  "query": "reset value of the FIFO Control Register",
+  "relevant_sections": [
+   "4.4 FIFO Control Register"
+  ],
+  "evidence_hint": "Reset Value : 11000000b"
+ },
+ {
+  "id": "U02",
+  "type": "paraphrase",
+  "query": "which register bit gives access to the divisor latches",
+  "relevant_sections": [
+   "4.5 Line Control Register"
+  ],
+  "evidence_hint": "Divisor Latch Access bit"
+ },
+ {
+  "id": "U03",
+  "type": "multi_section",
+  "query": "how is the baud rate derived from the input clock and the divisor value",
+  "relevant_sections": [
+   "4.9 Divisor Latches",
+   "5.1 Initialization"
+  ],
+  "evidence_hint": "(system clock speed) / (16 x desired baud rate)"
+ },
+ {
+  "id": "U04",
+  "type": "multi_section",
+  "query": "in what order must the divisor latch bytes be written",
+  "relevant_sections": [
+   "4.9 Divisor Latches",
+   "5.1 Initialization"
+  ],
+  "evidence_hint": "write the MSB first and the LSB last"
+ },
+ {
+  "id": "U05",
+  "type": "lexical",
+  "query": "which interrupt has the highest priority",
+  "relevant_sections": [
+   "4.3 Interrupt Identification Register"
+  ],
+  "evidence_hint": "0 1 1 1 st Receiver Line"
+ },
+ {
+  "id": "U06",
+  "type": "paraphrase",
+  "query": "how is the receiver timeout interrupt cleared",
+  "relevant_sections": [
+   "4.3 Interrupt Identification Register"
+  ],
+  "evidence_hint": "Reading from the"
+ },
+ {
+  "id": "U07",
+  "type": "lexical",
+  "query": "reset value of the Interrupt Identification Register",
+  "relevant_sections": [
+   "4.3 Interrupt Identification Register"
+  ],
+  "evidence_hint": "Reset Value: C1h"
+ },
+ {
+  "id": "U08",
+  "type": "paraphrase",
+  "query": "what state are the interrupts in after the core is reset",
+  "relevant_sections": [
+   "5.1 Initialization"
+  ],
+  "evidence_hint": "All interrupts are disabled in the Interrupt Enable Register"
+ },
+ {
+  "id": "U09",
+  "type": "lexical",
+  "query": "bit that indicates the transmitter FIFO is empty",
+  "relevant_sections": [
+   "4.7 Line Status Register"
+  ],
+  "evidence_hint": "The transmitter FIFO is empty"
+ },
+ {
+  "id": "U10",
+  "type": "paraphrase",
+  "query": "how do I put the serial port into a self-test loopback",
+  "relevant_sections": [
+   "4.6 Modem Control Register"
+  ],
+  "evidence_hint": "Loopback mode"
+ },
+ {
+  "id": "U11",
+  "type": "lexical",
+  "query": "modem status bit that reports a change on the CTS input",
+  "relevant_sections": [
+   "4.8 Modem Status Register"
+  ],
+  "evidence_hint": "Delta Clear To Send (DCTS)"
+ },
+ {
+  "id": "U12",
+  "type": "lexical",
+  "query": "what does the optional BAUD_O output carry",
+  "relevant_sections": [
+   "2.2 Other internal signals"
+  ],
+  "evidence_hint": "The signal here is the 16 x actual baud rate"
+ },
+ {
+  "id": "U13",
+  "type": "lexical",
+  "query": "list of external off-chip connections to the core",
+  "relevant_sections": [
+   "2.3 External"
+  ],
+  "evidence_hint": "External (off-chip) connections"
+ },
+ {
+  "id": "U14",
+  "type": "multi_section",
+  "query": "width of the address bus in 32-bit data bus mode",
+  "relevant_sections": [
+   "2.1 WISHBONE interface signals",
+   "5 Operation"
+  ],
+  "evidence_hint": "in 32-bit data bus mode, the [ADR_I] is 5 and not 3 bits wide"
+ },
+ {
+  "id": "U15",
+  "type": "paraphrase",
+  "query": "how are the byte lanes selected in the 32-bit WISHBONE mode",
+  "relevant_sections": [
+   "5 Operation",
+   "2.1 WISHBONE interface signals"
+  ],
+  "evidence_hint": "it uses the WISHBONE [SEL_I]"
+ },
+ {
+  "id": "U16",
+  "type": "lexical",
+  "query": "debug registers that expose internal state non-intrusively",
+  "relevant_sections": [
+   "4.10 Debug 1",
+   "4.11 Debug 2"
+  ],
+  "evidence_hint": "to provide"
+ },
+ {
+  "id": "U17",
+  "type": "lexical",
+  "query": "number of stop bits generated with 5-bit characters",
+  "relevant_sections": [
+   "4.5 Line Control Register"
+  ],
+  "evidence_hint": "1.5 stop bits when 5-bit character length selected"
+ },
+ {
+  "id": "U18",
+  "type": "lexical",
+  "query": "which bit enables parity generation on outgoing characters",
+  "relevant_sections": [
+   "4.5 Line Control Register"
+  ],
+  "evidence_hint": "Parity bit is generated on each outgoing character"
+ },
+ {
+  "id": "U19",
+  "type": "paraphrase",
+  "query": "how to flush the transmit queue of the FIFO",
+  "relevant_sections": [
+   "4.4 FIFO Control Register"
+  ],
+  "evidence_hint": "Writing a ‘1’ to bit 2 clears the Transmitter FIFO"
+ },
+ {
+  "id": "U20",
+  "type": "lexical",
+  "query": "receiver FIFO interrupt trigger levels available",
+  "relevant_sections": [
+   "4.4 FIFO Control Register"
+  ],
+  "evidence_hint": "‘11’ – 14 bytes"
+ },
+ {
+  "id": "U21",
+  "type": "lexical",
+  "query": "interrupt count and bus interface of the core architecture",
+  "relevant_sections": [
+   "6 Architecture"
+  ],
+  "evidence_hint": "The core requires one interrupt"
+ },
+ {
+  "id": "U22",
+  "type": "multi_section",
+  "query": "which pads are needed for serial input and output",
+  "relevant_sections": [
+   "6 Architecture",
+   "2.3 External"
+  ],
+  "evidence_hint": "It requires 2 pads in the chip (serial in and serial out)"
+ },
+ {
+  "id": "U23",
+  "type": "lexical",
+  "query": "clock inputs required by the core and their rates",
+  "relevant_sections": [
+   "3 Clocks"
+  ],
+  "evidence_hint": "Clocks table"
+ },
+ {
+  "id": "U24",
+  "type": "paraphrase",
+  "query": "what are the main features of this UART IP core",
+  "relevant_sections": [
+   "1 Introduction"
+  ],
+  "evidence_hint": "Register level and functionality compatibility with NS16550A"
+ }
+]
