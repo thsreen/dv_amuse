@@ -25,7 +25,7 @@ Editable source: [`architecture.svg`](architecture.svg) (regenerate the PNG from
 |---|---|---|---|---|---|
 | 1 | Ingest | `ingest.py` | none | discovery rules (format preference, skipped folders, changelogs); every skip has a reason | `manifest.json`, `text/`, `chunks.jsonl` |
 | 2 | Graph build | `graph.py`, `extract.py`, `community.py`, `dense.py` | `spec_requirements` per chunk; `requirement_dependencies` per entity group; optional embeddings | quotes located verbatim (whitespace and typography tolerant); dependency evidence quote must be in an endpoint's quote; entity references resolved by owner | `graph.json`, `build_stats.json`, `dense/` |
-| 3 | Retrieval and fetch | `retrieval.py`, `testplan_context.py`, `planning.py` | `rerank_chunks`, `test_plan_items` (per-requirement `plan` command) | evidence is always an L1 chunk; citations limited to retrieved IDs | `query`, `context`, `features` output; `test_plan.json` |
+| 3 | Retrieval and fetch | `retrieval.py`, `graph_fetch.py`, `combined_fetch.py`, `testplan_context.py`, `planning.py` | `rerank_chunks`, `test_plan_items` (per-requirement `plan` command) | evidence is always an L1 chunk; every item records its sources and path; citations limited to retrieved IDs | `query`, `context`, `deps`, `features` output; `test_plan.json` |
 | 4a | Interfaces | `interfaces.py` | `testplan_interfaces` | names and defining quotes in the cited chunk; direction, width and active level marked when not stated; one group per signal; groups sharing functionality and module type flagged | `interfaces.json/.md` |
 | 4b | Register map | `registers.py` | `testplan_registers` per batch of chunks | names, quotes, addresses, widths, access, reset values and encodings must be written in the chunk; records merged across chunks; conflicts and overlaps reported; writable fields from access codes | `registers.json/.md` |
 | 4c | Verification strategy | `strategy.py` | `testplan_strategy` | every interface group covered once; agents drive only DUT inputs of their groups; passive agents never drive; registers, scoreboard inputs and sequence agents must exist | `strategy.json/.md` |
@@ -36,6 +36,26 @@ Step 4c reads the saved outputs of 4a and 4b (regenerating them only when missin
 their trace IDs. Inside `testplan`, steps 4a-4c run in memory and feed sections 3-5; every section also
 receives the interface groups and the earlier sections, so stimulus, checks and coverage reuse the
 strategy's agent and sequence names.
+
+## Combined graph fetch (stage 3)
+
+Every fetch (`testplan_context.fetch_context`, used by all steps and sections) runs `combined_fetch.combined_fetch`:
+
+| Source | What it adds |
+|---|---|
+| retrieval | BM25 + dense seeds fused, entity anchors as extra seeds, Personalized PageRank |
+| entity | entities named in the topic (an owned name such as a field only with its owner); their parts and owners via `HAS_PART`, requirements mentioning them, sections, communities |
+| dependency | transitive preconditions of the top requirements (`DEPENDS_ON`, `CONSTRAINS`, `REFINES`) |
+| global | communities ranked by their summaries, expanded into member requirements |
+| path | shortest weighted path from the topic's anchors and seeds to each verified interface signal, register and uncovered requirement (a small take on the GRW-AS idea, D-017); requirements and chunks on the path |
+| coverage | requirements earlier sections have not cited directly |
+
+Adaptive selection gives each source up to `min_per_source` of its best items, then fills by score up to
+the cap; an item reached by several sources lists them all. Model-written sections also receive a
+precondition-first `dependency_order` (cycles become designer questions), and Checks is refused until it
+cites the requirements no earlier section covers. The document ends with a requirement coverage report.
+`dv-agent deps REQ-...` prints closure, order, cycles and conflicts; `dv-agent context "<topic>" --global N`
+shows the bundle with its paths and selection.
 
 ## Test-plan template
 
@@ -66,8 +86,10 @@ specification causes (for example two chunks giving different reset values). Eac
 API with `text.format` `json_schema` (Chat Completions with `META_API_STYLE=chat`). Bounded retries for
 rate limits, timeouts and server errors; errors are classified without echoing request details.
 Responses are cached by a hash of model, call name, instructions, payload and schema, so reruns cost
-nothing unless a prompt changes. `--llm auto|on|off` (or `DV_AGENT_LLM_MODE`) controls whether the
-model is used; `FakeLLM` drives the offline tests. Live use is not yet verified (see
+nothing unless a prompt changes. Each call records input, cached-input, output and reasoning tokens
+(estimated when the API reports none); the final test plan lists them per model call, with repair and
+local-cache counts, and `dv-agent usage` totals them per run and per call (`usage.py`, D-019). `--llm auto|on|off` (or `DV_AGENT_LLM_MODE`) controls
+whether the model is used; `FakeLLM` drives the offline tests. Live use is not yet verified (see
 `docs/WORKSHOP_REVIEW.md` for the open API questions).
 
 ## Provenance and lineage
@@ -104,6 +126,7 @@ are unchanged; `--force` reruns a stage; `--fresh` also clears the response cach
 | `dv-agent testplan [--scope] [--template]` | 5 |
 | `dv-agent plan REQ-...` | per-requirement items (older, overlaps `testplan`) |
 | `dv-agent pipeline <repo> [--testplan] [--fresh]` | 1-5 in order |
+| `dv-agent usage [--last N] [--trace ID]` | tokens per run and per model call |
 
 ## Status
 

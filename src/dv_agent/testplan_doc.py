@@ -18,6 +18,8 @@ from typing import Callable
 import networkx as nx
 
 from .graph import attach_artifact
+from .graph_fetch import dependency_order, requirement_coverage
+from .combined_fetch import step_targets
 from .interfaces import InterfaceConfig, compact, extract_interfaces, interface_questions
 from .interfaces import render as render_interfaces
 from .llm import LLM, LLMError
@@ -26,6 +28,7 @@ from .repair import default_max_repairs, render_repairs, structured_with_repair,
 from .registers import render as render_registers
 from .retrieval import RetrievalConfig
 from .strategy import build_strategy, strategy_questions, strategy_summary
+from .usage import render as render_usage
 from .strategy import render as render_strategy
 from .testplan_context import chunk_record, fetch_context, requirement_record
 from .trace import Tracer
@@ -45,6 +48,9 @@ Provenance for each entry:
 Cite only IDs from the supplied lists. Keep each entry to one idea; put sub-points in details.
 Stay consistent with previous_sections (reuse agent and sequence names defined there) and with
 interfaces, the design's interface groups (signals grouped by functionality and connected module type).
+When supplied: dependency_order lists requirements precondition-first (inferred, unreviewed links); use it for
+programming order and stimulus preconditions. uncovered_requirements are requirements no earlier section
+cites; cite each one in at least one entry.
 Section instructions:
 """
 
@@ -60,6 +66,7 @@ class DocConfig:
     max_previous_entries: int = 40
     max_entries: int = 40
     max_repairs: int = field(default_factory=default_max_repairs)
+    max_coverage_targets: int = 40
 
 
 def load_template(path: Path | None = None) -> dict:
@@ -107,15 +114,22 @@ def _entries_schema(kinds: list[str] | None, req_ids: list[str], chunk_ids: list
 
 
 def section_context(G: nx.MultiDiGraph, H: nx.Graph, section: dict, scope: str, cfg: DocConfig,
-                    dense_fn: Callable[[str], dict] | None = None) -> dict:
-    """Merge fetch bundles for a section's queries into one cited context."""
+                    dense_fn: Callable[[str], dict] | None = None, targets: list[str] | None = None,
+                    covered: tuple[set[str], set[str]] | None = None, tracer: Tracer | None = None) -> dict:
+    """Merge combined-fetch bundles for a section's queries into one cited context.
+
+    targets: graph entities for the verified signals and registers (path targets); covered: requirement
+    and chunk IDs earlier sections already cite (requirements outside them are fetched as coverage).
+    """
     reqs: dict[str, dict] = {}
     chunks: dict[str, dict] = {}
     deps: dict[tuple, dict] = {}
     queries = [" ".join(q.replace("{scope}", scope).split()) for q in section.get("queries", [])]
     for query in [q for q in queries if q]:
         b = fetch_context(G, query, cfg=cfg.retrieval, H=H, dense=dense_fn(query) if dense_fn else None,
-                          max_requirements=cfg.max_requirements)
+                          max_requirements=cfg.max_requirements, global_communities=section.get("global_communities"),
+                          targets=targets, covered_req_ids=covered[0] if covered else None,
+                          covered_chunk_ids=covered[1] if covered else None, tracer=tracer)
         for r in b["requirements"] + b["dependency_requirements"]:
             reqs.setdefault(r["req_id"], r)
         for e in b["evidence"]:
@@ -317,7 +331,9 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
         interfaces = _interfaces_step(G, H, llm, tracer, template, scope, cfg, dense_fn)
         iface_compact = compact(interfaces) if interfaces and interfaces["status"] == "PASS" else []
         registers = _registers_step(G, H, llm, tracer, template, scope, cfg, dense_fn)
+        path_targets = step_targets(G, interfaces, registers)
         strategy = None
+        cycles: set[tuple] = set()
         for sec in template["sections"]:
             with tracer.span(f"testplan_section:{sec['id']}", input={"section": sec["id"]}) as span:
                 if sec["generator"] == "title":
@@ -332,7 +348,8 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                     sections.append(dict(id=sec["id"], heading=sec["heading"], generator=sec["generator"],
                                          status="NOT_RUN", error=reason, configurations=[]))
                     continue
-                ctx = section_context(G, H, sec, scope, cfg, dense_fn)
+                ctx = section_context(G, H, sec, scope, cfg, dense_fn, targets=path_targets, covered=_cited(sections),
+                                      tracer=tracer)
                 if sec["generator"] == "strategy":
                     sections.append(_strategy_section(G, tracer, llm, sec, interfaces, registers, scope, ctx,
                                                       _previous(sections, cfg.max_previous_entries), cfg,
@@ -342,11 +359,21 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 for d in ctx["dependencies"]:
                     if d["type"] == "CONFLICTS_WITH":
                         conflicts[(d["src"], d["dst"])] = d
+                ordering = _add_dependency_order(G, ctx) if sec.get("dependency_order", True) else None
+                if ordering:
+                    cycles.update(tuple(c) for c in ordering["cycles"])
+                targets = _add_coverage_targets(G, ctx, sections, cfg) if sec.get("cover_requirements") else []
                 req_ids = [r["req_id"] for r in ctx["requirements"]]
                 chunk_ids = [c["chunk_id"] for c in ctx["chunks"]]
                 out = dict(id=sec["id"], heading=sec["heading"], generator=sec["generator"],
                            context=dict(queries=ctx["queries"], requirement_ids=req_ids, chunk_ids=chunk_ids))
                 payload = _payload(sec, scope, ctx, _previous(sections, cfg.max_previous_entries), iface_compact, cfg)
+                if ordering:
+                    out["dependency_order"] = ordering
+                    payload["dependency_order"] = _order_payload(G, ordering)
+                if targets:
+                    payload["uncovered_requirements"] = [
+                        {k: G.nodes[t][k] for k in ("statement", "section")} | {"req_id": t} for t in targets]
                 if sec["generator"] == "configurations":
                     configurable = registers["configurable"]
                     payload["configurable_fields"] = [
@@ -363,9 +390,12 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                         return notes + [f"{e['field_id']} ({e['register']}.{e['field']}): {v}"
                                         for e in entries for v in e["validation"]]
                 else:
-                    def check(d, r=set(req_ids), c=set(chunk_ids)):
-                        return [f"entry '{e['text'][:60]}': {v}" for e in
-                                _validate_entries(G, d.get("entries", []), r, c, cfg.max_entries) for v in e["validation"]]
+                    def check(d, r=set(req_ids), c=set(chunk_ids), t=tuple(targets)):
+                        entries = _validate_entries(G, d.get("entries", []), r, c, cfg.max_entries)
+                        problems = [f"entry '{e['text'][:60]}': {v}" for e in entries for v in e["validation"]]
+                        cited = {x for e in entries for x in e["cited_req_ids"]}
+                        return problems + [f"requirement {x} ('{G.nodes[x]['statement'][:70]}') is not cited by any "
+                                           "entry; add an entry that cites it" for x in t if x not in cited]
                 try:
                     result = structured_with_repair(llm, tracer, name=f"testplan_{sec['generator']}",
                                                     instructions=COMMON_RULES + sec.get("instructions", ""),
@@ -394,18 +424,72 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                         out["entries"] += _config_questions(sections)
                         out["entries"] += strategy_questions(strategy)
                         out["entries"] += _repair_questions(interfaces, registers, sections)
+                        out["entries"] += _cycle_questions(G, cycles)
                 out["status"] = "PASS"
                 _record(G, tracer, out, meta["template_id"], scope)
                 span.update(output={"status": "PASS", "items": len(out.get("entries", out.get("configurations", [])))},
                             metadata={"fact_ids": out["lineage_fact_ids"]})
                 sections.append(out)
+        coverage = _coverage(G, sections)
         stage.update(output={"interfaces": interfaces["status"] if interfaces else "DISABLED",
                              "registers": registers["status"] if registers else "DISABLED"}
                      | {s["id"]: s["status"] for s in sections})
     return dict(schema_version=DOC_SCHEMA_VERSION, **meta, scope=scope,
                 template_path=template["template_path"], review_status="NEEDS_REVIEW",
                 graph_build_trace_id=G.graph.get("build_trace_id"), trace_id=tracer.trace_id,
-                interfaces=interfaces, registers=registers, sections=sections)
+                interfaces=interfaces, registers=registers, sections=sections, coverage=coverage)
+
+
+def _add_dependency_order(G: nx.MultiDiGraph, ctx: dict) -> dict:
+    """Dependency closure of the section's requirements, precondition-first; closure members join the context."""
+    ordering = dependency_order(G, [r["req_id"] for r in ctx["requirements"]])
+    known = {r["req_id"] for r in ctx["requirements"]}
+    ctx["requirements"] += [requirement_record(G, r) | {"via": "dependency closure"} for r in ordering["order"]
+                            if r not in known]
+    return ordering
+
+
+def _order_payload(G: nx.MultiDiGraph, ordering: dict) -> dict:
+    after: dict[str, list[str]] = {}
+    for e in ordering["edges"]:
+        after.setdefault(e["dependent"], []).append(e["precondition"])
+    return dict(order=[dict(req_id=r, statement=G.nodes[r]["statement"], after=sorted(after.get(r, [])))
+                       for r in ordering["order"]],
+                cycles=ordering["cycles"], conflicts=ordering["conflicts"])
+
+
+def _cited(sections: list[dict]) -> tuple[set[str], set[str]]:
+    reqs, chunks = set(), set()
+    for s in sections:
+        for e in s.get("entries", []) + s.get("configurations", []):
+            reqs.update(e["cited_req_ids"])
+            chunks.update(e["cited_chunk_ids"])
+        st = s.get("strategy") or {}
+        for x in st.get("agents", []) + st.get("scoreboards", []):
+            chunks.update(x["cited_chunk_ids"])
+    return reqs, chunks
+
+
+def _add_coverage_targets(G: nx.MultiDiGraph, ctx: dict, sections: list[dict], cfg: DocConfig) -> list[str]:
+    """Requirements no earlier section cites directly; they join this section's context as targets."""
+    reqs, chunks = _cited(sections)
+    cov = requirement_coverage(G, reqs, chunks)
+    targets = [r["req_id"] for r in cov["uncovered"] + cov["chunk_only"]][:cfg.max_coverage_targets]
+    known = {r["req_id"] for r in ctx["requirements"]}
+    ctx["requirements"] += [requirement_record(G, t) | {"via": "coverage target"} for t in targets if t not in known]
+    return targets
+
+
+def _coverage(G: nx.MultiDiGraph, sections: list[dict]) -> dict:
+    reqs, chunks = _cited(sections)
+    return requirement_coverage(G, reqs, chunks)
+
+
+def _cycle_questions(G: nx.MultiDiGraph, cycles: set[tuple]) -> list[dict]:
+    return [dict(text="These requirements depend on each other in a cycle, so no programming or stimulus order "
+                      f"satisfies all of them: {'; '.join(G.nodes[r]['statement'] for r in cyc)}. Which dependency "
+                      "is wrong?", kind="question", provenance="INFERRED", cited_req_ids=list(cyc), cited_chunk_ids=[],
+                 details=["Raised by dependency ordering"], validation=[]) for cyc in sorted(cycles)]
 
 
 def _registers_step(G, H, llm, tracer, template, scope, cfg, dense_fn) -> dict | None:
@@ -572,7 +656,24 @@ def render_markdown(doc: dict) -> str:
             lines += [f"  - Validation: {v}" for v in e["validation"]]
         lines.append("")
         lines += render_repairs(s.get("repair"))
+    lines += _render_coverage(doc.get("coverage"))
+    if doc.get("token_usage"):
+        lines += render_usage(doc["token_usage"])
     return "\n".join(lines)
+
+
+def _render_coverage(cov: dict | None) -> list[str]:
+    if not cov or not cov["total"]:
+        return []
+    lines = ["## Requirement coverage", "",
+             f"{cov['covered']} of {cov['total']} specification requirements are cited directly by the plan "
+             f"({cov['ratio']:.0%}); {len(cov['chunk_only'])} only through their source chunk; "
+             f"{len(cov['uncovered'])} not at all.", ""]
+    for label, items in (("Not covered", cov["uncovered"]), ("Covered only through the chunk", cov["chunk_only"])):
+        if items:
+            lines += [f"**{label}:**", ""] + [f"- {r['req_id']} ({r['section']}, p.{r['page']}): {r['statement']}"
+                                              for r in items] + [""]
+    return lines
 
 
 def _render_configurations(s: dict) -> list[str]:

@@ -42,7 +42,7 @@ def test_structured_call_uses_strict_schema_and_caches(tmp_path):
     fake = _client(['{"x": "ok"}'])
     client = MetaClient(api_key="k", model="m", client=fake, cache_dir=tmp_path)
     first = _call(client)
-    assert first.data == {"x": "ok"} and not first.cached and first.usage == {"input": 10, "output": 5}
+    assert first.data == {"x": "ok"} and not first.cached and first.usage == {"input": 10, "output": 5, "reasoning": 0, "cached_input": 0}
     fmt = fake.responses.calls[0]["text"]["format"]
     assert fmt["strict"] is True and fmt["schema"] == SCHEMA
     assert fake.responses.calls[0]["store"] is False

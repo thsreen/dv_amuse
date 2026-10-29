@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 
 from .community import build_communities
+from .graph_fetch import add_owner_edges, dependency_closure, dependency_order
 from .dense import Embedder, build_index, dense_scores, load_index, save_index
 from .extract import ExtractConfig, extract_dependencies, extract_requirements
 from .fsutil import atomic_write_text
@@ -17,10 +18,12 @@ from .interfaces import InterfaceConfig, extract_interfaces
 from .interfaces import render as render_interfaces
 from .registers import RegisterConfig, extract_registers
 from .registers import render as render_registers
+from .combined_fetch import step_targets
 from .strategy import build_strategy
 from .strategy import render as render_strategy
 from .testplan_doc import DocConfig, build_testplan_doc, load_template, render_markdown, section_context
 from .trace import Tracer
+from .usage import run_totals, summarize
 
 TRACE_FILE = "trace.jsonl"
 GRAPH_FILE = "graph.json"
@@ -42,7 +45,8 @@ RUN_MARKERS = ("manifest.json", BUILD_STATS, GRAPH_FILE, TRACE_FILE)
 
 def _trace_info(tracer: Tracer) -> dict:
     return dict(trace_id=tracer.trace_id, langfuse=tracer.langfuse_active,
-                langfuse_error=tracer.langfuse_error, trace_url=tracer.trace_url())
+                langfuse_error=tracer.langfuse_error, trace_url=tracer.trace_url(),
+                usage=run_totals(tracer.sink, tracer.trace_id))
 
 
 def _doc_state(docs) -> dict[str, tuple[str, str]]:
@@ -165,6 +169,7 @@ def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None
             except LLMError as exc:
                 stats["llm"] = {"status": "BLOCKED", "reason": exc.kind, "model": llm.model}
         stats["mode"], stats["dense_mode"] = mode, dense_mode
+        stats["owners"] = add_owner_edges(G)
         stats["communities"] = build_communities(G)
         if embedder is None:
             stats["dense"] = {"status": "NOT_RUN", "reason": "no embedder configured"}
@@ -214,7 +219,8 @@ def run_query(out: Path, query: str, cfg: RetrievalConfig | None = None,
 
 
 def run_context(out: Path, *, topic: str | None = None, requirement: str | None = None,
-                cfg: RetrievalConfig | None = None, embedder: Embedder | None = None) -> dict:
+                cfg: RetrievalConfig | None = None, embedder: Embedder | None = None,
+                global_communities: int | None = None) -> dict:
     """Cited evidence bundle for a test-plan topic or a single requirement (no LLM calls)."""
     if (topic is None) == (requirement is None):
         raise ValueError("give exactly one of topic or requirement")
@@ -226,10 +232,23 @@ def run_context(out: Path, *, topic: str | None = None, requirement: str | None 
     with Tracer(out / TRACE_FILE, "context", input={"topic": topic, "requirement": requirement}) as tracer:
         dense = dense_scores(embedder, *index, query) if index and query else None
         if topic is not None:
-            bundle = fetch_context(G, topic, cfg=cfg, H=H, dense=dense, tracer=tracer)
+            bundle = fetch_context(G, topic, cfg=cfg, H=H, dense=dense, tracer=tracer,
+                                   global_communities=global_communities)
         else:
             bundle = requirement_context(G, requirement, cfg=cfg, H=H, dense=dense, tracer=tracer)
     return bundle | _trace_info(tracer)
+
+
+def run_deps(out: Path, requirement_ids: list[str], max_depth: int = 4) -> dict:
+    """Dependency closure and precondition-first order for requirements (no model calls)."""
+    G = load_graph(out / GRAPH_FILE)
+    unknown = [r for r in requirement_ids if r not in G or G.nodes[r].get("type") != "requirement"]
+    if unknown:
+        raise KeyError(f"unknown requirement IDs: {unknown}")
+    ordering = dependency_order(G, requirement_ids, max_depth)
+    return dict(requirements=requirement_ids, closure=dependency_closure(G, requirement_ids, max_depth),
+                order=[dict(req_id=r, statement=G.nodes[r]["statement"]) for r in ordering["order"]],
+                cycles=ordering["cycles"], conflicts=ordering["conflicts"], edges=ordering["edges"])
 
 
 def run_features(out: Path) -> dict:
@@ -266,6 +285,9 @@ def _doc_summary(doc: dict, out: Path) -> dict:
     return dict(json=str(out / TESTPLAN_DOC), markdown=str(out / TESTPLAN_MD), template_id=doc["template_id"],
                 scope=doc["scope"], model=doc["model"], review_status=doc["review_status"],
                 doc_trace_id=doc["trace_id"],
+                token_usage={k: {x: v["totals"][x] for x in ("calls", "api_calls", "local_cache_hits", "repair_calls",
+                                                             "consumed")}
+                             for k, v in (doc.get("token_usage") or {}).items()},
                 interfaces=None if doc.get("interfaces") is None else dict(
                     status=doc["interfaces"]["status"], groups=[
                         dict(name=g["name"], category=g["category"], sideband=g["is_sideband"],
@@ -274,6 +296,9 @@ def _doc_summary(doc: dict, out: Path) -> dict:
                     status=doc["registers"]["status"], registers=len(doc["registers"]["registers"]),
                     configurable_fields=len(doc["registers"].get("configurable", [])),
                     conflicts=len(doc["registers"]["conflicts"])),
+                coverage=None if not doc.get("coverage") else dict(
+                    total=doc["coverage"]["total"], covered=doc["coverage"]["covered"], ratio=doc["coverage"]["ratio"],
+                    uncovered=[r["req_id"] for r in doc["coverage"]["uncovered"]]),
                 sections=[dict(id=s["id"], status=s["status"], items=len(
                     s.get("entries") or s.get("configurations") or s.get("register_labels") or s.get("details") or []))
                           for s in doc["sections"]])
@@ -306,6 +331,9 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
                 metadata={"model": llm.model}) as tracer:
         doc = build_testplan_doc(G, H, llm, tracer, template, scope, cfg, dense_fn)
         save_graph(G, out / GRAPH_FILE)
+    doc["token_usage"] = {"Test-plan run": summarize(out / TRACE_FILE, tracer.trace_id)}
+    if G.graph.get("build_trace_id"):
+        doc["token_usage"]["Graph build"] = summarize(out / TRACE_FILE, G.graph["build_trace_id"])
     atomic_write_text(doc_path, json.dumps(doc, indent=2, default=str))
     atomic_write_text(out / TESTPLAN_MD, render_markdown(doc))
     return _doc_summary(doc, out) | _trace_info(tracer) | {"reused": False}
@@ -405,8 +433,9 @@ def run_strategy(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | N
         return _strategy_summary(prev, out) | {"reused": True, "inputs": dict(interfaces=ifs["reused"], registers=regs["reused"])}
     H = layered_view(G)
     dense_fn = _dense_fn(out, embedder)
-    ctx = section_context(G, H, {"queries": STRATEGY_QUERIES}, scope, DocConfig(), dense_fn)
     with Tracer(out / TRACE_FILE, "strategy", input={"scope": scope} | inputs, metadata={"model": llm.model}) as tracer:
+        ctx = section_context(G, H, {"queries": STRATEGY_QUERIES}, scope, DocConfig(), dense_fn,
+                              targets=step_targets(G, interfaces, registers), tracer=tracer)
         result = build_strategy(llm, tracer, interfaces, registers, scope, ctx)
         tracer.root.update(output={"status": result["status"], "agents": len(result["agents"])},
                            metadata={"chunk_ids": sorted({c for a in result["agents"] for c in a["cited_chunk_ids"]})})
@@ -425,3 +454,11 @@ def _strategy_summary(result: dict, out: Path) -> dict:
                              registers=a["registers"]) for a in result["agents"]],
                 scoreboards=[dict(name=s["name"], level=s["level"], inputs=s["inputs"]) for s in result["scoreboards"]],
                 gaps=result["gaps"], validation=result["validation"])
+
+
+def run_usage(out: Path, trace_id: str | None = None, last: int | None = None) -> dict:
+    """Token totals per run and per model call, from the run directory's trace."""
+    summary = summarize(out / TRACE_FILE, trace_id)
+    if last:
+        summary["runs"] = summary["runs"][-last:]
+    return summary

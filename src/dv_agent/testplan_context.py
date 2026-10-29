@@ -9,10 +9,11 @@ import re
 import networkx as nx
 
 from .graph import DEPENDENCY_EDGES, edges_of_type, lineage
-from .retrieval import RetrievalConfig, retrieve
+from .combined_fetch import FetchConfig, combined_fetch
+from .retrieval import RetrievalConfig
 from .trace import Tracer
 
-BUNDLE_SCHEMA_VERSION = 1
+BUNDLE_SCHEMA_VERSION = 3  # 3: combined graph fetch (guided walks, adaptive selection); per-item source and via
 MAX_REQUIREMENTS = 15
 
 
@@ -86,39 +87,50 @@ def _open_items(reqs: list[dict], deps: list[dict]) -> list[dict]:
     return items
 
 
-def _bundle(G: nx.MultiDiGraph, kind: str, query: str, result: dict, req_ids: list[str],
-            extra: dict | None = None) -> dict:
+def _bundle(G: nx.MultiDiGraph, kind: str, query: str, fetched: dict, extra: dict | None = None,
+            first: str | None = None) -> dict:
+    """Bundle from a combined fetch (combined_fetch.combined_fetch): selected requirements and evidence with sources."""
+    result = fetched["result"]
+    req_items = list(fetched["requirements"])
+    if first:
+        req_items = [dict(req_id=first, score=1.0, via="focus requirement", source="focus")] + [
+            r for r in req_items if r["req_id"] != first]
+    req_ids = [r["req_id"] for r in req_items]
     in_scope = set(req_ids)
     deps = dependencies_of(G, in_scope)
     outside = sorted({d["dst"] for d in deps if not d["dst_in_scope"]}
                      | {d["src"] for d in deps if not d["src_in_scope"]})
-    reqs = [requirement_record(G, r) for r in req_ids]
-    chunk_ids = [e["chunk_id"] for e in result["evidence"]]
+    reqs = [requirement_record(G, r["req_id"]) | {"via": r["via"], "source": r["source"],
+                                                  "sources": r.get("sources", [r["source"]]), "score": r["score"]}
+            for r in req_items]
+    by_chunk = {e["chunk_id"]: e for e in result["evidence"]}
+    evidence = []
+    for c in fetched["chunks"]:
+        e = by_chunk.get(c["chunk_id"])
+        evidence.append(dict(chunk_record(G, c["chunk_id"]), score=c["score"], source=c["source"],
+                             sources=c.get("sources", [c["source"]]), via=c["via"],
+                             components=e["components"] if e else {c["source"]: c["score"]},
+                             explanation=e["explanation"] if e else f"{c['source']}: {c['via']}"))
+    navigation = _navigation(G, [e["chunk_id"] for e in evidence], in_scope)
+    known = {n["node_id"] for n in navigation}
+    navigation += [dict(node_id=c["community_id"], type="community", title=c["label"], summary=c["summary"],
+                        navigation_only=True) for c in fetched["global_communities"] if c["community_id"] not in known]
     return dict(
         schema_version=BUNDLE_SCHEMA_VERSION, kind=kind, query=query, authority="specification",
         requirements=reqs,
         dependency_requirements=[requirement_record(G, r) for r in outside],
         dependencies=deps,
         entities=_entities(G, in_scope | set(outside)),
-        evidence=[dict(chunk_record(G, e["chunk_id"]), score=e["score"], components=e["components"],
-                       explanation=e["explanation"]) for e in result["evidence"]],
-        navigation=_navigation(G, chunk_ids, in_scope),
+        evidence=evidence,
+        navigation=navigation,
         open_items=_open_items(reqs, deps),
         retrieval=dict(seeds=result["seeds"],
-                       dense="PASS" if any(e["components"]["dense"] for e in result["evidence"]) else "NOT_RUN"),
+                       dense="PASS" if any(e["components"].get("dense") for e in result["evidence"]) else "NOT_RUN"),
+        graph=dict(anchors=fetched["anchors"], parts=fetched["parts"], owners=fetched["owners"],
+                   global_communities=fetched["global_communities"], paths=fetched["paths"],
+                   path_targets=fetched["path_targets"], coverage_targets=fetched["coverage_targets"],
+                   selection=fetched["selection"]),
         **(extra or {}))
-
-
-def _ranked_requirements(result: dict, limit: int) -> list[str]:
-    ordered: list[str] = []
-    for e in result["evidence"]:
-        for r in e["supporting_requirements"]:
-            if r not in ordered:
-                ordered.append(r)
-    for r in result["requirements"]:
-        if r["req_id"] not in ordered:
-            ordered.append(r["req_id"])
-    return ordered[:limit]
 
 
 def _trace(tracer: Tracer | None, name: str, inputs: dict, bundle: dict) -> None:
@@ -133,27 +145,49 @@ def _trace(tracer: Tracer | None, name: str, inputs: dict, bundle: dict) -> None
                     metadata={"fact_ids": fact_ids})
 
 
+def _fetch_cfg(cfg: RetrievalConfig | None, fetch: FetchConfig | None, max_requirements: int,
+               global_communities: int | None) -> FetchConfig:
+    fc = fetch or FetchConfig(retrieval=cfg or RetrievalConfig(), max_requirements=max_requirements)
+    if global_communities is not None:
+        fc.global_communities = global_communities
+    return fc
+
+
 def fetch_context(G: nx.MultiDiGraph, topic: str, *, cfg: RetrievalConfig | None = None,
                   H: nx.Graph | None = None, dense: dict[str, float] | None = None,
-                  max_requirements: int = MAX_REQUIREMENTS, tracer: Tracer | None = None) -> dict:
-    """Evidence bundle for a feature or topic, e.g. one test-plan section."""
-    result = retrieve(G, topic, cfg, dense=dense, H=H)
-    bundle = _bundle(G, "topic", topic, result, _ranked_requirements(result, max_requirements))
-    _trace(tracer, "fetch_context", {"topic": topic}, bundle)
+                  max_requirements: int = MAX_REQUIREMENTS, tracer: Tracer | None = None,
+                  fetch: FetchConfig | None = None, targets: list[str] | None = None,
+                  covered_req_ids: set[str] | None = None, covered_chunk_ids: set[str] | None = None,
+                  global_communities: int | None = None) -> dict:
+    """Evidence bundle for a feature or topic from the combined graph fetch (combined_fetch.combined_fetch).
+
+    Seed retrieval + PageRank, entity-centred traversal, dependency closure, global communities,
+    requirements not yet covered, and shortest paths to `targets` (verified signals and registers),
+    merged by adaptive selection.
+    """
+    fetched = combined_fetch(G, topic, H=H, cfg=_fetch_cfg(cfg, fetch, max_requirements, global_communities),
+                             dense=dense, targets=targets, covered_req_ids=covered_req_ids,
+                             covered_chunk_ids=covered_chunk_ids)
+    bundle = _bundle(G, "topic", topic, fetched)
+    _trace(tracer, "fetch_context", {"topic": topic, "targets": len(targets or []),
+                                     "selection": fetched["selection"]}, bundle)
     return bundle
 
 
 def requirement_context(G: nx.MultiDiGraph, req_id: str, *, cfg: RetrievalConfig | None = None,
                         H: nx.Graph | None = None, dense: dict[str, float] | None = None,
-                        max_requirements: int = MAX_REQUIREMENTS, tracer: Tracer | None = None) -> dict:
-    """Evidence bundle centred on one requirement, including its lineage."""
+                        max_requirements: int = MAX_REQUIREMENTS, tracer: Tracer | None = None,
+                        fetch: FetchConfig | None = None, targets: list[str] | None = None) -> dict:
+    """Evidence bundle centred on one requirement (anchored on the entities it mentions), with lineage."""
     if req_id not in G or G.nodes[req_id].get("type") != "requirement":
         raise KeyError(f"unknown requirement: {req_id}")
     statement = G.nodes[req_id]["statement"]
-    result = retrieve(G, statement, cfg, dense=dense, H=H, extra_seeds={req_id: 1.0})
-    ranked = [req_id] + [r for r in _ranked_requirements(result, max_requirements) if r != req_id]
-    bundle = _bundle(G, "requirement", statement, result, ranked[:max_requirements],
-                     extra={"focus_requirement": req_id, "lineage": lineage(G, req_id)})
+    anchors = sorted(v for _, v, _, _ in edges_of_type(G, req_id, {"MENTIONS"}))
+    fetched = combined_fetch(G, statement, H=H, cfg=_fetch_cfg(cfg, fetch, max_requirements, 0), dense=dense,
+                             targets=targets, extra_anchors=anchors, extra_seeds={req_id: 1.0})
+    bundle = _bundle(G, "requirement", statement, fetched,
+                     extra={"focus_requirement": req_id, "lineage": lineage(G, req_id)}, first=req_id)
+    bundle["requirements"] = bundle["requirements"][:max_requirements]
     _trace(tracer, f"requirement_context:{req_id}", {"req_id": req_id}, bundle)
     return bundle
 

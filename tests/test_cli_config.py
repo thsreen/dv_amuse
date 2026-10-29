@@ -10,7 +10,7 @@ from dv_agent.cli import main
 from dv_agent.llm import MetaClient
 from dv_agent.pipeline import run_build_graph, run_ingest
 
-COMMANDS = ["ingest", "build-graph", "interfaces", "registers", "strategy", "plan", "testplan", "pipeline", "query", "context", "features",
+COMMANDS = ["ingest", "build-graph", "interfaces", "registers", "strategy", "plan", "testplan", "pipeline", "query", "context", "deps", "features", "usage",
             "lineage"]
 
 

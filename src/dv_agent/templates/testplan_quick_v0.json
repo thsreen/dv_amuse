@@ -32,7 +32,8 @@
         "configuration",
         "limitation"
       ],
-      "instructions": "Key pointers describing the feature: purpose, external interfaces, operating modes, data path, interrupts, configuration options and stated limitations. One pointer per entry."
+      "instructions": "Key pointers describing the feature: purpose, external interfaces, operating modes, data path, interrupts, configuration options and stated limitations. One pointer per entry.",
+      "global_communities": 3
     },
     {
       "id": "register_map",
@@ -57,7 +58,8 @@
         "agent_scoreboard",
         "top_level_scoreboard"
       ],
-      "instructions": "Use the reset, register-access, transfer, error-injection, loopback and interrupt sequence families where the specification supports them."
+      "instructions": "Use the reset, register-access, transfer, error-injection, loopback and interrupt sequence families where the specification supports them.",
+      "global_communities": 2
     },
     {
       "id": "configurations",
@@ -69,7 +71,8 @@
         "{scope} programming sequence initialization",
         "{scope} register access conditions"
       ],
-      "instructions": "Configurations: for every writable register field in configurable_fields, state whether verification should randomise it and how. legal_values are copied exactly from the field's specification-stated values (values list) or from the cited specification text; distribution gives the weighting or sweep (for example uniform, weighted toward corner values, exhaustive); constraints lists dependencies the specification states (programming order, fields that must be set first, combinations that are not allowed, access conditions); reserved_handling says how reserved or ignored bits are driven (for example keep at reset value) and whether writing them is a negative test. Set randomize false for fields the specification requires to hold a fixed value. Do not invent values; if the specification states none, leave legal_values empty, explain in notes and mark the entry ASSUMED."
+      "instructions": "Configurations: for every writable register field in configurable_fields, state whether verification should randomise it and how. legal_values are copied exactly from the field's specification-stated values (values list) or from the cited specification text; distribution gives the weighting or sweep (for example uniform, weighted toward corner values, exhaustive); constraints lists dependencies the specification states (programming order, fields that must be set first, combinations that are not allowed, access conditions); reserved_handling says how reserved or ignored bits are driven (for example keep at reset value) and whether writing them is a negative test. Set randomize false for fields the specification requires to hold a fixed value. Do not invent values; if the specification states none, leave legal_values empty, explain in notes and mark the entry ASSUMED.",
+      "dependency_order": true
     },
     {
       "id": "stimulus",
@@ -88,7 +91,8 @@
         "error_injection",
         "corner_case"
       ],
-      "instructions": "Stimulus scenarios: configuration sweeps, traffic, error injection and corner cases. Each entry names the sequence it uses (from the strategy section where one applies) and the specification behaviour it exercises."
+      "instructions": "Stimulus scenarios: configuration sweeps, traffic, error injection and corner cases. Each entry names the sequence it uses (from the strategy section where one applies) and the specification behaviour it exercises.",
+      "dependency_order": true
     },
     {
       "id": "checks",
@@ -108,7 +112,8 @@
         "protocol_check",
         "interrupt_check"
       ],
-      "instructions": "Checks grouped by category. Each check states the expected behaviour from the specification and where it is checked: an assertion, a scoreboard inside an agent, or the top-level scoreboard. Expected behaviour must come from cited specification text."
+      "instructions": "Checks grouped by category. Each check states the expected behaviour from the specification and where it is checked: an assertion, a scoreboard inside an agent, or the top-level scoreboard. Expected behaviour must come from cited specification text.",
+      "cover_requirements": true
     },
     {
       "id": "coverage",
@@ -142,7 +147,8 @@
         "verify_at_higher_level",
         "configuration_dependency"
       ],
-      "instructions": "What subsystem or SoC testbenches need from this plan: agents and sequences to reuse, behaviour that can only be verified at a higher level (pads, clocks, interrupt routing, bus fabric), and integration parameters or build options."
+      "instructions": "What subsystem or SoC testbenches need from this plan: agents and sequences to reuse, behaviour that can only be verified at a higher level (pads, clocks, interrupt routing, bus fabric), and integration parameters or build options.",
+      "global_communities": 2
     },
     {
       "id": "assumptions",

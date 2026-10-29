@@ -69,10 +69,11 @@
   <!-- 3 Retrieval -->
   <rect x="330" y="450" width="580" height="104" rx="8" class="stage"/>
   <text x="346" y="472" class="h">3  Retrieval and fetch</text>
-  <text x="900" y="472" class="m" text-anchor="end">retrieval.py testplan_context.py planning.py</text>
-  <text x="346" y="494" class="t">Seeds: BM25 + dense, fused; Personalized PageRank over typed edges</text>
-  <text x="346" y="512" class="t">Evidence is always an L1 chunk, with scores and an explained path</text>
-  <text x="346" y="530" class="t">Cited context bundles; rerank + sufficiency multi-hop</text>
+  <text x="900" y="472" class="m" text-anchor="end">combined_fetch.py graph_fetch.py</text>
+  <text x="346" y="494" class="t">Combined fetch: seeds + PageRank, entities and parts, dependency</text>
+  <text x="346" y="510" class="t">closure, communities, coverage, shortest paths to the verified</text>
+  <text x="346" y="526" class="t">signals and registers; adaptive selection keeps every source</text>
+  <text x="346" y="544" class="t">Evidence is always an L1 chunk with its sources and path</text>
   <path d="M620,430 L620,448" class="flow"/>
 
   <!-- 4 Specification steps -->
@@ -140,7 +141,7 @@
 
   <rect x="30" y="450" width="270" height="104" rx="8" class="art"/>
   <text x="44" y="472" class="hs">Fetch outputs</text>
-  <text x="44" y="492" class="m">dv-agent query/context/features</text>
+  <text x="44" y="492" class="m">dv-agent context/deps/features</text>
   <text x="44" y="510" class="m">bundles: requirements, preconditions,</text>
   <text x="44" y="526" class="m">  evidence, open items</text>
   <text x="44" y="544" class="m">test_plan.json (per requirement)</text>

@@ -133,3 +133,22 @@ previous output plus the reasons. Up to `DV_AGENT_MAX_REPAIRS` repairs (default 
 conflicts are never refused; they stay designer questions. Problems left after the last repair are
 cleaned up as before and raised as one designer question per step. Every refusal is a `refusal:<step>`
 trace span and is shown in the Markdown ("Refused (attempt N)", "Repaired after N refusal(s)").
+
+## Combined graph fetch (`graph_fetch.py`, `combined_fetch.py`)
+Every fetch combines seed retrieval + PageRank, entity-centred traversal (register→field and interface→signal
+owner edges), dependency closure and order, global community expansion, coverage of requirements not yet cited,
+and shortest paths from the topic to the verified signals and registers (a deliberately small take on the
+GRW-AS idea; no AssertionForge code). Adaptive selection keeps every source represented. See `docs/ARCHITECTURE.md`. Commands: `dv-agent context "<topic>" [--global N]`,
+`dv-agent deps REQ-...`.
+
+## Token usage (`usage.py`)
+Every model call records the usage the Meta Model API reports: input, cached input (served from the provider's
+prompt cache, part of input), output and reasoning (part of output). Calls whose response reports no usage are
+estimated at about 4 characters per token and counted as estimated.
+- Final result: `testplan_doc.json` (`token_usage`) and a "Token usage" section in `testplan_doc.md`, per model
+  call, for the test-plan run and the graph build it used: calls (API / local cache), repairs, input, cached
+  input, uncached input, output, reasoning, total.
+- Every command's output includes `usage` for its run; `dv-agent pipeline` totals the stages that actually ran.
+- Calls answered from the local response cache (`llm_cache/`) consume nothing; their original usage is shown as
+  `replayed`, and `from_scratch` is what a fresh run would use.
+- `dv-agent usage --out runs/<repo> [--last N | --trace ID]`: totals per run and per model call.

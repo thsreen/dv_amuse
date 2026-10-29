@@ -13,6 +13,7 @@ from typing import Any, Callable, Protocol
 
 from .fsutil import atomic_write_text
 from .trace import Tracer
+from .usage import estimate_usage
 
 DEFAULT_BASE_URL = "https://api.meta.ai/v1"
 DEFAULT_MODEL = "muse-spark-1.3"
@@ -41,6 +42,26 @@ class LLM(Protocol):
                    tracer: Tracer | None = None) -> LLMResult: ...
 
 
+def _detail(usage: Any, group: str, key: str) -> int:
+    return int(getattr(getattr(usage, group, None), key, 0) or 0)
+
+
+def usage_from_responses(usage: Any) -> dict:
+    if not usage:
+        return {}
+    return dict(input=int(usage.input_tokens or 0), output=int(usage.output_tokens or 0),
+                reasoning=_detail(usage, "output_tokens_details", "reasoning_tokens"),
+                cached_input=_detail(usage, "input_tokens_details", "cached_tokens"))
+
+
+def usage_from_chat(usage: Any) -> dict:
+    if not usage:
+        return {}
+    return dict(input=int(usage.prompt_tokens or 0), output=int(usage.completion_tokens or 0),
+                reasoning=_detail(usage, "completion_tokens_details", "reasoning_tokens"),
+                cached_input=_detail(usage, "prompt_tokens_details", "cached_tokens"))
+
+
 def _cache_key(model: str, name: str, instructions: str, payload: dict, schema: dict) -> str:
     blob = json.dumps([model, name, instructions, payload, schema], sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()
@@ -63,8 +84,10 @@ class _Base:
                          input={"instructions": instructions, "payload": payload},
                          metadata={"cache_key": key}) as span:
             result = self._cached_call(cache_file, name, instructions, payload, schema)
-            span.update(output=result.data, usage=result.usage or None,
-                        metadata={"cached": result.cached, "response_id": result.response_id})
+            usage = result.usage or estimate_usage(instructions, payload, schema, result.data)
+            span.update(output=result.data, usage=usage,
+                        metadata={"cached": result.cached, "response_id": result.response_id,
+                                  "usage_estimated": not result.usage})
             return result
 
     def _cached_call(self, cache_file: Path | None, name: str, instructions: str, payload: dict,
@@ -132,18 +155,14 @@ class MetaClient(_Base):
             if choice.finish_reason not in (None, "stop"):
                 raise LLMError("incomplete", f"finish_reason={choice.finish_reason}")
             text = choice.message.content or ""
-            usage = getattr(resp, "usage", None)
-            usage = {"input": usage.prompt_tokens, "output": usage.completion_tokens} if usage else {}
-            return text, getattr(resp, "id", None), usage
+            return text, getattr(resp, "id", None), usage_from_chat(getattr(resp, "usage", None))
         resp = client.responses.create(
             model=self.model, store=False, max_output_tokens=self.max_output_tokens,
             instructions=instructions, input=text_input,
             text={"format": {"type": "json_schema", "name": name, "strict": True, "schema": schema}})
         if getattr(resp, "status", "completed") != "completed":
             raise LLMError("incomplete", f"status={resp.status}")
-        usage = getattr(resp, "usage", None)
-        usage = {"input": usage.input_tokens, "output": usage.output_tokens} if usage else {}
-        return resp.output_text, getattr(resp, "id", None), usage
+        return resp.output_text, getattr(resp, "id", None), usage_from_responses(getattr(resp, "usage", None))
 
     def _call(self, name: str, instructions: str, payload: dict, schema: dict) -> LLMResult:
         import openai

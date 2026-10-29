@@ -1,5 +1,5 @@
 """dv-agent CLI: ingest | build-graph | interfaces | registers | strategy | plan | testplan | pipeline | query |
-context | features | lineage."""
+context | deps | features | lineage | usage."""
 import argparse
 import json
 import os
@@ -10,10 +10,11 @@ from .dense import MetaEmbedder
 from .graph import lineage, load_graph
 from .llm import MetaClient
 from .fsutil import atomic_write_text
-from .pipeline import (GRAPH_FILE, clear_llm_cache, clear_run, run_build_graph, run_context, run_features,
-                       run_ingest, run_interfaces, run_query, run_registers, run_strategy, run_test_plan,
+from .pipeline import (GRAPH_FILE, clear_llm_cache, clear_run, run_build_graph, run_context, run_deps, run_features,
+                       run_ingest, run_interfaces, run_query, run_registers, run_strategy, run_test_plan, run_usage,
                        run_testplan_doc)
 from .planning import PlanConfig
+from .usage import run_totals
 from .retrieval import RetrievalConfig
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
@@ -157,10 +158,22 @@ def _main(argv: list[str] | None) -> int:
     pc.add_argument("--out", type=Path, required=True)
     pc.add_argument("--top-k", type=int, default=8)
     pc.add_argument("--save", type=Path, help="also write the bundle JSON to this file")
+    pc.add_argument("--global", dest="global_communities", type=int, default=None, metavar="N",
+                    help="number of best-matching communities to expand (default 2; 0 disables)")
+
+    pd = sub.add_parser("deps", help="dependency closure and precondition-first order for requirements")
+    pd.add_argument("requirement_ids", nargs="+")
+    pd.add_argument("--out", type=Path, required=True)
+    pd.add_argument("--depth", type=int, default=4)
 
     pf = sub.add_parser("features", help="specification outline (sections, communities, requirements)")
     pf.add_argument("--out", type=Path, required=True)
     pf.add_argument("--save", type=Path, help="also write the outline JSON to this file")
+
+    pu = sub.add_parser("usage", help="tokens (input, cached input, output, reasoning) per run and per model call")
+    pu.add_argument("--out", type=Path, required=True)
+    pu.add_argument("--trace", help="only this run (trace ID)")
+    pu.add_argument("--last", type=int, help="only the last N runs")
 
     pl = sub.add_parser("lineage", help="facts and source chunks behind a graph node")
     pl.add_argument("node_id")
@@ -226,6 +239,9 @@ def _main(argv: list[str] | None) -> int:
         if args.testplan:
             result["testplan"] = run_testplan_doc(out, llm, scope=args.scope, template_path=args.template,
                                                   embedder=embedder, force=force)
+        ran = [r["trace_id"] for r in (result.get(k) for k in ("ingest", "build", "plan", "testplan"))
+               if r and not r.get("reused") and r.get("trace_id")]
+        result["usage"] = run_totals(out / "trace.jsonl", ran) if ran else None
         _print(result)
     elif args.cmd == "query":
         _require(args.out, GRAPH_FILE)
@@ -238,11 +254,18 @@ def _main(argv: list[str] | None) -> int:
         if (args.topic is None) == (args.requirement is None):
             raise UsageError("give a topic or --requirement, not both")
         bundle = run_context(args.out, topic=args.topic, requirement=args.requirement,
-                             cfg=RetrievalConfig(top_k=args.top_k), embedder=_embedder())
+                             cfg=RetrievalConfig(top_k=args.top_k), embedder=_embedder(),
+                             global_communities=args.global_communities)
         _save_and_print(bundle, args.save)
+    elif args.cmd == "deps":
+        _require(args.out, GRAPH_FILE)
+        _print(run_deps(args.out, args.requirement_ids, args.depth))
     elif args.cmd == "features":
         _require(args.out, GRAPH_FILE)
         _save_and_print(run_features(args.out), args.save)
+    elif args.cmd == "usage":
+        _require(args.out, "trace.jsonl")
+        _print(run_usage(args.out, args.trace, args.last))
     elif args.cmd == "lineage":
         _require(args.out, GRAPH_FILE)
         G = load_graph(args.out / GRAPH_FILE)
