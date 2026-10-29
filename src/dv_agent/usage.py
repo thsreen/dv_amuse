@@ -44,9 +44,9 @@ def _blank() -> dict:
                 consumed=_tokens(), replayed=_tokens())
 
 
-def _add(acc: dict, usage: dict, cached: bool, estimated: bool, repair: bool) -> None:
+def _add(acc: dict, usage: dict, cached: bool, estimated: bool, repair: bool, api_attempts: int = 1) -> None:
     acc["calls"] += 1
-    acc["local_cache_hits" if cached else "api_calls"] += 1
+    acc["local_cache_hits" if cached else "api_calls"] += 1 if cached else api_attempts
     acc["repair_calls"] += repair
     acc["estimated_calls"] += estimated
     bucket = acc["replayed" if cached else "consumed"]
@@ -76,7 +76,7 @@ def summarize(sink: Path, trace_ids: str | list[str] | None = None) -> dict:
         repair = span_names.get(r.get("parent_id"), "").startswith("refusal:")
         run = runs.setdefault(r["trace_id"], dict(totals=_blank(), by_call={}))
         for acc in (run["totals"], run["by_call"].setdefault(name, _blank()), total, by_call_all.setdefault(name, _blank())):
-            _add(acc, usage, cached, estimated, repair)
+            _add(acc, usage, cached, estimated, repair, len(meta.get("api_attempts") or [None]))
     out_runs = [dict(trace_id=tid, run=roots.get(tid, {}).get("name"), started_utc=roots.get(tid, {}).get("start_utc"),
                      model=(roots.get(tid, {}).get("metadata") or {}).get("model"), totals=_final(run["totals"]),
                      by_call={k: _final(v) for k, v in sorted(run["by_call"].items())})

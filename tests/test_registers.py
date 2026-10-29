@@ -10,6 +10,8 @@ from dv_agent.registers import (RegisterConfig, access_class, configurable_field
                                 parse_number, register_questions)
 from dv_agent.retrieval import layered_view
 from dv_agent.trace import Tracer
+from dv_agent.register_tables import table_records
+from dv_agent.source_windows import extraction_windows
 
 SPEC = """# 1 Register list
 Name | Address | Access | Reset value
@@ -121,6 +123,7 @@ def test_parsers():
     assert [parse_bits(x) for x in ("7-6", "15:8", "[3:0]", "bit 3", "2..5", "abc")] == [(7, 6), (15, 8), (3, 0), (3, 3), (5, 2), None]
     assert [access_class(a) for a in ("RW", "R/W", "W", "W1C", "R", "RO", "")] == [
         "writable", "writable", "writable", "writable", "read_only", "read_only", "unknown"]
+    assert access_class("unknown") == "unknown"
 
 
 def test_cli_registers_writes_outputs_and_reuses(graph, capsys, monkeypatch):
@@ -130,9 +133,118 @@ def test_cli_registers_writes_outputs_and_reuses(graph, capsys, monkeypatch):
     assert main(["registers", "--out", str(out)]) == 0
     first = json.loads(capsys.readouterr().out)
     assert first["reused"] is False and [r["abbreviation"] for r in first["registers"]] == ["CTRL", "STAT"]
-    assert "### CTRL (CTRL) [DOCUMENTED]" in (out / "registers.md").read_text()
+    assert "### CTRL (CTRL) ✅<!--dv-evidence:" in (out / "registers.md").read_text()
     assert main(["registers", "--out", str(out)]) == 0
     assert json.loads(capsys.readouterr().out)["reused"] is True
     other = FakeLLM({"testplan_registers": handler})
     other.model = "other"
     assert run_registers(out, other)["reused"] is False
+
+
+TABLE = """# Register map
+Name Address Width Access Description
+Payload 0 8 W FIFO data
+Timing Control
+Register (TCR)
+4 16 RW Select the sampling period
+Status 4 8 R Read-only flags
+"""
+
+
+def _table_graph(tmp_path):
+    repo = tmp_path / "device"
+    (repo / "doc").mkdir(parents=True)
+    (repo / "doc" / "spec.md").write_text(TABLE)
+    out = tmp_path / "table-run"
+    run_ingest(repo, out)
+    run_build_graph(out, None)
+    return load_graph(out / GRAPH_FILE)
+
+
+def test_explicit_inventory_survives_all_model_failures(tmp_path):
+    G = _table_graph(tmp_path)
+    def fail(payload):
+        raise LLMError("incomplete", "output budget exhausted")
+    result = _extract(G, tmp_path, fail)
+    assert result["status"] == "BLOCKED"
+    assert [(r["name"], r["address"], r["width"], r["access"]) for r in result["registers"]] == [
+        ("Payload", "0", "8", "W"), ("Status", "4", "8", "R"),
+        ("Timing Control Register (TCR)", "4", "16", "RW")]
+    assert all(s["quote"] in G.nodes[s["chunk_id"]]["text"] for r in result["registers"] for s in r["sources"])
+    assert result["configurable"] == []  # Never pretend missing fields are safe whole-register controls.
+    assert "output budget exhausted" in result["failed_batches"][0]["detail"]
+
+
+def test_llm_identifies_configuration_controls_and_excludes_payload(tmp_path):
+    G = _table_graph(tmp_path)
+    def identify(payload):
+        records = []
+        for c in payload["chunks"]:
+            for r in table_records(c):
+                r |= dict(configurable=r["name"] != "Payload" and r["access"] == "RW",
+                          configuration_reason="Sampling period control" if r["access"] == "RW" else "Data/status",
+                          configuration_quote=r["quote"])
+                if r["access"] == "RW":
+                    r["name"] = "Timing Control Register"
+                records.append(r)
+        return {"registers": records}
+    result = _extract(G, tmp_path, identify)
+    assert len(result["registers"]) == 3  # Full name and documented acronym merged; same address stays distinct.
+    assert [f["register"] for f in result["configurable"]] == ["TCR"]
+    field = result["configurable"][0]
+    assert field["identification"] == "LLM" and field["review_status"] == "NEEDS_REVIEW"
+    assert field["configuration_reason"] == "Sampling period control"
+
+
+def test_extraction_windows_keep_the_end_of_long_source(tmp_path):
+    text = "A source line\n" * 300 + "TAIL_CONTROL 0x10 RW"
+    windows = extraction_windows([dict(text=text, chunk_id="CH-long")], 512)
+    assert all(len(w["text"]) <= 512 for w in windows)
+    assert windows[-1]["text"].endswith("TAIL_CONTROL 0x10 RW")
+    covered = set()
+    for w in windows:
+        assert text[w["window_start"]:w["window_end"]] == w["text"]
+        covered.update(range(w["window_start"], w["window_end"]))
+    assert len(covered) == len(text)
+
+
+def test_register_batch_default_is_one_complete_source_window(graph, tmp_path):
+    _, G = graph
+    seen = []
+    def capture(payload):
+        seen.extend(payload["chunks"])
+        assert len(payload["chunks"]) == 1
+        return {"registers": []}
+    _extract(G, tmp_path, capture)
+    assert {c["chunk_id"] for c in seen} == {n for n, d in G.nodes(data=True) if d["type"] == "chunk"}
+
+
+def test_register_table_markdown_and_unrelated_bit_table():
+    rows = table_records(dict(chunk_id="c", text="""Name | Address | Width | Access | Description
+--- | --- | --- | --- | ---
+CTRL | 0x04 | 16 | R/W | Select mode
+
+Bit # Access Description
+0 RW Enable
+"""))
+    assert len(rows) == 1 and rows[0]["address"] == "0x04" and rows[0]["access"] == "R/W"
+
+
+def test_configuration_identification_requires_source_quote(graph, tmp_path):
+    from dv_agent.registers import record_problems
+    _, G = graph
+    cid = next(n for n, d in G.nodes(data=True) if d["type"] == "chunk" and "Register list" in d["text"])
+    raw = handler({"chunks": [{"chunk_id": cid, "text": G.nodes[cid]["text"]}]})["registers"][0]
+    raw |= dict(configurable=True, configuration_reason="Mode control", configuration_quote="invented evidence")
+    assert any("configuration classification" in p for p in record_problems(G, {"registers": [raw]}, {cid}))
+
+
+def test_register_cache_from_before_configuration_identification_is_not_reused(graph):
+    out, _ = graph
+    llm = FakeLLM({"testplan_registers": handler})
+    run_registers(out, llm)
+    path = out / "registers.json"
+    result = json.loads(path.read_text())
+    result.pop("extraction_signature")
+    path.write_text(json.dumps(result))
+    assert run_registers(out, llm)["reused"] is False

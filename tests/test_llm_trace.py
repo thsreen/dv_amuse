@@ -140,3 +140,66 @@ def test_langfuse_mirror_and_failure_isolation(tmp_path):
             pass
         assert not tracer.langfuse_active and "failed" in tracer.langfuse_error
     assert [r["name"] for r in read_trace(tmp_path / "t2.jsonl")] == ["step", "run"]
+
+
+def _response(status, *, reason=None, text='{"x":"ok"}'):
+    return SimpleNamespace(status=status, incomplete_details=SimpleNamespace(reason=reason),
+                           output_text=text, id="response", usage=SimpleNamespace(input_tokens=10, output_tokens=20))
+
+
+class SequenceResponses:
+    def __init__(self, *items):
+        self.items, self.calls = list(items), []
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return self.items.pop(0)
+
+
+def test_token_exhaustion_grows_budget_and_accounts_for_failed_attempt(tmp_path):
+    from dv_agent.usage import run_totals
+    fake = SequenceResponses(_response("incomplete", reason="max_output_tokens"), _response("completed"))
+    client = MetaClient(api_key="k", model="m", client=SimpleNamespace(responses=fake),
+                        max_output_tokens=64, max_output_tokens_ceiling=128)
+    with Tracer(tmp_path / "t.jsonl", "run") as tracer:
+        assert _call(client, tracer=tracer).data == {"x": "ok"}
+    assert [c["max_output_tokens"] for c in fake.calls] == [64, 128]
+    totals = run_totals(tmp_path / "t.jsonl", tracer.trace_id)
+    assert totals["api_calls"] == 2
+    assert totals["consumed"]["input"] == 20 and totals["consumed"]["output"] == 40
+    assert client.max_output_tokens == 64  # Later small calls start at their original budget.
+
+
+@pytest.mark.parametrize("reason,expected_calls", [("max_output_tokens", 2), ("content_filter", 1)])
+def test_token_retries_are_bounded_and_other_incomplete_responses_are_not_retried(reason, expected_calls, tmp_path):
+    fake = SequenceResponses(*[_response("incomplete", reason=reason) for _ in range(3)])
+    client = MetaClient(api_key="k", model="m", client=SimpleNamespace(responses=fake),
+                        max_output_tokens=64, max_output_tokens_ceiling=128)
+    with pytest.raises(LLMError) as error:
+        _call(client)
+    assert len(fake.calls) == expected_calls and error.value.kind == "incomplete"
+    assert reason in str(error.value)
+    assert error.value.usage["output"] == 20 * expected_calls
+
+
+def test_chat_length_limit_uses_the_same_budget_recovery():
+    def chat(reason):
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason=reason, message=SimpleNamespace(content='{"x":"ok"}'))],
+                               id="chat", usage=SimpleNamespace(prompt_tokens=3, completion_tokens=10))
+    fake = SequenceResponses(chat("length"), chat("stop"))
+    client = MetaClient(api_key="k", model="m", api_style="chat", max_output_tokens=64,
+                        max_output_tokens_ceiling=128,
+                        client=SimpleNamespace(chat=SimpleNamespace(completions=fake)))
+    assert _call(client).data == {"x": "ok"}
+    assert [c["max_tokens"] for c in fake.calls] == [64, 128]
+
+
+def test_partial_extraction_does_not_report_a_passing_graph(spec_repo, tmp_path, fake_llm):
+    from dv_agent.pipeline import run_ingest, run_build_graph
+    def fail(payload):
+        raise LLMError("incomplete", "token limit")
+    fake_llm.handlers["spec_requirements"] = fail
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    result = run_build_graph(out, fake_llm)
+    assert result["requirements"]["failed_chunks"]
+    assert result["llm"]["status"] == "BLOCKED"

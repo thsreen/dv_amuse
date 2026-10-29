@@ -8,6 +8,7 @@ from rtl_agent.retrieval import QueryConfig, fetch_context
 
 from .llm import LLMError
 from .repair import render_repairs, structured_with_repair
+from .provenance_badge import badge
 
 FETCH_RULES = """Request read-only searches of the supplied RTL graph to investigate clock/reset handling,
 interconnected modules, dependency cones, control features, possible crossings and analysis gaps relevant
@@ -29,6 +30,7 @@ The latter two are unconfirmed questions for RTL design engineers. Absence in re
 absence from the complete specification. Cite spec IDs for DOCUMENTED_IN_SPEC or POSSIBLE_CONFLICT.
 Do not invent reset timing, synchronizer effectiveness, expected values or missing functionality.
 Each observation needs a suggested verification action and a concrete designer question. No observation
+is a direct specification fact: provide inference_reason explaining the derivation from cited RTL excerpts.
 is approved by you; all require RTL design engineer review. Return an empty observations list if no
 additional source-supported handling is found within the evidence budget."""
 
@@ -55,7 +57,7 @@ def _array(values=None):
 
 
 def _schema(ctx: dict, spec_ids: list[str], limit: int):
-    fields = {k: {"type": "string"} for k in ("text", "suggested_verification", "designer_question")}
+    fields = {k: {"type": "string"} for k in ("text", "suggested_verification", "designer_question", "inference_reason")}
     fields.update(kind={"type": "string", "enum": ["clocking", "reset", "crossing", "dependency", "integration", "feature", "analysis_gap"]},
                   spec_relationship={"type": "string", "enum": ["DOCUMENTED_IN_SPEC", "NOT_FOUND_IN_RETRIEVED_SPEC", "POSSIBLE_CONFLICT"]},
                   cited_rtl_node_ids=_array([n["id"] for n in ctx["nodes"]]),
@@ -144,8 +146,8 @@ def build_observations(RG, llm, tracer, spec_context: dict, *, scope="", cfg=Non
                 errors.append(f"observation {i + 1} cites unknown spec IDs")
             if obs.get("spec_relationship") in ("DOCUMENTED_IN_SPEC", "POSSIBLE_CONFLICT") and not obs.get("cited_spec_ids"):
                 errors.append(f"observation {i + 1} needs a spec citation for its comparison")
-            if not all(obs.get(k, "").strip() for k in ("text", "suggested_verification", "designer_question")):
-                errors.append(f"observation {i + 1} needs an observation, test action and designer question")
+            if not all(obs.get(k, "").strip() for k in ("text", "suggested_verification", "designer_question", "inference_reason")):
+                errors.append(f"observation {i + 1} needs an observation, inference reason, test action and designer question")
         support.clear()
         if errors or not items:
             return errors
@@ -213,7 +215,9 @@ def render(result: dict, heading: str) -> list[str]:
         lines += ["No additional sourced observations found within the retrieval budget.", ""]
     by_id = {c["id"]: c for c in result.get("evidence", [])}
     for e in result["entries"]:
-        lines += [f"- **{e['id']}** [INFERRED / NEEDS_REVIEW; RTL design engineer] ({e['kind']}): {e['text']}",
+        reason = e.get("inference_reason") or e.get("spec_relationship") or "Derived from the cited RTL excerpts; RTL engineer review required."
+        lines += [f"- **{e['id']}** {badge('INFERRED', e['cited_rtl_excerpt_ids'], reason)} NEEDS_REVIEW (RTL design engineer) ({e['kind']}): {e['text']}",
+                  f"  - Inference: {reason}",
                   f"  - Proposed test: {e['suggested_verification']}",
                   f"  - Spec comparison: {e['spec_relationship']} (gap/conflict unconfirmed)",
                   f"  - Designer question: {e['designer_question']}"]

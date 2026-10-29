@@ -12,6 +12,7 @@ from .llm import LLM, LLMError
 from .progress import emit
 from .repair import render_repairs, structured_with_repair
 from .trace import Tracer
+from .provenance_badge import badge
 
 AGENT_MODES = ["active", "passive", "reactive"]
 MECHANISMS = ["protocol_assertion", "monitor_check", "agent_scoreboard", "top_level_scoreboard",
@@ -76,6 +77,10 @@ def _register_summary(registers: dict | None) -> list[dict]:
     configurable = {(c["register"], c["field"]) for c in registers.get("configurable", [])}
     return [dict(register=r["abbreviation"] or r["name"], name=r["name"], address=r["address"], access=r["access"],
                  availability=r["availability"],
+                 configuration=r.get("configuration", {"configurable": None}),
+                 configuration_controls=[{k: c.get(k) for k in ("field", "bits", "identification", "configuration_reason",
+                                                                "review_status")}
+                                         for c in registers.get("configurable", []) if c["register"] == (r["abbreviation"] or r["name"])],
                  fields=[f"{f['bits']} {f['name']} {f['access']}".strip()
                          + (" (configurable)" if (r["abbreviation"] or r["name"], f["name"]) in configurable else "")
                          for f in r["fields"]])
@@ -268,12 +273,14 @@ def render(strategy: dict, heading: str) -> list[str]:
     if strategy["status"] != "PASS":
         return lines + [f"**{strategy['status']}**: {strategy.get('error', '')}", ""]
     if strategy.get("environment"):
-        lines += [f"[INFERRED] {strategy['environment']}", ""]
+        lines += [f"{badge('INFERRED', [], 'Proposed verification environment from the identified interfaces and registers.')} {strategy['environment']}", ""]
     lines += ["### Agents", "", "| Agent | Interface groups | Mode | Drives | Monitors | Registers | Provenance | Sources |",
               "|---|---|---|---|---|---|---|---|"]
     for a in strategy["agents"]:
         cells = [a["name"], ", ".join(a["interface_groups"]) or "-", a["mode"], ", ".join(a["drives"]) or "-",
-                 ", ".join(a["monitors"]) or "-", ", ".join(a["registers"]) or "-", a["provenance"],
+                 ", ".join(a["monitors"]) or "-", ", ".join(a["registers"]) or "-",
+                 badge(a["provenance"], a["cited_chunk_ids"],
+                       "Agent role is proposed from its cited interface and register evidence."),
                  ", ".join(a["cited_chunk_ids"]) or "-"]
         lines.append("| " + " | ".join(c.replace("|", "/") for c in cells) + " |")
     lines.append("")
@@ -287,7 +294,8 @@ def render(strategy: dict, heading: str) -> list[str]:
                   "|---|---|---|---|---|---|"]
         for s in strategy["scoreboards"]:
             cells = [s["name"], s["level"], ", ".join(s["inputs"]), s["reference_model"] or "-", s["compares"] or "-",
-                     s["provenance"]]
+                     badge(s["provenance"], s.get("cited_chunk_ids", []),
+                           "Scoreboard structure is proposed from the cited behavior.")]
             lines.append("| " + " | ".join(c.replace("|", "/") for c in cells) + " |")
         lines.append("")
     rm = strategy["register_model"]

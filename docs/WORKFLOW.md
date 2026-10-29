@@ -153,12 +153,15 @@ Writes `interfaces.json` / `.md`.
 
 ## 13. `registers.py` — Stage 4b: verified register map (LLM + repair)
 
-`extract_registers()`: one `testplan_registers` call per batch of chunks →
+`extract_registers()`: retain explicit Name/Address/Width/Access table rows first;
+one `testplan_registers` call per source window by default (overlapping windows cover long chunks) →
 checks require names, quotes, addresses, widths, access codes, reset values
 and encodings to appear verbatim in chunk text → records merged across
 chunks while conflicts (same register, different values) and overlaps
 (fields sharing bits) are reported as designer questions, never silently
-resolved → writable fields derived from access codes. Writes
+resolved → model identifies configurable registers and fields using verbatim supporting quotes;
+read-only status and writable data payloads are distinguished from configuration controls.
+Unclassified writable fields are review candidates, not confirmed configuration controls. Writes
 `registers.json` / `.md`. The test plan's Register Map section renders from
 this step with no model call.
 
@@ -189,8 +192,18 @@ outside the supplied evidence dropped; uncited DOCUMENTED/INFERRED become
 ASSUMED; Configurations requires every writable field with spec-stated
 legal values). Each section becomes a `TPS-*` graph node
 (`dv-agent lineage TPS-...`), a traced span, and part of the final
-requirement-coverage report. Writes `testplan_doc.json` / `.md`, including
-the per-call token-usage section.
+requirement-coverage report. Writes `testplan_doc.json` / `.md` / `.html`, including
+the per-call token-usage section. HTML comes directly from the editable Markdown, with no
+separate authoring or model call. `dv-agent render-testplan --out <run>` refreshes HTML
+after Markdown edits without accessing the model. Failed register extraction blocks the
+Configurations section's completeness and preserves the partial register inventory.
+With `render-testplan --out <run> --serve`, a loopback-only viewer exposes the
+HTML page's **Render testplan** button. Its POST action uses that same Markdown
+renderer, saves the HTML, and refreshes the displayed report with no model calls.
+The **Testplan** selector lists all generated plans below the chosen runs root;
+`render-testplan --serve` defaults to the repository's `runs/`. The selected ID
+travels in the page URL and is checked against discovered plans before reading
+or rendering any file. Reloading the page discovers newly generated plans.
 
 ## 16. `planning.py` — older per-requirement items (LLM + rerank)
 
@@ -321,3 +334,18 @@ mode/dense setting with no prior LLM failure; `interfaces` / `registers` /
 (still reading `llm_cache/`); `--fresh` also clears the cache;
 `pipeline --fresh` clears the whole run directory but refuses folders that
 aren't run directories.
+
+## orchestrate-agent (separate entry point over both flows)
+
+Bare `orchestrate-agent` (short alias: `orchestrate`) opens an interactive
+terminal (`src/orchestrator_agent/repl.py`): a free-text request names a local
+repository, which is scanned read-only and followed by an English execution
+preview. Four commands are exposed: `/plan` generates the spec/RTL grounded
+testplan, `/code` builds only cited documented items (running `/plan` first when
+needed), `/run` executes the basic built smoke test, and `/regress` executes
+every built test. `/plan` shows a live split-pane dashboard (`tui.py`):
+steps checking off on the right, run counters plus observed token usage and
+the current tool call on the left. Non-interactive `run|validate|status`
+unchanged. Interactive flow `src/orchestrator_agent/flows/testplan_flow.json`;
+advanced CLI flow `src/orchestrator_agent/flows/default_flow.json`;
+full contract in `docs/ORCHESTRATOR.md`.

@@ -8,7 +8,33 @@ question, skip an optional step, or stop. Every budget exhaustion, timeout,
 rule violation and review gate reverts to the owner with a review file and a
 resume command.
 
-## Quick start
+## Interactive testplan flow
+
+Run `.venv/bin/orchestrate-agent` from this repository and describe the local
+design repository in one sentence, for example:
+
+```text
+orch> Generate a UART16550 verification testplan from its specification and RTL.
+```
+
+The terminal scans the named repository without writing to it, identifies the
+specification documents and RTL top, and immediately prints the steps it will
+run in English. The interactive terminal has four commands:
+
+| Command | Action |
+| --- | --- |
+| `/plan` | Ingest specifications, build spec and RTL graphs, recover registers/configurable controls, and write `testplan_doc.json`, editable Markdown and readable HTML. |
+| `/code` | If no plan exists in this session, run `/plan` first. Build a UVM scaffold from cited `DOCUMENTED` plan items only; exclude inferred/uncited items and RTL observations. Also build one basic compile/clock/reset smoke test. |
+| `/run` | Run the basic built smoke test with local Xezim and save its log/result. |
+| `/regress` | Run every executable test listed in the code manifest and save results. Currently `/code` builds one smoke test; protocol-specific functional tests still need reviewed implementation. |
+
+`/plan` requires `MODEL_API_KEY`. `/run` and `/regress` need a local `xezim`
+executable on `PATH` or `XEZIM_BIN` set to its full path. A missing simulator
+or plan reports BLOCKED; it never reports a simulated PASS. The smoke test
+does not claim functional correctness. Ctrl-D leaves the terminal. The
+advanced non-interactive CLI below remains available for custom flow files.
+
+## Advanced CLI
 
 ```sh
 # Check a flow without running it
@@ -36,6 +62,11 @@ resume command.
 
 Exit codes: `0` PASS, `3` NEEDS_REVIEW (owner gate), `1` BLOCKED (flow/config
 fault), `2` usage error.
+
+`/plan` shows a live split-pane dashboard on interactive terminals. The right
+pane lists graph/testplan steps; the left shows tool-call budgets, observed
+tokens and the current tool. A non-TTY session gets a plain event log. The
+non-interactive `run` CLI keeps pure JSON stdout and no dashboard.
 
 ## Flow JSON
 

@@ -320,3 +320,162 @@ def test_default_flow_validates():
     flow = load_flow(repo_root / "src/orchestrator_agent/flows/default_flow.json")
     assert {s["tool"] for s in flow["steps"]} <= set(REGISTRY)
     assert flow["steps"][-1]["review_gate"] is True
+
+
+def scripted(lines):
+    it = iter(lines)
+
+    def read(prompt=""):
+        try:
+            return next(it)
+        except StopIteration:
+            raise EOFError
+
+    return read
+
+
+def test_repl_quits_and_handles_eof():
+    from orchestrator_agent.repl import repl
+    assert repl(input_fn=scripted(["/quit"]), output_fn=lambda line: None) == 0
+    assert repl(input_fn=scripted([]), output_fn=lambda line: None) == 0
+
+
+def _prompt_repo(tmp_path):
+    repo = tmp_path / "sample_design"
+    (repo / "doc").mkdir(parents=True)
+    (repo / "rtl").mkdir()
+    (repo / "doc" / "spec.txt").write_text("A small documented design.")
+    (repo / "rtl" / "chip_top.sv").write_text(
+        "module chip_top(input clk, input reset, input data, output reg q);\n"
+        "always @(posedge clk or posedge reset) if (reset) q <= 0; else q <= data;\nendmodule\n")
+    return repo
+
+
+def test_repl_prompt_previews_english_steps_and_only_four_commands(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    repo = _prompt_repo(tmp_path)
+    monkeypatch.setattr(terminal, "_default_out", lambda: tmp_path / "run")
+    shown = []
+    code = terminal.repl(input_fn=scripted([f"Plan tests for {repo}", "/unknown"]),
+                         output_fn=shown.append, llm_mode="off")
+    assert code == 0
+    text = "\n".join(shown)
+    assert "--- testplan preview ---" in text
+    assert "Read specification files" in text and "Recover registers" in text
+    assert "RTL top: chip_top" in text and "ready: yes" in text
+    assert terminal.HELP == "Commands: /plan  /code  /run  /regress  (Ctrl-D to leave)"
+
+
+def test_repl_four_commands_run_in_order_without_manual_variables(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    repo = _prompt_repo(tmp_path)
+    out = tmp_path / "run"
+    monkeypatch.setattr(terminal, "_default_out", lambda: out)
+    calls = []
+    def fake_flow(flow_path, *, out_dir, variables, **kwargs):
+        calls.append(("plan", variables))
+        (out_dir / "dv").mkdir(parents=True)
+        (out_dir / "dv" / "testplan_doc.json").write_text("{}")
+        return dict(status="PASS", reason="done")
+    def fake_code(out_dir, variables):
+        calls.append(("code", variables))
+        return dict(code_dir=str(out_dir / "code"), policy=dict(kept=1, skipped=2),
+                    tests=[dict(name="basic_smoke")])
+    def fake_tests(out_dir, *, regress):
+        calls.append(("regress" if regress else "run", out_dir))
+        return dict(status="PASS", tests=[dict(name="basic_smoke", status="PASS", reason="exit 0")])
+    monkeypatch.setattr(terminal, "run_flow", fake_flow)
+    monkeypatch.setattr(terminal, "build_code", fake_code)
+    monkeypatch.setattr(terminal, "run_tests", fake_tests)
+    shown = []
+    assert terminal.repl(input_fn=scripted([f"Verify {repo}", "/plan", "/code", "/run", "/regress"]),
+                         output_fn=shown.append, llm=object()) == 0
+    assert [c[0] for c in calls] == ["plan", "code", "run", "regress"]
+    assert calls[0][1]["rtl_files"] == [str(repo / "rtl" / "chip_top.sv")]
+    assert json.loads((out / "orchestrator_ask.json").read_text())["requirement"] == f"Verify {repo}"
+
+
+def test_repl_code_generates_plan_first(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    repo = _prompt_repo(tmp_path)
+    out = tmp_path / "run"
+    monkeypatch.setattr(terminal, "_default_out", lambda: out)
+    called = []
+    def fake_flow(flow_path, *, out_dir, variables, **kwargs):
+        called.append("plan")
+        (out_dir / "dv").mkdir(parents=True)
+        (out_dir / "dv" / "testplan_doc.json").write_text("{}")
+        return dict(status="PASS", reason="done")
+    monkeypatch.setattr(terminal, "run_flow", fake_flow)
+    monkeypatch.setattr(terminal, "build_code", lambda out_dir, variables: called.append("code") or
+                        dict(code_dir="code", policy=dict(kept=0, skipped=0), tests=[dict(name="basic_smoke")]))
+    assert terminal.repl(input_fn=scripted([f"Verify {repo}", "/code"]),
+                         output_fn=lambda text: None, llm=object()) == 0
+    assert called == ["plan", "code"]
+
+
+def test_entry_point_starts_repl(monkeypatch):
+    from orchestrator_agent import cli
+    seen = []
+    monkeypatch.setattr(cli, "load_env_file", lambda path: None)
+    monkeypatch.setattr("orchestrator_agent.repl.repl", lambda **kwargs: seen.append(kwargs) or 0)
+    assert cli_main([]) == 0
+    assert seen and seen[0]["llm_mode"] is None
+
+
+def test_runner_event_sink_receives_lifecycle(tmp_path):
+    events = []
+    result = runner.run_flow(write_flow(tmp_path, base_flow()), out_dir=tmp_path / "run",
+                             variables={}, registry=stub_registry([]), event_sink=events.append)
+    assert result["status"] == "PASS"
+    kinds = [e["event"] for e in events]
+    assert kinds[0] == "run_start" and kinds[-1] == "run_finish"
+    assert kinds.count("tool_start") == 2 and kinds.count("tool_done") == 2
+
+
+def test_dashboard_frame_lists_steps_and_tool_call(tmp_path):
+    from orchestrator_agent.tui import Dashboard
+    flow = validate_flow(base_flow())
+    shown = []
+    dash = Dashboard(tmp_path, shown.append, flow=flow, title="verify it", ansi=True)
+    dash.handle({"event": "run_start", "steps": ["first", "second"]})
+    dash.handle({"event": "tool_start", "step": "first", "tool": "stub_a",
+                 "attempt": 1, "revisit": 0, "extra_prompt": "sharper?"})
+    frame = shown[-1]
+    assert "first" in frame and "second" in frame and "stub_a" in frame
+    assert "sharper?" in frame and "tokens in 0 out 0" in frame
+    assert "calls 1/32" in frame and "verify it" in frame
+    dash.handle({"event": "tool_done", "step": "first", "status": "PASS", "summary": "ok"})
+    dash.handle({"event": "run_finish", "status": "PASS", "reason": "done"})
+    assert "PASS" in shown[-1] and "done" in shown[-1]
+
+
+def test_dashboard_plain_mode_without_ansi(tmp_path):
+    from orchestrator_agent.tui import Dashboard
+    shown = []
+    dash = Dashboard(tmp_path, shown.append, flow=validate_flow(base_flow()), ansi=False)
+    dash.handle({"event": "tool_start", "step": "first", "tool": "stub_a",
+                 "attempt": 1, "revisit": 0, "extra_prompt": ""})
+    dash.handle({"event": "tool_done", "step": "first", "status": "PASS", "summary": "ok"})
+    assert shown == ["[run] first: stub_a", "[PASS] first: ok"]
+
+
+def test_repl_plan_requires_repository_and_model(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    monkeypatch.setattr(terminal, "_default_out", lambda: tmp_path / "run")
+    shown = []
+    assert terminal.repl(input_fn=scripted(["Make a plan", "/plan"]),
+                         output_fn=shown.append, llm_mode="off") == 0
+    assert "Name a local repository" in "\n".join(shown)
+    assert not (tmp_path / "run").exists()
+
+
+def test_scan_tokens_counts_usage_and_ignores_deep_trees(tmp_path):
+    from orchestrator_agent.tui import scan_tokens
+    near = tmp_path / "dv" / "trace.jsonl"
+    near.parent.mkdir()
+    near.write_text('{"usage": {"input": 10, "output": 3}}\n{"name": "x"}\n')
+    deep = tmp_path / "a" / "b" / "c" / "d" / "trace.jsonl"
+    deep.parent.mkdir(parents=True)
+    deep.write_text('{"usage": {"input": 9999, "output": 9999}}\n')
+    assert scan_tokens(tmp_path) == {"calls": 1, "input": 10, "output": 3, "cached_input": 0}

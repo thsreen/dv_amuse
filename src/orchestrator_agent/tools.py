@@ -128,8 +128,15 @@ def run_dv_testplan(args: dict, ctx: StepContext) -> dict:
     except Exception as exc:
         return _failed("dv_testplan", exc)
     sections = ", ".join(f"{s['id']}:{s['status']}" for s in res.get("sections", []))
-    return dict(status="PASS", summary=f"testplan [{sections}]",
-                files=_files(out, "testplan_doc.json", "testplan_doc.md"),
+    incomplete = [f"{s['id']}:{s['status']}" for s in res.get("sections", []) if s["status"] != "PASS"
+                  and not (s["id"] == "rtl_observations" and not rtl_graph and s["status"] == "NOT_RUN")]
+    for name in ("interfaces", "registers"):
+        item = res.get(name)
+        if item and item.get("status") not in ("PASS", "NOT_RUN"):
+            incomplete.append(f"{name}:{item['status']}")
+    return dict(status="BLOCKED" if incomplete else "PASS",
+                summary=f"testplan [{sections}]" + (f"; incomplete: {', '.join(incomplete)}" if incomplete else ""),
+                files=_files(out, "testplan_doc.json", "testplan_doc.md", "testplan_doc.html"),
                 detail=dict(res, rtl_used=bool(rtl_graph)))
 
 

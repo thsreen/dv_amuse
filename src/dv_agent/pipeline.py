@@ -8,6 +8,7 @@ from .graph_fetch import add_owner_edges, dependency_closure, dependency_order
 from .dense import Embedder, build_index, dense_scores, load_index, save_index
 from .extract import ExtractConfig, extract_dependencies, extract_requirements
 from .fsutil import atomic_write_text
+from .html_report import render_html
 from .graph import build_structure, load_graph, save_graph
 from .ingest import ChunkConfig, discover, ingest, load_chunks, load_manifest
 from .llm import LLM, LLMError
@@ -16,12 +17,12 @@ from .retrieval import RetrievalConfig, layered_view, retrieve
 from .testplan_context import feature_index, fetch_context, requirement_context
 from .interfaces import InterfaceConfig, extract_interfaces
 from .interfaces import render as render_interfaces
-from .registers import RegisterConfig, extract_registers
+from .registers import RegisterConfig, extract_registers, extraction_signature
 from .registers import render as render_registers
 from .combined_fetch import step_targets
 from .strategy import build_strategy
 from .strategy import render as render_strategy
-from .testplan_doc import DocConfig, build_testplan_doc, load_template, render_markdown, section_context
+from .testplan_doc import DocConfig, build_evidence_index, build_testplan_doc, load_template, render_markdown, section_context
 from .trace import Tracer
 from .usage import run_totals, summarize
 
@@ -32,6 +33,7 @@ BUILD_STATS = "build_stats.json"
 TEST_PLAN = "test_plan.json"
 TESTPLAN_DOC = "testplan_doc.json"
 TESTPLAN_MD = "testplan_doc.md"
+TESTPLAN_HTML = "testplan_doc.html"
 REGISTERS_JSON = "registers.json"
 REGISTERS_MD = "registers.md"
 INTERFACES_JSON = "interfaces.json"
@@ -39,7 +41,7 @@ INTERFACES_MD = "interfaces.md"
 STRATEGY_JSON = "strategy.json"
 STRATEGY_MD = "strategy.md"
 STEP_FILES = (REGISTERS_JSON, REGISTERS_MD, INTERFACES_JSON, INTERFACES_MD, STRATEGY_JSON, STRATEGY_MD)
-DERIVED_FILES = (GRAPH_FILE, BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD) + STEP_FILES
+DERIVED_FILES = (GRAPH_FILE, BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD, TESTPLAN_HTML) + STEP_FILES
 RUN_MARKERS = ("manifest.json", BUILD_STATS, GRAPH_FILE, TRACE_FILE)
 
 
@@ -69,7 +71,7 @@ def _ingest_current(repo: Path, out: Path, include: list[str] | None) -> bool:
 
 
 RUN_ARTIFACTS = ("manifest.json", "chunks.jsonl", "text", GRAPH_FILE, BUILD_STATS,
-                 TEST_PLAN, TESTPLAN_DOC, TESTPLAN_MD, *STEP_FILES, DENSE_DIR, "llm_cache", TRACE_FILE)
+                 TEST_PLAN, TESTPLAN_DOC, TESTPLAN_MD, TESTPLAN_HTML, *STEP_FILES, DENSE_DIR, "llm_cache", TRACE_FILE)
 
 
 def _remove(p: Path) -> bool:
@@ -150,7 +152,7 @@ def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None
         reused = _build_reusable(out, mode, dense_mode)
         if reused is not None:
             return reused
-    for name in (BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD, *STEP_FILES):
+    for name in (BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD, TESTPLAN_HTML, *STEP_FILES):
         _remove(out / name)
     manifest, chunks = load_manifest(out), load_chunks(out)
     with Tracer(out / TRACE_FILE, "build_graph",
@@ -165,7 +167,10 @@ def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None
             try:
                 stats["requirements"] = extract_requirements(G, llm, tracer, cfg)
                 stats["dependencies"] = extract_dependencies(G, llm, tracer, cfg)
-                stats["llm"] = {"status": "PASS", "model": llm.model}
+                incomplete = bool(stats["requirements"].get("failed_chunks") or stats["dependencies"].get("failed_groups"))
+                stats["llm"] = {"status": "BLOCKED" if incomplete else "PASS", "model": llm.model}
+                if incomplete:
+                    stats["llm"]["reason"] = "partial extraction; failed source chunks or dependency groups"
             except LLMError as exc:
                 stats["llm"] = {"status": "BLOCKED", "reason": exc.kind, "model": llm.model}
         stats["mode"], stats["dense_mode"] = mode, dense_mode
@@ -282,7 +287,7 @@ def run_test_plan(out: Path, requirement_ids: list[str], llm: LLM, cfg: PlanConf
 
 
 def _doc_summary(doc: dict, out: Path) -> dict:
-    return dict(json=str(out / TESTPLAN_DOC), markdown=str(out / TESTPLAN_MD), template_id=doc["template_id"],
+    return dict(json=str(out / TESTPLAN_DOC), markdown=str(out / TESTPLAN_MD), html=str(out / TESTPLAN_HTML), template_id=doc["template_id"],
                 scope=doc["scope"], model=doc["model"], review_status=doc["review_status"],
                 doc_trace_id=doc["trace_id"],
                 token_usage={k: {x: v["totals"][x] for x in ("calls", "api_calls", "local_cache_hits", "repair_calls",
@@ -295,6 +300,7 @@ def _doc_summary(doc: dict, out: Path) -> dict:
                 registers=None if doc.get("registers") is None else dict(
                     status=doc["registers"]["status"], registers=len(doc["registers"]["registers"]),
                     configurable_fields=len(doc["registers"].get("configurable", [])),
+                    configurable_registers=sorted({f["register"] for f in doc["registers"].get("configurable", [])}),
                     conflicts=len(doc["registers"]["conflicts"])),
                 coverage=None if not doc.get("coverage") else dict(
                     total=doc["coverage"]["total"], covered=doc["coverage"]["covered"], ratio=doc["coverage"]["ratio"],
@@ -307,7 +313,7 @@ def _doc_summary(doc: dict, out: Path) -> dict:
 def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Path | None = None,
                      cfg: DocConfig | None = None, embedder: Embedder | None = None,
                      force: bool = False, rtl_graph_path: Path | None = None, rtl_scope: str = "") -> dict:
-    """Generate the template-driven test-plan document (JSON + Markdown) from the graph."""
+    """Generate the template-driven test-plan document (JSON + Markdown + HTML) from the graph."""
     template = load_template(template_path)
     rtl_graph, rtl_input = None, None
     if rtl_scope and rtl_graph_path is None:
@@ -334,10 +340,12 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
                 and prev.get("model") == llm.model
                 and prev.get("graph_build_trace_id") == G.graph.get("build_trace_id")
                 and prev.get("rtl_input") == rtl_input
+                and (prev.get("registers") is None or prev["registers"].get("extraction_signature") == extraction_signature())
                 and all(s["status"] == "PASS" or (s.get("generator") == "rtl_observations" and s["status"] == "NOT_RUN")
                         for s in prev.get("sections", [])) and prev.get("sections")
                 and (prev.get("interfaces") is None or prev["interfaces"]["status"] in ("PASS", "NOT_RUN"))
                 and (prev.get("registers") is None or prev["registers"]["status"] in ("PASS", "NOT_RUN"))):
+            _write_doc_views(prev, out, preserve_markdown=True)
             return _doc_summary(prev, out) | {"reused": True}
     H = layered_view(G)
     index = _load_dense(out, embedder)
@@ -352,9 +360,34 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
     doc["token_usage"] = {"Test-plan run": summarize(out / TRACE_FILE, tracer.trace_id)}
     if G.graph.get("build_trace_id"):
         doc["token_usage"]["Graph build"] = summarize(out / TRACE_FILE, G.graph["build_trace_id"])
+    doc["evidence_index"] = build_evidence_index(G, doc)
     atomic_write_text(doc_path, json.dumps(doc, indent=2, default=str))
-    atomic_write_text(out / TESTPLAN_MD, render_markdown(doc))
+    _write_doc_views(doc, out)
     return _doc_summary(doc, out) | _trace_info(tracer) | {"reused": False}
+
+
+def _write_doc_views(doc: dict, out: Path, *, preserve_markdown: bool = False) -> None:
+    if not doc.get("evidence_index") and (out / GRAPH_FILE).is_file():
+        doc["evidence_index"] = build_evidence_index(load_graph(out / GRAPH_FILE), doc)
+    md_path = out / TESTPLAN_MD
+    if preserve_markdown and md_path.exists():
+        markdown = md_path.read_text(encoding="utf-8")
+    else:
+        markdown = render_markdown(doc)
+        atomic_write_text(md_path, markdown)
+    atomic_write_text(out / TESTPLAN_HTML, render_html(markdown))
+
+
+def render_testplan(out: Path) -> dict:
+    """Refresh HTML from editable Markdown; fall back to saved JSON if needed."""
+    if (out / TESTPLAN_MD).is_file():
+        markdown = (out / TESTPLAN_MD).read_text(encoding="utf-8")
+        atomic_write_text(out / TESTPLAN_HTML, render_html(markdown))
+    elif (out / TESTPLAN_DOC).is_file():
+        _write_doc_views(json.loads((out / TESTPLAN_DOC).read_text(encoding="utf-8")), out)
+    else:
+        raise ValueError(f"{out} has no {TESTPLAN_MD} or {TESTPLAN_DOC} to render")
+    return dict(markdown=str(out / TESTPLAN_MD), html=str(out / TESTPLAN_HTML))
 
 
 def run_registers(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | None = None,
@@ -362,7 +395,8 @@ def run_registers(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | 
     """Fetch the register map definitions from the specification into registers.json / registers.md."""
     G = load_graph(out / GRAPH_FILE)
     path = out / REGISTERS_JSON
-    prev = None if force else _load_current(path, scope.strip(), llm.model, G)
+    prev = None if force else _load_current(path, scope.strip(), llm.model, G,
+                                          extra={"extraction_signature": extraction_signature()})
     if prev is not None:
         return _registers_summary(prev, out) | {"reused": True}
     H = layered_view(G)
@@ -383,7 +417,9 @@ def _registers_summary(result: dict, out: Path) -> dict:
                 step_trace_id=result["trace_id"],
                 registers=[dict(name=r["name"], abbreviation=r["abbreviation"], address=r["address"],
                                 fields=len(r["fields"]), provenance=r["provenance"]) for r in result["registers"]],
-                configurable_fields=len(result.get("configurable", [])), conflicts=result["conflicts"],
+                configurable_fields=len(result.get("configurable", [])),
+                configurable_registers=sorted({f["register"] for f in result.get("configurable", [])}),
+                conflicts=result["conflicts"],
                 validation=result["validation"], failed_batches=result["failed_batches"])
 
 

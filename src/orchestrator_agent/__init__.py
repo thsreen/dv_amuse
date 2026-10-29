@@ -1,1 +1,1 @@
-"""Step-by-step orchestrator over the DV agent and the RTL agent."""
+"""orchestrator: interactive terminal and step-by-step orchestrator over the DV and RTL agents."""

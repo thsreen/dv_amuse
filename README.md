@@ -10,6 +10,9 @@ The RTL extractor and interface builder live in `src/rtl_agent/`. Run them indep
 
 RTL hierarchy/dataflow/domain graph construction and combined Graph-RAG fetching:
 [docs/RTL_GRAPH_RAG.md](docs/RTL_GRAPH_RAG.md).
+Interactive orchestrator: `.venv/bin/orchestrate-agent`; describe a local
+repository, then use `/plan`, `/code`, `/run` or `/regress`. See
+[docs/ORCHESTRATOR.md](docs/ORCHESTRATOR.md).
 Separate UVM coding flow: [scaffold generator](docs/UVM_SCAFFOLD.md).
 UVM agent components and fill points: [agent template catalog](src/dv_agent/templates/uvm_agent/template.json).
 
@@ -92,13 +95,31 @@ The `plan` command now also passes dependency preconditions to the model and all
 `dv-agent testplan --out runs/<repo> [--scope "<feature>"] [--template my_template.json] [--force|--fresh]`
 or in one go: `dv-agent pipeline <repo> --fresh --testplan [--scope ...]`.
 
-Writes `testplan_doc.json` (structured, with citations and lineage) and `testplan_doc.md` (readable).
+Writes `testplan_doc.json` (structured, with citations and lineage), `testplan_doc.md` (editable)
+and `testplan_doc.html` (readable, standalone and printable). HTML is rendered directly from the
+same Markdown, without another model call. After editing the Markdown, run
+`dv-agent render-testplan --out runs/<repo>` to refresh HTML without regenerating the plan.
+For a testplan selector and **Render testplan** button in the HTML page, start the local viewer once:
+`dv-agent render-testplan --serve`. Open the printed URL and select any generated plan under `runs/`.
+Save edits to that plan's `testplan_doc.md`, then click the button to refresh it and save its HTML copy.
+The selector also finds plans generated while the viewer is running when the page is reloaded.
+`--out runs/<repo> --serve` opens that plan first and lists its sibling runs; `--out runs --serve`
+opens the full runs directory. No model calls are made. `--port` selects a port (default 8765);
+Ctrl+C stops the viewer.
 The template is data: `src/dv_agent/templates/testplan_quick_v0.json` (the user's 10-section quick reference).
 Each section has `generator` (`title` | `entries` | `register_map`), `queries` (`{scope}` placeholder),
 `instructions`, optional `entry_kinds`, `include_kinds`, `collect_assumed`, `include_conflicts`.
 - Every entry is tagged `[DOCUMENTED]`, `[INFERRED]` or `[ASSUMED]` with source IDs. Citations outside the
   supplied evidence are dropped; DOCUMENTED/INFERRED without citations become ASSUMED.
 - Register map: DOCUMENTED addresses and reset values must appear verbatim in cited text, otherwise INFERRED.
+- Explicit Name/Address/Width/Access specification tables supply the register inventory even if a model
+  call fails. Model enrichment uses one source window per call, retaining the entire selected text.
+  The LLM identifies configurable registers and fields with supporting specification quotes;
+  data/FIFO payloads and read-only status are distinguished from configuration controls. These
+  reviewed classifications, access codes, legal encodings and access conditions feed Configurations.
+  Failed extraction keeps partial maps visible and blocks configuration completeness.
+- Token-limit model responses retry with a larger output budget (three attempts total, capped by
+  `META_MAX_OUTPUT_TOKENS_CEILING`, default 32768). Other incomplete responses remain explicit failures.
 - Later sections receive earlier ones (agents/sequences stay consistent). Assumptions collect ASSUMED
   entries from all sections; designer questions include specification conflicts and evidence gaps.
 - Each section is a `test_plan_section` graph node (`dv-agent lineage TPS-...`) and a traced span with fact IDs.
@@ -125,7 +146,7 @@ Runs before any test-plan section (template `interfaces` block; `"enabled": fals
 | Command | Output | What it does |
 |---|---|---|
 | `dv-agent interfaces --out runs/<repo>` | `interfaces.json`, `.md` | Signals grouped by functionality and connected module type; names, directions, widths and active levels checked against the spec text |
-| `dv-agent registers --out runs/<repo>` | `registers.json`, `.md` | Register map: batched extraction per chunk, verified against chunk text, merged across chunks; conflicting values and overlapping fields are reported, not resolved; writable fields derived from access codes |
+| `dv-agent registers --out runs/<repo>` | `registers.json`, `.md` | Source-table inventory plus model extraction per source window, merged with citations; configurable registers/fields identified by the LLM and checked against access; conflicts and overlaps reported for review |
 | `dv-agent strategy --out runs/<repo>` | `strategy.json`, `.md` | Agents per interface group (mode, drives, monitors, registers, sequences, correctness mechanisms), agent and top-level scoreboards, register model, virtual sequences; built from the saved interface and register steps (regenerated only if missing or stale) and checked against them |
 
 All accept `--scope`, `--force` and `--fresh`. Strategy checks: every interface group covered by exactly one agent (uncovered groups become gaps and designer questions); agents drive only DUT inputs of their own groups; passive agents never drive; registers must exist in the register map; scoreboard and virtual-sequence agents must exist.

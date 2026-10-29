@@ -46,8 +46,12 @@ def call_with_timeout(fn, timeout_s: float):
 def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
              llm=None, embedder=None, approvals=(), dry_run: bool = False,
              force: bool = False, registry: dict | None = None,
-             resume_hint: str | None = None) -> dict:
-    """Execute a flow file step by step. Returns the result (also on disk)."""
+             resume_hint: str | None = None, event_sink=None) -> dict:
+    """Execute a flow file step by step. Returns the result (also on disk).
+
+    event_sink, when given, receives a copy of every trace event as it fires
+    (used by the live dashboard); trace-file output is unchanged.
+    """
     flow = load_flow(Path(flow_path))
     specs = registry if registry is not None else REGISTRY
     out_dir = Path(out_dir)
@@ -55,9 +59,11 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
     trace_path = out_dir / TRACE_FILE
 
     def emit(event: str, **fields):
+        record = dict(ts=_now(), event=event, **fields)
         with trace_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(dict(ts=_now(), event=event, **fields),
-                                    default=str) + "\n")
+            handle.write(json.dumps(record, default=str) + "\n")
+        if event_sink is not None:
+            event_sink(record)
 
     variables = dict(variables)
     variables.setdefault("out", str(out_dir))

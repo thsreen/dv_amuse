@@ -22,9 +22,14 @@ API_STYLES = ("responses", "chat")
 
 
 class LLMError(RuntimeError):
-    def __init__(self, kind: str, message: str):
+    def __init__(self, kind: str, message: str, *, usage: dict | None = None,
+                 response_id: str | None = None, token_exhausted: bool = False):
         super().__init__(f"{kind}: {message}")
         self.kind = kind
+        self.usage = usage or {}
+        self.response_id = response_id
+        self.token_exhausted = token_exhausted
+        self.attempts: list[dict] = []
 
 
 @dataclass
@@ -34,6 +39,7 @@ class LLMResult:
     response_id: str | None = None
     cached: bool = False
     usage: dict = field(default_factory=dict)
+    attempts: list[dict] = field(default_factory=list)
 
 
 class LLM(Protocol):
@@ -84,11 +90,18 @@ class _Base:
         with tracer.span(f"llm:{name}", as_type="generation", model=self.model,
                          input={"instructions": instructions, "payload": payload},
                          metadata={"cache_key": key}) as span:
-            result = self._cached_call(cache_file, name, instructions, payload, schema)
+            try:
+                result = self._cached_call(cache_file, name, instructions, payload, schema)
+            except LLMError as exc:
+                span.update(usage=exc.usage, metadata={"api_attempts": exc.attempts,
+                            "response_id": exc.response_id, "error_kind": exc.kind,
+                            "error_detail": str(exc)}, status_message=str(exc))
+                raise
             usage = result.usage or estimate_usage(instructions, payload, schema, result.data)
             span.update(output=result.data, usage=usage,
                         metadata={"cached": result.cached, "response_id": result.response_id,
                                   "usage_estimated": not result.usage})
+            span.update(metadata={"api_attempts": [] if result.cached else result.attempts})
             return result
 
     def _cached_call(self, cache_file: Path | None, name: str, instructions: str, payload: dict,
@@ -113,6 +126,7 @@ class MetaClient(_Base):
     def __init__(self, *, api_key: str | None = None, base_url: str | None = None,
                  model: str | None = None, api_style: str | None = None, timeout: float = 90.0,
                  max_attempts: int = 3, max_output_tokens: int | None = None,
+                 max_output_tokens_ceiling: int | None = None,
                  cache_dir: Path | None = None, client: Any = None,
                  sleep: Callable[[float], None] = time.sleep):
         self.api_key = api_key if api_key is not None else os.getenv("MODEL_API_KEY", "").strip()
@@ -128,6 +142,13 @@ class MetaClient(_Base):
             raise ValueError(f"META_MAX_OUTPUT_TOKENS must be an integer, got {raw_tokens!r}") from None
         if self.max_output_tokens <= 0:
             raise ValueError("META_MAX_OUTPUT_TOKENS must be positive")
+        ceiling = max_output_tokens_ceiling if max_output_tokens_ceiling is not None else os.getenv(
+            "META_MAX_OUTPUT_TOKENS_CEILING", str(max(32768, self.max_output_tokens)))
+        self.max_output_tokens_ceiling = int(ceiling)
+        if self.max_output_tokens_ceiling < self.max_output_tokens:
+            raise ValueError("META_MAX_OUTPUT_TOKENS_CEILING must be at least META_MAX_OUTPUT_TOKENS")
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be positive")
         self.timeout = timeout
         self.max_attempts = max_attempts
         self.cache_dir = cache_dir
@@ -143,26 +164,31 @@ class MetaClient(_Base):
                                          timeout=self.timeout, max_retries=0)
         return self._client
 
-    def _request(self, client, name: str, instructions: str, payload: dict, schema: dict):
+    def _request(self, client, name: str, instructions: str, payload: dict, schema: dict, token_budget: int):
         text_input = json.dumps(payload, ensure_ascii=False)
         if self.api_style == "chat":
             resp = client.chat.completions.create(
-                model=self.model, max_tokens=self.max_output_tokens,
+                model=self.model, max_tokens=token_budget,
                 messages=[{"role": "system", "content": instructions},
                           {"role": "user", "content": text_input}],
                 response_format={"type": "json_schema", "json_schema": {
                     "name": name, "strict": True, "schema": schema}})
             choice = resp.choices[0]
             if choice.finish_reason not in (None, "stop"):
-                raise LLMError("incomplete", f"finish_reason={choice.finish_reason}")
+                raise LLMError("incomplete", f"finish_reason={choice.finish_reason}; output budget={token_budget}",
+                               usage=usage_from_chat(getattr(resp, "usage", None)), response_id=getattr(resp, "id", None),
+                               token_exhausted=choice.finish_reason == "length")
             text = choice.message.content or ""
             return text, getattr(resp, "id", None), usage_from_chat(getattr(resp, "usage", None))
         resp = client.responses.create(
-            model=self.model, store=False, max_output_tokens=self.max_output_tokens,
+            model=self.model, store=False, max_output_tokens=token_budget,
             instructions=instructions, input=text_input,
             text={"format": {"type": "json_schema", "name": name, "strict": True, "schema": schema}})
         if getattr(resp, "status", "completed") != "completed":
-            raise LLMError("incomplete", f"status={resp.status}")
+            reason = getattr(getattr(resp, "incomplete_details", None), "reason", "unknown")
+            raise LLMError("incomplete", f"status={resp.status}; reason={reason}; output budget={token_budget}",
+                           usage=usage_from_responses(getattr(resp, "usage", None)), response_id=getattr(resp, "id", None),
+                           token_exhausted=reason == "max_output_tokens")
         return resp.output_text, getattr(resp, "id", None), usage_from_responses(getattr(resp, "usage", None))
 
     def _call(self, name: str, instructions: str, payload: dict, schema: dict) -> LLMResult:
@@ -170,13 +196,32 @@ class MetaClient(_Base):
         client = self._get_client()
         transient = (openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError,
                      openai.InternalServerError)
+        token_budget = self.max_output_tokens
+        attempts: list[dict] = []
+        total_usage: dict[str, int] = {}
         for attempt in range(1, self.max_attempts + 1):
             try:
-                text, response_id, usage = self._request(client, name, instructions, payload, schema)
+                text, response_id, usage = self._request(client, name, instructions, payload, schema, token_budget)
+                attempts.append(dict(status="PASS", response_id=response_id, output_budget=token_budget))
+                for key, value in usage.items():
+                    total_usage[key] = total_usage.get(key, 0) + value
                 break
+            except LLMError as exc:
+                attempts.append(dict(status=exc.kind, response_id=exc.response_id, output_budget=token_budget))
+                for key, value in exc.usage.items():
+                    total_usage[key] = total_usage.get(key, 0) + value
+                if not exc.token_exhausted or attempt == self.max_attempts or token_budget >= self.max_output_tokens_ceiling:
+                    exc.usage, exc.attempts = total_usage, attempts
+                    raise
+                token_budget = min(token_budget * 2, self.max_output_tokens_ceiling)
+                emit(f"model call {name!r} exhausted its output budget; retrying with {token_budget} tokens "
+                     f"(attempt {attempt + 1}/{self.max_attempts})")
             except transient as exc:
+                attempts.append(dict(status="transient", output_budget=token_budget))
                 if attempt == self.max_attempts:
-                    raise LLMError("transient", f"{type(exc).__name__} after {attempt} attempts")
+                    error = LLMError("transient", f"{type(exc).__name__} after {attempt} attempts", usage=total_usage)
+                    error.attempts = attempts
+                    raise error from None
                 delay = 2.0 * 2 ** (attempt - 1)
                 emit(f"model call {name!r} hit {type(exc).__name__}; retrying in {delay:.0f}s "
                      f"(attempt {attempt}/{self.max_attempts})")
@@ -189,10 +234,12 @@ class MetaClient(_Base):
         try:
             data = json.loads(text)
         except json.JSONDecodeError:
-            raise LLMError("parse", "response was not valid JSON") from None
+            error = LLMError("parse", "response was not valid JSON", usage=total_usage, response_id=response_id)
+            error.attempts = attempts
+            raise error from None
         if not isinstance(data, dict):
             raise LLMError("parse", "response JSON was not an object")
-        return LLMResult(data=data, model=self.model, response_id=response_id, usage=usage)
+        return LLMResult(data=data, model=self.model, response_id=response_id, usage=total_usage, attempts=attempts)
 
 
 class FakeLLM(_Base):

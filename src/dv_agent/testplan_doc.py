@@ -34,6 +34,7 @@ from .usage import render as render_usage
 from .strategy import render as render_strategy
 from .testplan_context import chunk_record, fetch_context, requirement_record
 from .trace import Tracer
+from .provenance_badge import badge, decode
 
 DOC_SCHEMA_VERSION = 1
 DEFAULT_TEMPLATE = Path(__file__).parent / "templates" / "testplan_quick_v0.json"
@@ -47,6 +48,8 @@ Provenance for each entry:
 - DOCUMENTED: the cited requirement or chunk states it directly.
 - INFERRED: derived from cited sources (engineering proposals such as testbench structure are INFERRED).
 - ASSUMED: no supplied source supports it.
+For every INFERRED entry or configuration, provide inference_reason: one concise sentence explaining the
+reasoning from its cited evidence. Leave inference_reason empty for DOCUMENTED and ASSUMED.
 Cite only IDs from the supplied lists. Keep each entry to one idea; put sub-points in details.
 Stay consistent with previous_sections (reuse agent and sequence names defined there) and with
 interfaces, the design's interface groups (signals grouped by functionality and connected module type).
@@ -114,9 +117,10 @@ def _entries_schema(kinds: list[str] | None, req_ids: list[str], chunk_ids: list
     schema = {"type": "object", "additionalProperties": False, "required": ["entries"],
             "properties": {"entries": {"type": "array", "items": {
                 "type": "object", "additionalProperties": False,
-                "required": ["text", "kind", "provenance", "cited_req_ids", "cited_chunk_ids", "details"],
+                "required": ["text", "kind", "provenance", "inference_reason", "cited_req_ids", "cited_chunk_ids", "details"],
                 "properties": {"text": {"type": "string"}, "kind": kind,
                                "provenance": {"type": "string", "enum": PROVENANCE},
+                               "inference_reason": {"type": "string"},
                                "cited_req_ids": _ids_schema(req_ids),
                                "cited_chunk_ids": _ids_schema(chunk_ids),
                                "details": {"type": "array", "items": {"type": "string"}}}}}}}
@@ -215,6 +219,9 @@ def _validate_entries(G, raw: list[dict], req_ids: set[str], chunk_ids: set[str]
             if e["cited_rtl_observation_ids"]:
                 e.update(provenance="INFERRED", review_status="NEEDS_REVIEW", review_owner="RTL_DESIGN_ENGINEER")
         e["validation"] = _clean_citations(e, req_ids, chunk_ids)
+        e["inference_reason"] = e.get("inference_reason", "").strip() if e["provenance"] == "INFERRED" else ""
+        if e["provenance"] == "INFERRED" and not e["inference_reason"]:
+            e["inference_reason"] = "Reason not supplied; designer review required."
         if unknown_rtl:
             e["validation"].append("dropped unknown RTL observation citations")
         out.append(e)
@@ -227,12 +234,13 @@ def _config_schema(field_ids: list[str], req_ids: list[str], chunk_ids: list[str
             "properties": {"configurations": {"type": "array", "items": {
                 "type": "object", "additionalProperties": False,
                 "required": ["field_id", "randomize", "legal_values", "distribution", "constraints",
-                             "reserved_handling", "notes", "provenance", "cited_req_ids", "cited_chunk_ids"],
+                             "reserved_handling", "notes", "provenance", "inference_reason", "cited_req_ids", "cited_chunk_ids"],
                 "properties": {"field_id": {"type": "string", "enum": field_ids or [""]},
                                "randomize": {"type": "boolean"},
                                "legal_values": {"type": "array", "items": t}, "distribution": t,
                                "constraints": {"type": "array", "items": t}, "reserved_handling": t, "notes": t,
                                "provenance": {"type": "string", "enum": PROVENANCE},
+                               "inference_reason": t,
                                "cited_req_ids": _ids_schema(req_ids), "cited_chunk_ids": _ids_schema(chunk_ids)}}}}}
 
 
@@ -251,7 +259,8 @@ def _validate_configs(G: nx.MultiDiGraph, raw: list[dict], configurable: list[di
                  randomize=bool(c["randomize"]), legal_values=[v.strip() for v in c["legal_values"] if v.strip()],
                  distribution=c["distribution"].strip(), constraints=[x.strip() for x in c["constraints"] if x.strip()],
                  reserved_handling=c["reserved_handling"].strip(), notes=c["notes"].strip(),
-                 provenance=c["provenance"], cited_req_ids=list(c.get("cited_req_ids", [])),
+                 provenance=c["provenance"], inference_reason=c.get("inference_reason", "").strip(),
+                 cited_req_ids=list(c.get("cited_req_ids", [])),
                  cited_chunk_ids=[x for x in c.get("cited_chunk_ids", []) if x] or list(f["source_chunk_ids"]))
         e["validation"] = _clean_citations(e, req_ids, chunk_ids | set(f["source_chunk_ids"]))
         spec_values = {_norm(v["value"]) for v in f["values"]} | {_norm(v["meaning"]) for v in f["values"]}
@@ -261,13 +270,16 @@ def _validate_configs(G: nx.MultiDiGraph, raw: list[dict], configurable: list[di
             e["validation"].append(f"legal values not stated in the specification: {undocumented}")
             if e["provenance"] == "DOCUMENTED":
                 e["provenance"] = "INFERRED"
+        if e["provenance"] == "INFERRED" and not e["inference_reason"]:
+            e["inference_reason"] = ("Proposed legal values are not stated in the cited specification."
+                                     if undocumented else "Reason not supplied; designer review required.")
         out.append(e)
     for f in configurable:
         if f["field_id"] not in seen:
             out.append(dict(field_id=f["field_id"], register=f["register"], field=f["field"], bits=f["bits"],
                             access=f["access"], randomize=None, legal_values=[], distribution="", constraints=[],
                             reserved_handling="", notes="No randomisation proposed for this writable field.",
-                            provenance="ASSUMED", cited_req_ids=[], cited_chunk_ids=list(f["source_chunk_ids"]),
+                            provenance="ASSUMED", inference_reason="", cited_req_ids=[], cited_chunk_ids=list(f["source_chunk_ids"]),
                             validation=["missing from model output; needs designer input"]))
     out.sort(key=lambda e: e["field_id"])
     return out, notes
@@ -391,7 +403,8 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                     reason = ("register-map step disabled" if registers is None
                               else f"register map is {registers['status']} with no registers")
                     sections.append(dict(id=sec["id"], heading=sec["heading"], generator=sec["generator"],
-                                         status="NOT_RUN", error=reason, configurations=[]))
+                                         status="BLOCKED" if registers and registers["status"] == "BLOCKED" else "NOT_RUN",
+                                         error=reason, configurations=[]))
                     continue
                 ctx = section_context(G, H, sec, scope, cfg, dense_fn, targets=path_targets, covered=_cited(sections),
                                       tracer=tracer)
@@ -428,7 +441,7 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                     payload["configurable_fields"] = [
                         {k: f[k] for k in ("field_id", "register", "register_name", "address", "bits", "field",
                                            "access", "reset_value", "description", "values", "availability",
-                                           "reserved")} for f in configurable]
+                                           "reserved", "identification", "configuration_reason", "review_status")} for f in configurable]
                     schema = _config_schema([f["field_id"] for f in configurable], req_ids,
                                             sorted(set(chunk_ids) | {c for f in configurable for c in f["source_chunk_ids"]}))
                 else:
@@ -477,6 +490,10 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 else:
                     out["entries"] = _validate_entries(G, result.data.get("entries", []), set(req_ids),
                                                        set(chunk_ids), cfg.max_entries, rtl_ids)
+                    if sec["id"] in ("checks", "coverage"):
+                        # Plan-time execution status; simulation/sign-off flows update it later.
+                        for e in out["entries"]:
+                            e["status"] = "NOT_RUN"
                     if sec.get("collect_assumed"):
                         out["entries"] += _collected_assumptions(sections, out["entries"])
                     if sec.get("include_conflicts"):
@@ -496,9 +513,11 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                                                       details=["RTL design engineer review required"], validation=[],
                                                       review_status="NEEDS_REVIEW", review_owner="RTL_DESIGN_ENGINEER"))
                 _finish_claims(out, claims_state["result"], claims_on)
-                out["status"] = "PASS"
+                out["status"] = "BLOCKED" if sec["generator"] == "configurations" and registers["status"] == "BLOCKED" else "PASS"
+                if out["status"] == "BLOCKED":
+                    out["error"] = "register extraction is incomplete; configuration controls are partial"
                 _record(G, tracer, out, meta["template_id"], scope)
-                span.update(output={"status": "PASS", "items": len(out.get("entries", out.get("configurations", [])))},
+                span.update(output={"status": out["status"], "items": len(out.get("entries", out.get("configurations", [])))},
                             metadata={"fact_ids": out["lineage_fact_ids"]})
                 sections.append(out)
         coverage = _coverage(G, sections)
@@ -732,13 +751,98 @@ def _cite(e: dict) -> str:
     return f" — sources: {', '.join(ids)}" if ids else ""
 
 
+def _badge(e: dict) -> str:
+    return badge(e["provenance"], e.get("cited_req_ids", []) + e.get("cited_chunk_ids", [])
+                 + e.get("cited_rtl_observation_ids", []), e.get("inference_reason", ""))
+
+
 def _render_entry(e: dict) -> list[str]:
-    lines = [f"- [{e['provenance']}] ({e['kind']}) {e['text']}{_cite(e)}"]
+    lines = [f"- {_badge(e)} ({e['kind']}) {e['text']}{_cite(e)}"]
+    if e["provenance"] == "INFERRED":
+        lines.append(f"  - Inference: {e.get('inference_reason') or 'Reason not supplied; designer review required.'}")
     if e.get("cited_rtl_observation_ids"):
         lines.append("  - NEEDS_REVIEW: RTL design engineer approval required.")
     lines += [f"  - {d}" for d in e["details"]]
     lines += [f"  - Validation: {v}" for v in e["validation"]]
     return lines
+
+
+def _cell(value: str) -> str:
+    return value.replace("|", "\\|").replace("\n", "<br/>")
+
+
+def _render_table(entries: list[dict], start: int = 1) -> list[str]:
+    lines = ["| # | Description | Kind | Details | Sources | Provenance | Status |",
+             "| --- | --- | --- | --- | --- | --- | --- |"]
+    for i, e in enumerate(entries, start):
+        details = list(e["details"])
+        if e["provenance"] == "INFERRED":
+            details.append(f"Inference: {e.get('inference_reason') or 'Reason not supplied; designer review required.'}")
+        if e.get("cited_rtl_observation_ids"):
+            details.append("NEEDS_REVIEW: RTL design engineer approval required.")
+        details += [f"Validation: {v}" for v in e["validation"]]
+        sources = ", ".join(e["cited_req_ids"] + e["cited_chunk_ids"]
+                            + e.get("cited_rtl_observation_ids", []))
+        lines.append(" | ".join(["", str(i), _cell(e["text"]), _cell(e["kind"]),
+                                 _cell("<br/>".join(details)), _cell(sources),
+                                 _badge(e), _cell(e.get("status", "NOT_RUN")), ""]))
+    return lines + [""]
+
+
+def build_evidence_index(G: nx.MultiDiGraph, doc: dict) -> dict:
+    """Save only referenced source locations so HTML anchors remain available offline."""
+    ids: set[str] = set()
+    def walk(value):
+        if isinstance(value, dict):
+            for v in value.values():
+                walk(v)
+        elif isinstance(value, list):
+            for v in value:
+                walk(v)
+        elif isinstance(value, str) and value in G and G.nodes[value].get("type") in ("requirement", "chunk"):
+            ids.add(value)
+    walk(doc)
+    index = {}
+    for cid in sorted(ids):
+        n = G.nodes[cid]
+        index[cid] = dict(path=n.get("doc_path", ""), section=n.get("section", ""),
+                          page=n.get("page", n.get("page_start")),
+                          excerpt=(n.get("quote") or n.get("text") or "")[:1200])
+    for section in doc.get("sections", []):
+        for c in section.get("evidence", []):
+            if isinstance(c, dict) and c.get("id"):
+                index[c["id"]] = dict(path=c.get("path", ""), section="RTL excerpt",
+                                      page=None, line_start=c.get("line_start"), line_end=c.get("line_end"),
+                                      excerpt=c.get("text", "")[:1200])
+    for obs in (doc.get("rtl_observations") or {}).get("entries", []):
+        index[obs["id"]] = dict(path="RTL observation (design engineer review required)",
+                                 excerpt=obs.get("text", "") + "\nCited RTL excerpts: "
+                                 + ", ".join(obs.get("cited_rtl_excerpt_ids", [])))
+    return index
+
+
+def _render_references(markdown: str, index: dict) -> str:
+    cited = set()
+    for token in re.findall(r"<!--dv-evidence:([A-Za-z0-9_-]+)-->", markdown):
+        try:
+            cited.update(i for i in decode(token)["citations"] if re.fullmatch(r"[A-Za-z0-9_-]+", i))
+        except (ValueError, KeyError, TypeError):
+            continue
+    if not cited:
+        return ""
+    lines = ["## Reference evidence", "", "Source locations and excerpts for the evidence badges above.", ""]
+    for cid in sorted(cited):
+        source = index.get(cid, {})
+        lines += [f"### Reference {cid}", ""]
+        location = source.get("path", "Source location unavailable in this report")
+        if source.get("page") is not None:
+            location += f", p.{source['page']}"
+        if source.get("line_start") is not None:
+            location += f":{source['line_start']}-{source.get('line_end', source['line_start'])}"
+        lines += [f"Source: {location}", ""]
+        if source.get("excerpt"):
+            lines += ["> " + line for line in source["excerpt"].splitlines()[:20]] + [""]
+    return "\n".join(lines)
 
 
 def render_markdown(doc: dict) -> str:
@@ -762,6 +866,8 @@ def render_markdown(doc: dict) -> str:
         lines += [f"## {s['heading']}", ""]
         if s["status"] != "PASS":
             lines += [f"**{s['status']}**: {s.get('error', '')}", ""]
+            if s["generator"] == "configurations" and s.get("configurations"):
+                lines += _render_configurations(s)
             continue
         if s["generator"] == "configurations":
             lines += _render_configurations(s) + render_repairs(s.get("repair")) + _render_claims(s.get("claims_check"))
@@ -773,18 +879,21 @@ def render_markdown(doc: dict) -> str:
         if s["id"] == "coverage":
             trailing = [e for e in entries if e.get("cited_rtl_observation_ids")]
             entries = [e for e in entries if not e.get("cited_rtl_observation_ids")]
-        for e in entries:
-            lines += _render_entry(e)
-        if trailing:
-            lines += ["### Coverage from RTL observations (NEEDS_REVIEW; RTL design engineer)", ""]
-            for e in trailing:
+        if s["id"] in ("checks", "coverage"):
+            lines += _render_table(entries)
+            if trailing:
+                lines += ["### Coverage from RTL observations (NEEDS_REVIEW; RTL design engineer)", ""]
+                lines += _render_table(trailing, len(entries) + 1)
+        else:
+            for e in entries:
                 lines += _render_entry(e)
         lines.append("")
         lines += render_repairs(s.get("repair")) + _render_claims(s.get("claims_check"))
     lines += _render_coverage(doc.get("coverage"))
     if doc.get("token_usage"):
         lines += render_usage(doc["token_usage"])
-    return "\n".join(lines)
+    markdown = "\n".join(lines)
+    return markdown + _render_references(markdown, doc.get("evidence_index", {}))
 
 
 def _render_coverage(cov: dict | None) -> list[str]:
@@ -803,14 +912,14 @@ def _render_coverage(cov: dict | None) -> list[str]:
 
 def _render_configurations(s: dict) -> list[str]:
     if not s["configurations"]:
-        return ["_No writable register fields were found in the specification._", ""]
+        return ["_No configurable register fields were identified in the retrieved specification evidence._", ""]
     lines = ["| Register.Field | Bits | Access | Randomise | Legal values | Distribution | Constraints | "
              "Reserved handling | Provenance | Sources |", "|---|---|---|---|---|---|---|---|---|---|"]
     for e in s["configurations"]:
         rnd = {True: "yes", False: "no", None: "undecided"}[e["randomize"]]
         cells = [f"{e['register']}.{e['field']}", e["bits"] or "-", e["access"], rnd,
                  "; ".join(e["legal_values"]) or "not stated", e["distribution"] or "-",
-                 "; ".join(e["constraints"]) or "-", e["reserved_handling"] or "-", e["provenance"],
+                 "; ".join(e["constraints"]) or "-", e["reserved_handling"] or "-", _badge(e),
                  ", ".join(e["cited_req_ids"] + e["cited_chunk_ids"]) or "-"]
         lines.append("| " + " | ".join(c.replace("|", "/") for c in cells) + " |")
     lines.append("")
@@ -818,5 +927,7 @@ def _render_configurations(s: dict) -> list[str]:
         lines += [f"> {e['register']}.{e['field']}: {v}" for v in e["validation"]]
         if e["notes"]:
             lines.append(f"> {e['register']}.{e['field']} note: {e['notes']}")
+        if e["provenance"] == "INFERRED":
+            lines.append(f"> {e['register']}.{e['field']} inference: {e.get('inference_reason') or 'Reason not supplied; designer review required.'}")
     lines += [f"> Validation: {v}" for v in s.get("validation", [])]
     return lines + [""]

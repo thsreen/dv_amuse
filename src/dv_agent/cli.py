@@ -12,7 +12,7 @@ from .llm import MetaClient
 from .fsutil import atomic_write_text
 from .pipeline import (GRAPH_FILE, clear_llm_cache, clear_run, run_build_graph, run_context, run_deps, run_features,
                        run_ingest, run_interfaces, run_query, run_registers, run_strategy, run_test_plan, run_usage,
-                       run_testplan_doc)
+                       run_testplan_doc, render_testplan)
 from .planning import PlanConfig
 from .progress import emit, set_sink, stderr_sink
 from .usage import run_totals
@@ -128,7 +128,7 @@ def _main(argv: list[str] | None) -> int:
         sp.add_argument("--force", action="store_true", help=f"regenerate even if {name}.json is current")
         sp.add_argument("--fresh", action="store_true", help="delete the LLM cache and regenerate")
 
-    pt = sub.add_parser("testplan", help="generate the template-driven test-plan document (JSON + Markdown)")
+    pt = sub.add_parser("testplan", help="generate the template-driven test-plan document (JSON + Markdown + HTML)")
     pt.add_argument("--out", type=Path, required=True)
     pt.add_argument("--scope", default="", help="feature or block the plan covers (default: whole specification)")
     pt.add_argument("--template", type=Path, help="template JSON (default: built-in quick_reference_v0)")
@@ -136,6 +136,11 @@ def _main(argv: list[str] | None) -> int:
     pt.add_argument("--fresh", action="store_true", help="delete the LLM cache and regenerate")
     pt.add_argument("--rtl-graph", type=Path, help="opt in to review-required implementation observations from this graph")
     pt.add_argument("--rtl-scope", default="", help="instance scope within --rtl-graph")
+
+    pr = sub.add_parser("render-testplan", help="refresh HTML from editable testplan Markdown without model calls")
+    pr.add_argument("--out", type=Path, help="run or runs directory (default with --serve: runs/)")
+    pr.add_argument("--serve", action="store_true", help="start a local viewer with a Render testplan button")
+    pr.add_argument("--port", type=int, default=8765, help="local viewer port with --serve (default: 8765)")
 
     pa = sub.add_parser("pipeline", help="ingest, build the graph and (optionally) plan in one command")
     pa.add_argument("repo", type=Path)
@@ -280,6 +285,22 @@ def _main(argv: list[str] | None) -> int:
         result = step(args.out, llm, scope=args.scope, embedder=_embedder(), force=args.force or args.fresh)
         emit(f"{args.cmd} done: {result['status']}" + (" (reused cached output)" if result.get("reused") else ""))
         _print(result | {"cache_cleared": removed})
+    elif args.cmd == "render-testplan":
+        if args.serve:
+            from .testplan_viewer import create_report_server
+            viewer_out = args.out or PACKAGE_ROOT / "runs"
+            with create_report_server(viewer_out, args.port) as server:
+                _print({"url": f"http://127.0.0.1:{server.server_port}/", "out": str(viewer_out.resolve()),
+                        "message": "Open the URL, select a testplan, and click Render testplan after saving Markdown edits. Ctrl+C stops the viewer."})
+                sys.stdout.flush()
+                try:
+                    server.serve_forever(poll_interval=0.25)
+                except KeyboardInterrupt:
+                    pass
+        else:
+            if args.out is None:
+                raise UsageError("--out is required to render a single testplan without --serve")
+            _print(render_testplan(args.out))
     elif args.cmd == "testplan":
         _require(args.out, GRAPH_FILE)
         llm = _llm()

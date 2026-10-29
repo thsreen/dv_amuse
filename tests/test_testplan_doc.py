@@ -24,6 +24,7 @@ def entries_handler(payload):
             "assumptions": "assumption", "questions": "question"}[sec]
     entries = [
         {"text": f"{sec} entry backed by evidence", "kind": kind, "provenance": "INFERRED",
+         "inference_reason": "The cited behavior motivates this proposed verification action.",
          "cited_req_ids": reqs[:1], "cited_chunk_ids": chunks[:1], "details": ["detail a", " "]},
         {"text": f"{sec} unsupported claim", "kind": kind, "provenance": "DOCUMENTED",
          "cited_req_ids": [], "cited_chunk_ids": [], "details": []},
@@ -135,7 +136,14 @@ def test_document_has_all_sections_in_template_order(run):
     positions = [md.index(h if h == "1. Title" else f"## {h}") if h != "1. Title" else 0 for h in HEADINGS]
     assert positions == sorted(positions)
     assert md.startswith("# Verification Test Plan: tmr32_spec")
-    assert "[INFERRED] (directed_test) stimulus entry backed by evidence — sources:" in md
+    assert "⚠️<!--dv-evidence:" in md and "(directed_test) stimulus entry backed by evidence — sources:" in md
+    assert "Inference: The cited behavior motivates this proposed verification action." in md
+    doc = _doc(run)
+    entry = next(s for s in doc["sections"] if s["id"] == "stimulus")["entries"][0]
+    assert entry["inference_reason"] == "The cited behavior motivates this proposed verification action."
+    assert "## Reference evidence" in md and "Source: doc/tmr32_spec.txt" in md
+    report = (run / "testplan_doc.html").read_text()
+    assert 'class="evidence-tooltip"' in report and 'href="#reference-' in report
     assert "| bus_agent | Register bus | active |" in md
 
 
@@ -158,7 +166,7 @@ def test_register_map_section_is_rendered_from_the_register_step(run):
     doc = _doc(run)
     assert [r["abbreviation"] for r in doc["registers"]["registers"]] == ["CTRL"]
     md = (run / "testplan_doc.md").read_text()
-    assert "## 3. Register Map" in md and "### Control Register (CTRL) [DOCUMENTED]" in md
+    assert "## 3. Register Map" in md and "### Control Register (CTRL) ✅<!--dv-evidence:" in md
     assert "| 0 | Enable | RW |" in md
 
 
@@ -278,3 +286,100 @@ def test_coverage_observation_entries_render_as_subsection():
     head = md.index("### Coverage from RTL observations")
     assert md.index("plain scenario cover") < head < md.index("observation-driven cover")
     assert "NEEDS_REVIEW: RTL design engineer approval required." in md
+
+
+def test_checks_and_coverage_render_as_tables_with_trailing_status():
+    from dv_agent.testplan_doc import render_markdown
+
+    def entry(text, kind="assertion", obs=(), status="NOT_RUN"):
+        return {"text": text, "kind": kind, "provenance": "INFERRED",
+                "cited_req_ids": ["REQ-1"], "cited_chunk_ids": ["CH-1"],
+                "cited_rtl_observation_ids": list(obs), "details": ["detail a"],
+                "validation": [], "status": status}
+
+    plain = entry("plain cover", "covergroup")
+    obs_entry = entry("obs cover", "cover_property", obs=["RTLOBS-1"])
+    check_sec = {"id": "checks", "heading": "8. Checks", "generator": "entries",
+                 "status": "PASS",
+                 "entries": [entry("ack follows req", "assertion")]}
+    cov_sec = {"id": "coverage", "heading": "9. Coverage", "generator": "entries",
+               "status": "PASS", "entries": [plain, obs_entry]}
+    doc = {"sections": [check_sec, cov_sec],
+           "coverage": None, "token_usage": None}
+    md = render_markdown(doc)
+    assert md.count("| # | Description | Kind | Details | Sources | Provenance | Status |") == 3
+    assert "| 1 | ack follows req | assertion | detail a<br/>Inference: Reason not supplied; designer review required. | REQ-1, CH-1 | ⚠️<!--dv-evidence:" in md
+    assert "| NOT_RUN |" in md
+    head = md.index("### Coverage from RTL observations")
+    obs_row = md.index("| 2 | obs cover | cover_property |")
+    assert head < obs_row
+    assert obs_row < md.index("| NOT_RUN |", obs_row) < md.index("\n", obs_row)
+
+
+def test_html_is_rendered_from_the_exact_markdown_and_recovered_without_model_calls(run, monkeypatch, capsys):
+    from dv_agent.html_report import render_html
+    llm = _llm()
+    result = run_testplan_doc(run, llm)
+    md = (run / "testplan_doc.md").read_text()
+    assert (run / "testplan_doc.html").read_text() == render_html(md)
+    assert result["html"] == str(run / "testplan_doc.html")
+    (run / "testplan_doc.html").unlink()
+    edited = md + "\n## Engineer edits\n\nReviewed control settings.\n"
+    (run / "testplan_doc.md").write_text(edited)
+    def fail():
+        raise AssertionError("rendering must not call a model")
+    monkeypatch.setattr("dv_agent.cli._llm", fail)
+    assert main(["render-testplan", "--out", str(run)]) == 0
+    assert json.loads(capsys.readouterr().out)["html"] == result["html"]
+    assert (run / "testplan_doc.html").read_text() == render_html(edited)
+    assert (run / "testplan_doc.md").read_text() == edited
+    cached_llm = _llm()
+    assert run_testplan_doc(run, cached_llm)["reused"] is True
+    assert cached_llm.calls == []
+    assert (run / "testplan_doc.md").read_text() == edited
+
+
+def test_configurations_are_blocked_when_register_extraction_failed(run):
+    def fail(payload):
+        raise LLMError("incomplete", "limited")
+    run_testplan_doc(run, _llm(testplan_registers=fail))
+    doc = _doc(run)
+    assert doc["registers"]["status"] == "BLOCKED"
+    section = next(s for s in doc["sections"] if s["id"] == "configurations")
+    assert section["status"] == "BLOCKED"
+
+
+def test_old_register_extraction_invalidates_dependent_testplan_cache(run):
+    run_testplan_doc(run, _llm())
+    doc = _doc(run)
+    doc["registers"].pop("extraction_signature")
+    (run / "testplan_doc.json").write_text(json.dumps(doc))
+    assert run_testplan_doc(run, _llm())["reused"] is False
+
+
+def test_llm_configuration_identification_feeds_strategy_and_configuration_sections(run):
+    seen = set()
+    def identified(payload):
+        result = registers_handler(payload)
+        for r in result["registers"]:
+            if r["abbreviation"] != "CTRL":
+                continue
+            r |= dict(configurable=True, configuration_reason="Select counter operating enables",
+                      configuration_quote=r["quote"])
+            for f in r["fields"]:
+                f |= dict(configurable=True, configuration_reason="Enable control", configuration_quote=f["quote"])
+        return result
+    def strategy(payload):
+        ctrl = next(r for r in payload["registers"] if r["register"] == "CTRL")
+        assert ctrl["configuration"]["configurable"] is True
+        assert all(c["identification"] == "LLM" for c in ctrl["configuration_controls"])
+        seen.add("strategy")
+        return strategy_handler(payload)
+    def configurations(payload):
+        assert all(f["identification"] == "LLM" for f in payload["configurable_fields"])
+        assert all(f["configuration_reason"] == "Enable control" for f in payload["configurable_fields"])
+        seen.add("configurations")
+        return configurations_handler(payload)
+    run_testplan_doc(run, _llm(testplan_registers=identified, testplan_strategy=strategy,
+                               testplan_configurations=configurations))
+    assert seen == {"strategy", "configurations"}

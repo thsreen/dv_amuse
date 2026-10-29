@@ -19,6 +19,7 @@ from .repair import default_max_repairs, render_repairs, structured_with_repair
 from .retrieval import RetrievalConfig
 from .testplan_context import chunk_record, fetch_context
 from .trace import Tracer
+from .provenance_badge import badge
 
 CATEGORIES = ["bus", "serial_data", "flow_control", "interrupt", "clock", "reset", "sideband",
               "debug", "test", "power", "other"]
@@ -276,7 +277,9 @@ def render(interfaces: dict, heading: str) -> list[str]:
         reason = interfaces.get("error") or "; ".join(interfaces.get("validation", []))
         return lines + [f"**{interfaces['status']}**: {reason}", ""]
     for g in interfaces["groups"]:
-        lines += [f"### {g['name']} [{g['provenance']}]",
+        g_ids = [s["chunk_id"] for s in g["signals"] if s.get("chunk_id")]
+        lines += [f"### {g['name']} " + badge(g['provenance'], g_ids, g.get('rationale', '') or
+                                                 "Signals are grouped by inferred function and connected module type."),
                   f"Function: {g['function']} | Category: {g['category']}{' (sideband)' if g['is_sideband'] else ''} | "
                   f"Connected module type: {g['peer_type']} ({g['connected_to'] or 'not stated'}) | "
                   f"Protocol: {g['protocol'] or 'not stated'} | DUT role: {g['dut_role']} | "
@@ -290,7 +293,9 @@ def render(interfaces: dict, heading: str) -> list[str]:
                                                            or s["active_level"] in ("not_applicable", "unknown")
                                                            else " (not stated)")
             lines.append(f"| {s['name']} | {width} | {direction} | {level} | {s['availability'] or '-'} | "
-                         f"{s['description'].replace('|', '/')} | {s['chunk_id']} p.{s['pages'][0]} [{s['provenance']}] |")
+                         f"{s['description'].replace('|', '/')} | {s['chunk_id']} p.{s['pages'][0]} "
+                         + badge(s['provenance'], [s['chunk_id']],
+                                 "Signal properties are interpreted from the cited source text.") + " |")
         lines.append("")
     lines += [f"> Validation: {v}" for v in interfaces["validation"]]
     lines += render_repairs(interfaces.get("repair"))

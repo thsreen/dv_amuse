@@ -28,6 +28,7 @@ def observation(payload):
     excerpt = next(c for c in context["evidence"] if "posedge clk" in c["text"])
     return dict(observations=[dict(text="Potential clock-domain transfer into top.right.q requires designer review.",
                                    kind="crossing", suggested_verification="Exercise source/destination clocks and reset during transfers.",
+                                   inference_reason="The cited RTL shows signals crossing the candidate clock domains.",
                                    designer_question="Which transfer/reset assumptions and synchronization checks are required?",
                                    spec_relationship="NOT_FOUND_IN_RETRIEVED_SPEC", cited_spec_ids=[],
                                    cited_rtl_node_ids=[node["id"]], cited_rtl_excerpt_ids=[excerpt["id"]])])

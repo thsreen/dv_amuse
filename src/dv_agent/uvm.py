@@ -212,7 +212,8 @@ def _template_text(filename: str, values: dict[str, str]) -> str:
 
 def _render(prefix: str, ports: list[dict], clock: str, reset: str | None,
             reset_active: str | None, sequences: list[dict], controls: dict,
-            plan_configs: list[dict], arguments: dict, catalog: dict) -> dict[str, str]:
+            plan_configs: list[dict], arguments: dict, catalog: dict,
+            plan_supplied: bool = False) -> dict[str, str]:
     driven = [p for p in ports if p["direction"] == "input" and p["name"] not in {clock, reset}]
     observed = [p for p in ports if p["direction"] == "output"]
     if not driven:
@@ -231,7 +232,7 @@ def _render(prefix: str, ports: list[dict], clock: str, reset: str | None,
         "ITEM_FIELDS": "\n".join(_declaration(driven, rand=True) + _declaration(observed)),
         "DRIVE_KNOBS": "\n".join(f"    bit drive_{p['name']} = 1;" for p in driven),
         "SEQUENCE_KNOBS": "\n".join(
-            ["    bit enable_base_sequence = " + ("0;" if sequences else "1;")]
+            ["    bit enable_base_sequence = " + ("0;" if plan_supplied else "1;")]
             + [line for seq in sequences for line in
                (f"    bit enable_{_slug(seq['name'])} = 0;",
                 f"    int unsigned count_{_slug(seq['name'])} = 1;")]),
@@ -439,7 +440,7 @@ def build_uvm(definition: dict, *, prefix: str | None, clock: str, reset: str | 
     if len(knobs) != len(set(knobs)):
         raise ValueError("generated configuration names collide")
     artifacts = _render(prefix, ports, clock, reset, reset_active, sequences, controls,
-                        plan_configs, arguments, catalog)
+                        plan_configs, arguments, catalog, plan_supplied=plan is not None)
     template_files = sorted(TEMPLATE_ROOT.glob("*"))
     template_hash = hashlib.sha256(b"".join(p.name.encode() + b"\0" + p.read_bytes()
                                             for p in template_files if p.is_file())).hexdigest()

@@ -1,4 +1,4 @@
-"""orchestrate-agent CLI: run | validate | status."""
+"""orchestrate-agent CLI: interactive terminal, or run | validate | status."""
 import argparse
 import json
 import os
@@ -92,14 +92,17 @@ def _main(argv: list[str] | None) -> int:
     load_env_file(PACKAGE_ROOT / ".env")
     args_list = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(prog="orchestrate-agent")
-    sub = parser.add_subparsers(dest="cmd", required=True)
+    parser.add_argument("--llm", choices=LLM_MODES,
+                        help="model use for the interactive terminal (default: auto)")
+    sub = parser.add_subparsers(dest="cmd", required=False)
 
     pr = sub.add_parser("run", help="execute a flow file step by step")
     pr.add_argument("--flow", type=Path, required=True, help="flow JSON contract")
-    pr.add_argument("--out", type=Path, required=True, help="orchestrator run directory")
+    pr.add_argument("--out", type=Path, required=True, help="run directory")
     pr.add_argument("--repo", type=Path, help="spec repository (${repo})")
     pr.add_argument("--include", action="append", default=[], help="${include} entry (repeatable)")
     pr.add_argument("--rtl-files", action="append", default=[], help="${rtl_files} entry (repeatable)")
+    pr.add_argument("--rtl-graph-files", action="append", default=[], help="RTL graph source (repeatable; defaults to --rtl-files)")
     pr.add_argument("--rtl-top", help="${rtl_top}")
     pr.add_argument("--scope", default="", help="${scope}")
     pr.add_argument("--template", type=Path, help="${template}")
@@ -122,6 +125,9 @@ def _main(argv: list[str] | None) -> int:
     ps.add_argument("--out", type=Path, required=True)
 
     args = parser.parse_args(args_list)
+    if args.cmd is None:
+        from .repl import repl
+        return repl(llm_mode=args.llm)
     if args.cmd == "validate":
         from .flow import load_flow
         from .guards import unknown_rules
@@ -156,7 +162,8 @@ def _main(argv: list[str] | None) -> int:
     if not args.flow.is_file():
         raise UsageError(f"flow file not found: {args.flow}")
     variables: dict = {"include": list(args.include),
-                       "rtl_files": list(args.rtl_files), "scope": args.scope}
+                       "rtl_files": list(args.rtl_files),
+                       "rtl_graph_files": list(args.rtl_graph_files or args.rtl_files), "scope": args.scope}
     if args.repo is not None:
         variables["repo"] = str(args.repo)
     if args.rtl_top:
