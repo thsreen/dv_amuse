@@ -5,13 +5,15 @@ test plan, using Meta's Muse Spark model for the semantic work and deterministic
 
 ![dv_agent architecture](architecture.png)
 
+The diagram shows the default specification path. The opt-in [RTL observations extension](RTL_OBSERVATIONS.md) runs before strategy and does not change specification authority.
+
 Editable source: [`architecture.svg`](architecture.svg) (regenerate the PNG from it after edits).
 
 ## Principles
 
 | Principle | Where it is enforced |
 |---|---|
-| Specification only: no design source is read or mentioned (D-008) | `ingest.discover` skips design-source, bench and tool-output folders; prompts and templates name only the specification |
+| Specification-authoritative intended behavior; optional RTL implementation observations (D-032) | Default ingestion still skips design sources. An explicit prebuilt RTL graph enables the dedicated review-required observations stage before strategy; see RTL_OBSERVATIONS.md |
 | Fixed step order chosen by the user; the model never picks the next step (D-014) | `pipeline.py`, `testplan_doc.build_testplan_doc` |
 | The model does the semantic work; code verifies it | Every model call goes through a schema and a check (below) |
 | Checks outside the model refuse its output and the model repairs it (D-015) | `repair.structured_with_repair` |
@@ -74,6 +76,9 @@ only for a new output shape.
 2. `check(answer)` returns the problems the model can fix; an empty list accepts the answer.
 3. A refused answer goes back with `previous_output` and `refusal` (the problems) and repair instructions.
 4. At most `DV_AGENT_MAX_REPAIRS` repairs (default 2). A failed repair call keeps the last answer.
+5. In free-text sections and Configurations, once the deterministic checks pass, a separate `claims_check`
+   call judges each DOCUMENTED/INFERRED claim against only its cited text (`claims.py`, D-025). Unsupported
+   claims are refused like any other problem; claims still unsupported after the budget become ASSUMED.
 
 After the last attempt the step's deterministic cleanup still applies (drop, downgrade, fill), and the
 unresolved problems become one designer question per step. Checks never include problems the

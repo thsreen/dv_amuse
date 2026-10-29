@@ -11,7 +11,7 @@ from dv_agent.llm import MetaClient
 from dv_agent.pipeline import run_build_graph, run_ingest
 
 COMMANDS = ["ingest", "build-graph", "interfaces", "registers", "strategy", "plan", "testplan", "pipeline", "query", "context", "deps", "features", "usage",
-            "lineage"]
+            "lineage", "rtl-interfaces", "build-interface"]
 
 
 @pytest.mark.parametrize("cmd", COMMANDS)

@@ -89,6 +89,7 @@ def test_blocked_interface_step_does_not_stop_the_plan(spec_repo, tmp_path):
     assert summary["interfaces"]["status"] == "BLOCKED"
     status = {s["id"]: s["status"] for s in summary["sections"]}
     assert status.pop("strategy") == "NOT_RUN"  # the strategy is built from verified interface groups
+    assert status.pop("rtl_observations") == "NOT_RUN"  # opt-in; no RTL graph provided
     assert set(status.values()) == {"PASS"}
     assert "**BLOCKED**" in (out / "testplan_doc.md").read_text()
     assert run_testplan_doc(out, _llm())["reused"] is False

@@ -306,9 +306,23 @@ def _doc_summary(doc: dict, out: Path) -> dict:
 
 def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Path | None = None,
                      cfg: DocConfig | None = None, embedder: Embedder | None = None,
-                     force: bool = False) -> dict:
+                     force: bool = False, rtl_graph_path: Path | None = None, rtl_scope: str = "") -> dict:
     """Generate the template-driven test-plan document (JSON + Markdown) from the graph."""
     template = load_template(template_path)
+    rtl_graph, rtl_input = None, None
+    if rtl_scope and rtl_graph_path is None:
+        raise ValueError("rtl_scope requires an explicit RTL graph")
+    if rtl_graph_path is not None:
+        if not rtl_graph_path.is_file():
+            raise ValueError(f"RTL graph not found: {rtl_graph_path}")
+        if not any(s["generator"] == "rtl_observations" for s in template["sections"]):
+            raise ValueError("template needs an rtl_observations section to use an RTL graph")
+        from rtl_agent.graph import load_graph as load_rtl_graph
+        from rtl_agent.dense import fingerprint
+        rtl_graph = load_rtl_graph(rtl_graph_path)
+        if rtl_scope and not any(d.get("type") == "instance" and d.get("scope") == rtl_scope for _, d in rtl_graph.nodes(data=True)):
+            raise ValueError(f"unknown RTL scope: {rtl_scope}")
+        rtl_input = dict(graph_fingerprint=fingerprint(rtl_graph), scope=rtl_scope, graph_path=str(rtl_graph_path.resolve()))
     G = load_graph(out / GRAPH_FILE)
     doc_path = out / TESTPLAN_DOC
     if not force and doc_path.exists():
@@ -319,7 +333,9 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
         if (prev.get("template_hash") == template["template_hash"] and prev.get("scope") == scope.strip()
                 and prev.get("model") == llm.model
                 and prev.get("graph_build_trace_id") == G.graph.get("build_trace_id")
-                and all(s["status"] == "PASS" for s in prev.get("sections", [])) and prev.get("sections")
+                and prev.get("rtl_input") == rtl_input
+                and all(s["status"] == "PASS" or (s.get("generator") == "rtl_observations" and s["status"] == "NOT_RUN")
+                        for s in prev.get("sections", [])) and prev.get("sections")
                 and (prev.get("interfaces") is None or prev["interfaces"]["status"] in ("PASS", "NOT_RUN"))
                 and (prev.get("registers") is None or prev["registers"]["status"] in ("PASS", "NOT_RUN"))):
             return _doc_summary(prev, out) | {"reused": True}
@@ -329,8 +345,10 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
     with Tracer(out / TRACE_FILE, "testplan_doc",
                 input={"template": template["template_id"], "scope": scope},
                 metadata={"model": llm.model}) as tracer:
-        doc = build_testplan_doc(G, H, llm, tracer, template, scope, cfg, dense_fn)
+        doc = build_testplan_doc(G, H, llm, tracer, template, scope, cfg, dense_fn,
+                                rtl_graph=rtl_graph, rtl_scope=rtl_scope)
         save_graph(G, out / GRAPH_FILE)
+    doc["rtl_input"] = rtl_input
     doc["token_usage"] = {"Test-plan run": summarize(out / TRACE_FILE, tracer.trace_id)}
     if G.graph.get("build_trace_id"):
         doc["token_usage"]["Graph build"] = summarize(out / TRACE_FILE, G.graph["build_trace_id"])

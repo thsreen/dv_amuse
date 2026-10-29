@@ -89,7 +89,8 @@ def _evidence_chunks(interfaces: dict | None, registers: dict | None) -> list[st
 
 def build_strategy(llm: LLM, tracer: Tracer, interfaces: dict | None, registers: dict | None,
                    scope: str = "", context: dict | None = None, previous: list[dict] | None = None,
-                   chunk_chars: int = 1200, extra_instructions: str = "", max_repairs: int | None = None) -> dict:
+                   chunk_chars: int = 1200, extra_instructions: str = "", max_repairs: int | None = None,
+                   rtl_observations: dict | None = None) -> dict:
     """Structured strategy from the interface and register steps; checked against them."""
     groups = (interfaces or {}).get("groups", []) if (interfaces or {}).get("status") == "PASS" else []
     if not groups:
@@ -104,18 +105,63 @@ def build_strategy(llm: LLM, tracer: Tracer, interfaces: dict | None, registers:
                    chunks=[{"chunk_id": c["chunk_id"], "section": c["section"], "text": c["text"][:chunk_chars]}
                            for c in context["chunks"]],
                    previous_sections=previous or [])
+    observations = (rtl_observations or {}).get("entries", [])
+    schema = _schema([g["name"] for g in groups], signals, reg_labels, chunk_ids)
+    if observations:
+        from .rtl_observations import compact as compact_rtl
+        payload["rtl_observations"] = compact_rtl(rtl_observations)
+        schema["required"].append("rtl_observation_actions")
+        schema["properties"]["rtl_observation_actions"] = {
+            "type": "array", "items": {"type": "object", "additionalProperties": False,
+                "required": ["observation_id", "handling", "agents"], "properties": {
+                    "observation_id": {"type": "string", "enum": [e["id"] for e in observations]},
+                    "handling": {"type": "string"}, "agents": {"type": "array", "items": {"type": "string"}}}}}
+
+    def check(data):
+        return (validate_strategy(data, groups, set(reg_labels), set(chunk_ids))["validation"]
+                + _rtl_actions(data, observations)[1])
     try:
         instructions = STRATEGY_INSTRUCTIONS + (f"\nAdditional instructions:\n{extra_instructions}" if extra_instructions else "")
+        if observations:
+            instructions += ("\nAddress every supplied RTL observation in rtl_observation_actions with proposed verification "
+                             "handling and agent names. These are implementation concerns pending RTL design engineer review, "
+                             "not expected behavior. Do not assume a crossing is a bug or safe, or invent spec behavior. "
+                             "Keep interface drive ownership and specification-backed expected behavior unchanged.")
         out = structured_with_repair(
             llm, tracer, name="testplan_strategy", instructions=instructions, payload=payload,
-            schema=_schema([g["name"] for g in groups], signals, reg_labels, chunk_ids),
-            check=lambda d: validate_strategy(d, groups, set(reg_labels), set(chunk_ids))["validation"],
+            schema=schema, check=check,
             max_repairs=max_repairs)
     except LLMError as exc:
         return dict(status="BLOCKED", error=exc.kind, agents=[], scoreboards=[], register_model={},
                     virtual_sequences=[], gaps=[], validation=[])
-    return dict(status="PASS", environment=out.data.get("environment", "").strip(),
-                **validate_strategy(out.data, groups, set(reg_labels), set(chunk_ids)), repair=out.summary())
+    result = dict(status="PASS", environment=out.data.get("environment", "").strip(),
+                  **validate_strategy(out.data, groups, set(reg_labels), set(chunk_ids)), repair=out.summary())
+    if observations:
+        actions, notes = _rtl_actions(out.data, observations)
+        result["rtl_observation_actions"] = actions
+        result["validation"] += notes
+    return result
+
+
+def _rtl_actions(data: dict, observations: list[dict]) -> tuple[list[dict], list[str]]:
+    if not observations:
+        return [], []
+    allowed = {o["id"] for o in observations}
+    agents = {a["name"] for a in data.get("agents", [])}
+    actions, notes, seen = [], [], set()
+    for a in data.get("rtl_observation_actions", []):
+        oid = a.get("observation_id")
+        if oid not in allowed or oid in seen or not a.get("handling", "").strip():
+            notes.append(f"invalid/duplicate RTL observation action: {oid}")
+            continue
+        seen.add(oid)
+        if set(a.get("agents", [])) - agents:
+            notes.append(f"RTL action {oid} names unknown agents")
+        actions.append(dict(observation_id=oid, handling=a["handling"].strip(),
+                            agents=[n for n in a.get("agents", []) if n in agents],
+                            review_status="NEEDS_REVIEW", review_owner="RTL_DESIGN_ENGINEER"))
+    notes += [f"RTL observation {oid} has no strategy handling action" for oid in sorted(allowed - seen)]
+    return actions, notes
 
 
 def validate_strategy(data: dict, groups: list[dict], reg_labels: set[str], chunk_ids: set[str]) -> dict:
@@ -252,6 +298,12 @@ def render(strategy: dict, heading: str) -> list[str]:
         lines.append("")
     for g in strategy["gaps"]:
         lines.append(f"> Gap: interface group {g['interface_group']} has no agent")
+    if strategy.get("rtl_observation_actions"):
+        lines += ["### RTL observations driving strategy", "",
+                  "All actions require RTL design engineer review; expected behavior remains spec-derived.", ""]
+        for action in strategy["rtl_observation_actions"]:
+            lines.append(f"- {action['observation_id']} [NEEDS_REVIEW]: {action['handling']} "
+                         f"(agents: {', '.join(action['agents']) or 'designer/integration review'})")
     lines += [f"> Validation: {v}" for v in strategy["validation"]]
     lines += render_repairs(strategy.get("repair"))
     return lines + [""]

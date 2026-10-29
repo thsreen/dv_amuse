@@ -175,3 +175,5 @@ def no_langfuse(monkeypatch):
     monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
     monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
     monkeypatch.delenv("MODEL_API_KEY", raising=False)
+    # Ordinary CLI tests must not reload real credentials from the developer's .env.
+    monkeypatch.setattr("dv_agent.cli.load_env_file", lambda path: None)

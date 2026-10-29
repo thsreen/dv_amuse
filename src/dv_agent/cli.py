@@ -133,6 +133,8 @@ def _main(argv: list[str] | None) -> int:
     pt.add_argument("--template", type=Path, help="template JSON (default: built-in quick_reference_v0)")
     pt.add_argument("--force", action="store_true", help="regenerate even if the document is current")
     pt.add_argument("--fresh", action="store_true", help="delete the LLM cache and regenerate")
+    pt.add_argument("--rtl-graph", type=Path, help="opt in to review-required implementation observations from this graph")
+    pt.add_argument("--rtl-scope", default="", help="instance scope within --rtl-graph")
 
     pa = sub.add_parser("pipeline", help="ingest, build the graph and (optionally) plan in one command")
     pa.add_argument("repo", type=Path)
@@ -142,6 +144,8 @@ def _main(argv: list[str] | None) -> int:
     pa.add_argument("--testplan", action="store_true", help="also generate the template-driven test-plan document")
     pa.add_argument("--scope", default="", help="test-plan scope (with --testplan)")
     pa.add_argument("--template", type=Path, help="test-plan template JSON (with --testplan)")
+    pa.add_argument("--rtl-graph", type=Path, help="RTL observations graph (requires --testplan)")
+    pa.add_argument("--rtl-scope", default="", help="instance scope within --rtl-graph")
     pa.add_argument("--force", action="store_true", help="rerun every stage regardless of existing outputs")
     pa.add_argument("--fresh", action="store_true",
                     help="delete all generated artifacts (cache, graph, plan, trace) and run from scratch")
@@ -179,8 +183,55 @@ def _main(argv: list[str] | None) -> int:
     pl.add_argument("node_id")
     pl.add_argument("--out", type=Path, required=True)
 
+    # Existing entry point forwards to the independent RTL package.
+    from rtl_agent.cli import add_commands
+    add_commands(sub)
+
+    puvm = sub.add_parser("build-uvm", help="build an extendable UVM scaffold from interface JSON")
+    puvm.add_argument("interface", type=Path, help="interface_definition.json")
+    puvm.add_argument("--out", type=Path, required=True, help="separate coding-flow output directory")
+    puvm.add_argument("--prefix", help="generated SV class prefix (or name in --agent-args)")
+    puvm.add_argument("--clock", required=True, help="explicit scalar DUT input clock")
+    puvm.add_argument("--reset", help="explicit scalar DUT input reset for the common reset UVC")
+    puvm.add_argument("--reset-active", choices=("high", "low"),
+                      help="required with --reset; no polarity is inferred from the name")
+    puvm.add_argument("--testplan", type=Path, help="testplan_doc.json for named sequence skeletons")
+    puvm.add_argument("--agent-args", type=Path,
+                      help="template_id/name/custom code arguments for the UVM agent template")
+    puvm.add_argument("--llm", choices=("off", "on"), default="off",
+                      help="opt-in plan-to-control extraction; requires --testplan and MODEL_API_KEY")
+    puvm.add_argument("--force", action="store_true", help="replace generated files in the output directory")
+
     args = p.parse_args(argv)
-    if args.cmd == "ingest":
+    if args.cmd == "build-uvm":
+        from .uvm import build_uvm, write_uvm
+        if not args.interface.is_file():
+            raise UsageError(f"interface file not found: {args.interface}")
+        if args.testplan and not args.testplan.is_file():
+            raise UsageError(f"test plan file not found: {args.testplan}")
+        if args.agent_args and not args.agent_args.is_file():
+            raise UsageError(f"agent arguments file not found: {args.agent_args}")
+        if args.llm == "on" and not args.testplan:
+            raise UsageError("--llm on requires --testplan")
+        llm = _llm() if args.llm == "on" else None
+        if args.llm == "on" and llm is None:
+            raise UsageError("MODEL_API_KEY is required for --llm on")
+        try:
+            definition = json.loads(args.interface.read_text(encoding="utf-8"))
+            plan = json.loads(args.testplan.read_text(encoding="utf-8")) if args.testplan else None
+            agent_args = json.loads(args.agent_args.read_text(encoding="utf-8")) if args.agent_args else None
+        except json.JSONDecodeError as exc:
+            raise UsageError(f"input JSON is invalid: {exc}") from None
+        artifacts, manifest = build_uvm(definition, prefix=args.prefix, clock=args.clock,
+                                        reset=args.reset, reset_active=args.reset_active,
+                                        plan=plan, llm=llm, agent_args=agent_args)
+        write_uvm(args.out, artifacts, inputs=[p for p in (args.interface, args.testplan, args.agent_args) if p],
+                  force=args.force)
+        _print({"out": str(args.out), "files": sorted(artifacts), "status": manifest["status"]})
+    elif args.cmd in ("rtl-interfaces", "build-interface"):
+        from rtl_agent.commands import run_rtl_command
+        _print(run_rtl_command(args))
+    elif args.cmd == "ingest":
         out = args.out or PACKAGE_ROOT / "runs" / args.repo.resolve().name
         _print(run_ingest(args.repo, out, args.include, force=args.force) | {"out": str(out)})
     elif args.cmd == "build-graph":
@@ -218,10 +269,13 @@ def _main(argv: list[str] | None) -> int:
         removed = clear_llm_cache(args.out) if args.fresh else False
         llm.cache_dir = args.out / "llm_cache"
         _print(run_testplan_doc(args.out, llm, scope=args.scope, template_path=args.template,
-                                embedder=_embedder(), force=args.force or args.fresh) | {"cache_cleared": removed})
+                                embedder=_embedder(), force=args.force or args.fresh,
+                                rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope) | {"cache_cleared": removed})
     elif args.cmd == "pipeline":
         out = args.out or PACKAGE_ROOT / "runs" / args.repo.resolve().name
         llm, embedder = _models_for(_llm_mode(args.llm))
+        if (args.rtl_graph or args.rtl_scope) and not args.testplan:
+            raise UsageError("--rtl-graph/--rtl-scope require --testplan")
         if (args.requirements or args.testplan) and llm is None:
             raise UsageError("test-plan generation needs the LLM (MODEL_API_KEY set and --llm not off)")
         result = {"out": str(out)}
@@ -238,7 +292,8 @@ def _main(argv: list[str] | None) -> int:
                                            embedder=embedder, force=force)
         if args.testplan:
             result["testplan"] = run_testplan_doc(out, llm, scope=args.scope, template_path=args.template,
-                                                  embedder=embedder, force=force)
+                                                  embedder=embedder, force=force,
+                                                  rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope)
         ran = [r["trace_id"] for r in (result.get(k) for k in ("ingest", "build", "plan", "testplan"))
                if r and not r.get("reused") and r.get("trace_id")]
         result["usage"] = run_totals(out / "trace.jsonl", ran) if ran else None

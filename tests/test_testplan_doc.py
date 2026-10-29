@@ -10,9 +10,9 @@ from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_testp
 from dv_agent.testplan_doc import load_template
 from dv_agent.trace import read_trace
 
-HEADINGS = ["1. Title", "2. Feature Description", "3. Register Map", "4. High Level Verification Strategy",
-            "5. Configurations", "6. Stimulus", "7. Checks", "8. Coverage", "9. Callouts to Higher Testbenches",
-            "10. Assumptions", "11. Questions to Designers"]
+HEADINGS = ["1. Title", "2. Feature Description", "3. Register Map", "4. Observations from RTL", "5. High Level Verification Strategy",
+            "6. Configurations", "7. Stimulus", "8. Checks", "9. Coverage", "10. Callouts to Higher Testbenches",
+            "11. Assumptions", "12. Questions to Designers"]
 
 
 def entries_handler(payload):
@@ -93,12 +93,16 @@ def configurations_handler(payload):
          "cited_chunk_ids": []}]}
 
 
+def claims_handler(payload):
+    return {"judgements": [{"id": c["id"], "supported": True, "reason": ""} for c in payload["claims"]]}
+
+
 def _llm(**overrides):
     handlers = {"spec_requirements": extraction_handler, "requirement_dependencies": dependency_handler,
                 "rerank_chunks": rerank_handler, "test_plan_items": plan_handler,
                 "testplan_entries": entries_handler, "testplan_registers": registers_handler,
                 "testplan_configurations": configurations_handler, "testplan_interfaces": interfaces_handler,
-                "testplan_strategy": strategy_handler}
+                "testplan_strategy": strategy_handler, "claims_check": claims_handler}
     handlers.update(overrides)
     return FakeLLM(handlers)
 
@@ -126,7 +130,7 @@ def test_template_loads_and_validates(tmp_path):
 
 def test_document_has_all_sections_in_template_order(run):
     summary = run_testplan_doc(run, _llm())
-    assert [s["status"] for s in summary["sections"]] == ["PASS"] * 11
+    assert [s["status"] for s in summary["sections"]] == ["PASS"] * 3 + ["NOT_RUN"] + ["PASS"] * 8
     md = (run / "testplan_doc.md").read_text()
     positions = [md.index(h if h == "1. Title" else f"## {h}") if h != "1. Title" else 0 for h in HEADINGS]
     assert positions == sorted(positions)
@@ -173,7 +177,7 @@ def test_configurations_cover_every_writable_field(run):
     questions = next(s for s in doc["sections"] if s["id"] == "questions")["entries"]
     assert any("CTRL.Interrupt enable" in q["text"] for q in questions)
     md = (run / "testplan_doc.md").read_text()
-    assert md.index("## 4. High Level Verification Strategy") < md.index("## 5. Configurations") < md.index("## 6. Stimulus")
+    assert md.index("## 5. High Level Verification Strategy") < md.index("## 6. Configurations") < md.index("## 7. Stimulus")
 
 
 def test_later_sections_see_earlier_ones_and_assumptions_are_collected(run):
@@ -245,7 +249,7 @@ def test_cli_testplan(run, capsys, monkeypatch):
     capsys.readouterr()
     assert main(["testplan", "--out", str(run), "--scope", "timer"]) == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["scope"] == "timer" and len(out["sections"]) == 11
+    assert out["scope"] == "timer" and len(out["sections"]) == 12
 
 
 def test_pipeline_testplan_flag(spec_repo, tmp_path, capsys, monkeypatch):

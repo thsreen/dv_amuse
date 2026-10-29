@@ -41,8 +41,18 @@
       "generator": "register_map"
     },
     {
+      "id": "rtl_observations",
+      "heading": "4. Observations from RTL",
+      "generator": "rtl_observations",
+      "queries": [
+        "{scope} clocks reset initialization",
+        "{scope} external connections dependencies integration"
+      ],
+      "instructions": "Optional implementation considerations from a supplied RTL graph. Require RTL design engineer review; feed proposed handling into strategy and the verification plan. The specification remains authority for expected behavior."
+    },
+    {
       "id": "strategy",
-      "heading": "4. High Level Verification Strategy",
+      "heading": "5. High Level Verification Strategy",
       "generator": "strategy",
       "queries": [
         "{scope} bus interface signals",
@@ -63,7 +73,7 @@
     },
     {
       "id": "configurations",
-      "heading": "5. Configurations",
+      "heading": "6. Configurations",
       "generator": "configurations",
       "queries": [
         "{scope} configuration options modes",
@@ -76,7 +86,7 @@
     },
     {
       "id": "stimulus",
-      "heading": "6. Stimulus",
+      "heading": "7. Stimulus",
       "generator": "entries",
       "queries": [
         "{scope} configuration options",
@@ -96,7 +106,7 @@
     },
     {
       "id": "checks",
-      "heading": "7. Checks",
+      "heading": "8. Checks",
       "generator": "entries",
       "queries": [
         "{scope} status indicators",
@@ -117,7 +127,7 @@
     },
     {
       "id": "coverage",
-      "heading": "8. Coverage",
+      "heading": "9. Coverage",
       "generator": "entries",
       "queries": [
         "{scope} configuration options",
@@ -134,7 +144,7 @@
     },
     {
       "id": "callouts",
-      "heading": "9. Callouts to Higher Testbenches",
+      "heading": "10. Callouts to Higher Testbenches",
       "generator": "entries",
       "queries": [
         "{scope} external connections pads",
@@ -152,7 +162,7 @@
     },
     {
       "id": "assumptions",
-      "heading": "10. Assumptions",
+      "heading": "11. Assumptions",
       "generator": "entries",
       "queries": [
         "{scope} optional features defines",
@@ -162,11 +172,12 @@
         "assumption"
       ],
       "collect_assumed": true,
-      "instructions": "Assumptions this plan makes where the specification is silent or ambiguous. Every entry is ASSUMED unless a cited source states it."
+      "instructions": "Assumptions this plan makes where the specification is silent or ambiguous. Every entry is ASSUMED unless a cited source states it.",
+      "claims_check": false
     },
     {
       "id": "questions",
-      "heading": "11. Questions to Designers",
+      "heading": "12. Questions to Designers",
       "generator": "entries",
       "queries": [
         "{scope} undefined unclear behaviour",
@@ -176,7 +187,8 @@
         "question"
       ],
       "include_conflicts": true,
-      "instructions": "Questions for the designers about ambiguous, missing or contradictory specification statements. Cite the text that raises each question."
+      "instructions": "Questions for the designers about ambiguous, missing or contradictory specification statements. Cite the text that raises each question.",
+      "claims_check": false
     }
   ]
 }

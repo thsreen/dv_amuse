@@ -1,0 +1,6 @@
+  class {{UVC_NAME}}_item extends uvm_sequence_item;
+    `uvm_object_utils({{UVC_NAME}}_item)
+{{ITEM_FIELDS}}
+{{CUSTOM_ITEM_FIELDS}}
+    function new(string name="{{UVC_NAME}}_item"); super.new(name); endfunction
+  endclass

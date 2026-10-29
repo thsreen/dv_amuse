@@ -1,0 +1,22 @@
+  class {{UVC_NAME}}_monitor extends uvm_component;
+    `uvm_component_utils({{UVC_NAME}}_monitor)
+    {{UVC_NAME}}_cfg cfg;
+    uvm_analysis_port #({{UVC_NAME}}_item) ap;
+{{CUSTOM_MONITOR_DECLARATIONS}}
+    function new(string name, uvm_component parent);
+      super.new(name, parent); ap = new("ap", this);
+    endfunction
+    virtual function void sample_item({{UVC_NAME}}_item tr);
+{{MONITOR_ASSIGNMENTS}}
+{{CUSTOM_MONITOR_SAMPLE}}
+    endfunction
+    task run_phase(uvm_phase phase);
+      {{UVC_NAME}}_item tr;
+      forever begin
+        @(posedge cfg.vif.{{CLOCK_SIGNAL}});
+        tr = {{UVC_NAME}}_item::type_id::create("tr");
+        sample_item(tr);
+        ap.write(tr);
+      end
+    endtask
+  endclass

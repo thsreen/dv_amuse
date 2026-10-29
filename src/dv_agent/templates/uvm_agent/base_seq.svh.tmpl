@@ -1,0 +1,25 @@
+  class {{UVC_NAME}}_base_seq extends uvm_sequence #({{UVC_NAME}}_item);
+    `uvm_object_utils({{UVC_NAME}}_base_seq)
+    `uvm_declare_p_sequencer({{UVC_NAME}}_sequencer)
+{{CUSTOM_BASE_SEQ_DECLARATIONS}}
+    function new(string name="{{UVC_NAME}}_base_seq"); super.new(name); endfunction
+    virtual function void configure_item({{UVC_NAME}}_item tr);
+      if (!tr.randomize()) `uvm_fatal("RAND", "transaction randomization failed")
+{{CUSTOM_BASE_SEQ_CONFIGURE}}
+    endfunction
+    virtual task apply_configuration();
+{{CUSTOM_BASE_SEQ_SETUP}}
+    endtask
+    virtual function int unsigned item_count(); return p_sequencer.cfg.num_items; endfunction
+    task body();
+      {{UVC_NAME}}_item tr;
+      if (p_sequencer.cfg == null) `uvm_fatal("CFG", "sequencer config missing")
+      apply_configuration();
+      repeat (item_count()) begin
+        tr = {{UVC_NAME}}_item::type_id::create("tr");
+        start_item(tr); configure_item(tr); finish_item(tr);
+        repeat (p_sequencer.cfg.inter_item_cycles)
+          @(posedge p_sequencer.cfg.vif.{{CLOCK_SIGNAL}});
+      end
+    endtask
+  endclass

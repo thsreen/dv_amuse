@@ -1,0 +1,15 @@
+  class {{UVC_NAME}}_scoreboard extends uvm_component;
+    `uvm_component_utils({{UVC_NAME}}_scoreboard)
+    uvm_analysis_imp #({{UVC_NAME}}_item, {{UVC_NAME}}_scoreboard) analysis_export;
+    int unsigned samples_seen;
+{{CUSTOM_SCOREBOARD_DECLARATIONS}}
+    function new(string name, uvm_component parent);
+      super.new(name, parent); analysis_export = new("analysis_export", this);
+    endfunction
+    virtual function void check_sample({{UVC_NAME}}_item tr);
+{{CUSTOM_SCOREBOARD_CHECK}}
+    endfunction
+    function void write({{UVC_NAME}}_item tr);
+      samples_seen++; check_sample(tr);
+    endfunction
+  endclass

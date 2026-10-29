@@ -1,0 +1,6 @@
+  class {{UVC_NAME}}_sequencer extends uvm_sequencer #({{UVC_NAME}}_item);
+    `uvm_component_utils({{UVC_NAME}}_sequencer)
+    {{UVC_NAME}}_cfg cfg;
+{{CUSTOM_SEQUENCER_DECLARATIONS}}
+    function new(string name, uvm_component parent); super.new(name, parent); endfunction
+  endclass

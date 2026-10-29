@@ -1,0 +1,51 @@
+{
+  "template_id": "uvm_agent_v1",
+  "description": "One class per file. Script fills wiring, names, and standard UVM plumbing; optional arguments fill reviewed custom slots.",
+  "components": [
+    {"id": "interface", "template": "interface.sv.tmpl", "output": "<name>_if.sv", "purpose": "DUT-relative signal bundle"},
+    {"id": "item", "template": "item.svh.tmpl", "output": "uvm/<name>_item.svh", "purpose": "transaction fields"},
+    {"id": "cfg", "template": "cfg.svh.tmpl", "output": "uvm/<name>_cfg.svh", "purpose": "agent and sequence controls"},
+    {"id": "sequencer", "template": "sequencer.svh.tmpl", "output": "uvm/<name>_sequencer.svh", "purpose": "sequence arbitration"},
+    {"id": "driver", "template": "driver.svh.tmpl", "output": "uvm/<name>_driver.svh", "purpose": "DUT-input drive hook"},
+    {"id": "monitor", "template": "monitor.svh.tmpl", "output": "uvm/<name>_monitor.svh", "purpose": "DUT observation hook"},
+    {"id": "scoreboard", "template": "scoreboard.svh.tmpl", "output": "uvm/<name>_scoreboard.svh", "purpose": "reviewed predictor/check hook"},
+    {"id": "agent", "template": "agent.svh.tmpl", "output": "uvm/<name>_agent.svh", "purpose": "driver/monitor/scoreboard assembly"},
+    {"id": "env", "template": "env.svh.tmpl", "output": "uvm/<name>_env.svh", "purpose": "agent container"},
+    {"id": "base_seq", "template": "base_seq.svh.tmpl", "output": "uvm/<name>_base_seq.svh", "purpose": "common stimulus loop"},
+    {"id": "named_seq", "template": "named_seq.svh.tmpl", "output": "uvm/<name>_<sequence>_seq.svh", "purpose": "one subclass per test-plan sequence"},
+    {"id": "test", "template": "test.svh.tmpl", "output": "uvm/<name>_test.svh", "purpose": "common clock/reset and agent startup"},
+    {"id": "package", "template": "package.sv.tmpl", "output": "<name>_pkg.sv", "purpose": "ordered imports and includes only"}
+  ],
+  "custom_slots": {
+    "interface.declarations": "Additional interface declarations",
+    "item.fields": "Additional transaction fields",
+    "cfg.fields": "Additional configuration knobs",
+    "sequencer.declarations": "Additional sequencer declarations",
+    "driver.declarations": "Additional driver declarations",
+    "driver.drive": "Additional code inside drive_item",
+    "monitor.declarations": "Additional monitor declarations",
+    "monitor.sample": "Additional code inside sample_item",
+    "scoreboard.declarations": "Predictor state and helper declarations",
+    "scoreboard.check": "Expected-behavior checks inside check_sample",
+    "agent.declarations": "Additional agent members",
+    "agent.build": "Additional build_phase code",
+    "agent.connect": "Additional connect_phase code",
+    "env.declarations": "Additional environment members",
+    "env.build": "Additional environment build_phase code",
+    "base_seq.declarations": "Additional base-sequence members",
+    "base_seq.configure": "Additional code inside configure_item",
+    "base_seq.setup": "Configuration setup before traffic",
+    "test.declarations": "Additional test members",
+    "test.build": "Additional test build_phase code",
+    "test.run": "Additional test run_phase code",
+    "named_seq.configure": "Per-named-sequence code after generic controls"
+  },
+  "argument_schema": {
+    "template_id": "uvm_agent_v1",
+    "name": "optional SystemVerilog identifier overriding --prefix",
+    "imports": ["optional SystemVerilog package names"],
+    "custom": {"<custom_slot>": "SystemVerilog snippet"},
+    "sequences": {"<plan sequence name>": {"configure": "SystemVerilog snippet"}},
+    "cited_chunk_ids": ["optional test-plan chunk IDs supporting custom behavior"]
+  }
+}

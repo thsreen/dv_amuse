@@ -1,0 +1,13 @@
+  class {{UVC_NAME}}_cfg extends uvm_object;
+    `uvm_object_utils({{UVC_NAME}}_cfg)
+    virtual {{UVC_NAME}}_if vif;
+    uvm_active_passive_enum is_active = UVM_ACTIVE;
+    bit enable_scoreboard = 0;
+    int unsigned num_items = 1;
+    int unsigned inter_item_cycles = 0;
+{{DRIVE_KNOBS}}
+{{SEQUENCE_KNOBS}}
+{{CONFIG_KNOBS}}
+{{CUSTOM_CFG_FIELDS}}
+    function new(string name="{{UVC_NAME}}_cfg"); super.new(name); endfunction
+  endclass

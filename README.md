@@ -2,6 +2,17 @@
 
 Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ([diagram](docs/architecture.png)).
 
+Current review/status: [docs/CODE_REVIEW_STATUS.md](docs/CODE_REVIEW_STATUS.md).
+Separate RTL coding flow: [JSON interface extractor and builder](docs/RTL_INTERFACES.md), using the
+[basic JSON template](src/rtl_agent/templates/rtl_interface_v0.json).
+The RTL extractor and interface builder live in `src/rtl_agent/`. Run them independently with
+`.venv/bin/python -m rtl_agent`; existing `dv-agent` subcommands still work.
+
+RTL hierarchy/dataflow/domain graph construction and combined Graph-RAG fetching:
+[docs/RTL_GRAPH_RAG.md](docs/RTL_GRAPH_RAG.md).
+Separate UVM coding flow: [scaffold generator](docs/UVM_SCAFFOLD.md).
+UVM agent components and fill points: [agent template catalog](src/dv_agent/templates/uvm_agent/template.json).
+
 Spec ingestion → dependency GraphRAG → traceable lineage, for any design repository
 (UART16550 in `../baseline_repos/uart16550` is the prototype, not a constraint).
 
@@ -119,7 +130,12 @@ Runs before any test-plan section (template `interfaces` block; `"enabled": fals
 
 All accept `--scope`, `--force` and `--fresh`. Strategy checks: every interface group covered by exactly one agent (uncovered groups become gaps and designer questions); agents drive only DUT inputs of their own groups; passive agents never drive; registers must exist in the register map; scoreboard and virtual-sequence agents must exist.
 
-Test-plan sections (template `quick_reference_v0`): 1 Title, 2 Feature Description, 3 Register Map (from the register step, no model call), 4 High Level Verification Strategy (strategy step), 5 Configurations (every writable field with spec-stated legal values, distribution, constraints and reserved-bit handling; missing fields are added as ASSUMED and raised as questions), 6 Stimulus, 7 Checks, 8 Coverage, 9 Callouts, 10 Assumptions, 11 Questions to Designers.
+Test-plan sections (template `quick_reference_v0`): 1 Title, 2 Feature Description, 3 Register Map, 4 Observations from RTL (opt-in, design-engineer review), 5 High Level Verification Strategy, 6 Configurations, 7 Stimulus, 8 Checks, 9 Coverage, 10 Callouts, 11 Assumptions, 12 Questions to Designers.
+
+Supply `--rtl-graph <rtl_graph.json> [--rtl-scope <instance>]` to `testplan` or `pipeline --testplan`
+to add source-backed implementation concerns before strategy. The model can request bounded graph
+fetches; observations and derived tests remain INFERRED and require RTL design engineer review.
+See [docs/RTL_OBSERVATIONS.md](docs/RTL_OBSERVATIONS.md). Without the flag the section is NOT_RUN.
 
 ## Formats
 `.docx` (headings from Word heading styles or outline levels, tables as `cell | cell` rows, page numbers from page breaks) and `.html` (`h1`-`h6` headings, tables as rows; scripts and styles skipped) are parsed with the standard library. Legacy binary `.doc` is still reported SKIPPED.
@@ -152,3 +168,10 @@ estimated at about 4 characters per token and counted as estimated.
 - Calls answered from the local response cache (`llm_cache/`) consume nothing; their original usage is shown as
   `replayed`, and `from_scratch` is what a fresh run would use.
 - `dv-agent usage --out runs/<repo> [--last N | --trace ID]`: totals per run and per model call.
+
+## Claims check (`claims.py`)
+A valid citation does not make a claim true. In free-text sections and Configurations, after the deterministic
+checks pass, a separate `claims_check` model call judges each DOCUMENTED or INFERRED claim against only the text it
+cites. Unsupported claims are refused back to the author call (refuse-and-repair); any still unsupported after the
+repair budget are downgraded to ASSUMED and raised as a designer question. Off for Assumptions and Questions; a
+failed judge call is reported as BLOCKED and never blocks the section (D-025).

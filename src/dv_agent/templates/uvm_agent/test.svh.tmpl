@@ -1,0 +1,40 @@
+  class {{UVC_NAME}}_test extends uvm_test;
+    `uvm_component_utils({{UVC_NAME}}_test)
+    {{UVC_NAME}}_env env;
+    {{UVC_NAME}}_cfg cfg;
+    clock_agent clock_uvc;
+    clock_cfg clock_control;
+{{RESET_TEST_MEMBERS}}
+{{CUSTOM_TEST_DECLARATIONS}}
+    function new(string name, uvm_component parent); super.new(name, parent); endfunction
+    function void build_phase(uvm_phase phase);
+      super.build_phase(phase);
+      clock_control = clock_cfg::type_id::create("clock_control");
+      if (!uvm_config_db #(virtual clock_if)::get(this, "", "clock_vif", clock_control.vif))
+        `uvm_fatal("CLOCK_VIF", "set clock_vif in uvm_config_db before run_test")
+      uvm_config_db #(clock_cfg)::set(this, "clock_uvc", "cfg", clock_control);
+      clock_uvc = clock_agent::type_id::create("clock_uvc", this);
+{{RESET_TEST_BUILD}}
+      cfg = {{UVC_NAME}}_cfg::type_id::create("cfg");
+      if (!uvm_config_db #(virtual {{UVC_NAME}}_if)::get(this, "", "vif", cfg.vif))
+        `uvm_fatal("VIF", "set vif in uvm_config_db before run_test")
+      uvm_config_db #({{UVC_NAME}}_cfg)::set(this, "env.agent", "cfg", cfg);
+      env = {{UVC_NAME}}_env::type_id::create("env", this);
+{{CUSTOM_TEST_BUILD}}
+    endfunction
+    task run_phase(uvm_phase phase);
+      {{UVC_NAME}}_base_seq seq;
+{{RESET_TEST_RUN_DECLARATIONS}}
+      phase.raise_objection(this);
+{{RESET_TEST_RUN}}
+      if (cfg.is_active == UVM_ACTIVE) begin
+        if (cfg.enable_base_sequence) begin
+          seq = {{UVC_NAME}}_base_seq::type_id::create("base_seq");
+          seq.start(env.agent.sqr);
+        end
+{{NAMED_SEQUENCE_STARTS}}
+      end
+{{CUSTOM_TEST_RUN}}
+      phase.drop_objection(this);
+    endtask
+  endclass

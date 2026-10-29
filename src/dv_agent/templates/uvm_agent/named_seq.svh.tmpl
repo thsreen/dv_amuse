@@ -1,0 +1,11 @@
+  // Plan sequence {{SEQUENCE_ID}}; purpose and citations are in uvm_manifest.json.
+  class {{UVC_NAME}}_{{SEQUENCE_ID}}_seq extends {{UVC_NAME}}_base_seq;
+    `uvm_object_utils({{UVC_NAME}}_{{SEQUENCE_ID}}_seq)
+    function new(string name="{{UVC_NAME}}_{{SEQUENCE_ID}}_seq"); super.new(name); endfunction
+    virtual function int unsigned item_count(); return p_sequencer.cfg.count_{{SEQUENCE_ID}}; endfunction
+    virtual function void configure_item({{UVC_NAME}}_item tr);
+      super.configure_item(tr);
+{{SEQUENCE_CONTROLS}}
+{{CUSTOM_NAMED_SEQ_CONFIGURE}}
+    endfunction
+  endclass

@@ -1,0 +1,18 @@
+  class {{UVC_NAME}}_driver extends uvm_driver #({{UVC_NAME}}_item);
+    `uvm_component_utils({{UVC_NAME}}_driver)
+    {{UVC_NAME}}_cfg cfg;
+{{CUSTOM_DRIVER_DECLARATIONS}}
+    function new(string name, uvm_component parent); super.new(name, parent); endfunction
+    virtual task drive_item({{UVC_NAME}}_item tr);
+      @(negedge cfg.vif.{{CLOCK_SIGNAL}});
+{{DRIVE_ASSIGNMENTS}}
+{{CUSTOM_DRIVER_DRIVE}}
+    endtask
+    task run_phase(uvm_phase phase);
+      forever begin
+        seq_item_port.get_next_item(req);
+        drive_item(req);
+        seq_item_port.item_done();
+      end
+    endtask
+  endclass

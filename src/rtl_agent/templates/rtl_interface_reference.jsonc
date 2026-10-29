@@ -1,0 +1,12 @@
+{
+  "sources": ["top.sv"],
+  "direction_reference": "DUT",
+  "parameters": [],
+  "ports": [
+    {"direction": "input"   , "width": 8   , "name": "data"},
+    // Equivalent range form for the row above:
+    // {"direction": "input"   , "range": "[7:0]"   , "name": "data"},
+    {"direction": "input"   , "width": 1   , "name": "clk"   , "description": "Clock input"}
+    // description is optional and, when supplied, is the last column.
+  ]
+}

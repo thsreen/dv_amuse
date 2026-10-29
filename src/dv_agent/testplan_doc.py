@@ -17,6 +17,7 @@ from typing import Callable
 
 import networkx as nx
 
+from .claims import apply_leftovers, config_claims, entry_claims, judge, refusals
 from .graph import attach_artifact
 from .graph_fetch import dependency_order, requirement_coverage
 from .combined_fetch import step_targets
@@ -35,7 +36,7 @@ from .trace import Tracer
 
 DOC_SCHEMA_VERSION = 1
 DEFAULT_TEMPLATE = Path(__file__).parent / "templates" / "testplan_quick_v0.json"
-GENERATORS = {"title", "entries", "register_map", "strategy", "configurations"}
+GENERATORS = {"title", "entries", "register_map", "strategy", "configurations", "rtl_observations"}
 PROVENANCE = ["DOCUMENTED", "INFERRED", "ASSUMED"]
 
 COMMON_RULES = """You write ONE section of a hardware verification test plan.
@@ -51,6 +52,9 @@ interfaces, the design's interface groups (signals grouped by functionality and 
 When supplied: dependency_order lists requirements precondition-first (inferred, unreviewed links); use it for
 programming order and stimulus preconditions. uncovered_requirements are requirements no earlier section
 cites; cite each one in at least one entry.
+When rtl_observations is supplied: use its review-required implementation concerns to add proposed
+stimulus/check/coverage handling. Cite cited_rtl_observation_ids for that handling, mark it INFERRED,
+and retain RTL design engineer review. It never establishes intended behavior or proves a spec gap.
 Section instructions:
 """
 
@@ -67,6 +71,7 @@ class DocConfig:
     max_entries: int = 40
     max_repairs: int = field(default_factory=default_max_repairs)
     max_coverage_targets: int = 40
+    claims_check: bool = True
 
 
 def load_template(path: Path | None = None) -> dict:
@@ -91,6 +96,9 @@ def load_template(path: Path | None = None) -> dict:
     bad = [s["id"] for s in template["sections"] if s.get("generator") not in GENERATORS]
     if bad:
         raise ValueError(f"unknown generator in template sections: {bad}")
+    rtl_positions = [i for i, s in enumerate(template["sections"]) if s["generator"] == "rtl_observations"]
+    if len(rtl_positions) > 1 or (rtl_positions and any(i < rtl_positions[0] for i, s in enumerate(template["sections"]) if s["generator"] == "strategy")):
+        raise ValueError("one RTL observations section is allowed, and it must precede strategy")
     return template | {"template_hash": hashlib.sha256(raw.encode()).hexdigest()[:16],
                        "template_path": str(path)}
 
@@ -100,9 +108,9 @@ def _ids_schema(ids: list[str]) -> dict:
     return {"type": "array", "items": {"type": "string", "enum": ids or [""]}}
 
 
-def _entries_schema(kinds: list[str] | None, req_ids: list[str], chunk_ids: list[str]) -> dict:
+def _entries_schema(kinds: list[str] | None, req_ids: list[str], chunk_ids: list[str], rtl_ids=None) -> dict:
     kind = {"type": "string", "enum": kinds} if kinds else {"type": "string"}
-    return {"type": "object", "additionalProperties": False, "required": ["entries"],
+    schema = {"type": "object", "additionalProperties": False, "required": ["entries"],
             "properties": {"entries": {"type": "array", "items": {
                 "type": "object", "additionalProperties": False,
                 "required": ["text", "kind", "provenance", "cited_req_ids", "cited_chunk_ids", "details"],
@@ -111,6 +119,11 @@ def _entries_schema(kinds: list[str] | None, req_ids: list[str], chunk_ids: list
                                "cited_req_ids": _ids_schema(req_ids),
                                "cited_chunk_ids": _ids_schema(chunk_ids),
                                "details": {"type": "array", "items": {"type": "string"}}}}}}}
+    if rtl_ids:
+        item = schema["properties"]["entries"]["items"]
+        item["properties"]["cited_rtl_observation_ids"] = _ids_schema(rtl_ids)
+        item["required"].append("cited_rtl_observation_ids")
+    return schema
 
 
 def section_context(G: nx.MultiDiGraph, H: nx.Graph, section: dict, scope: str, cfg: DocConfig,
@@ -177,7 +190,7 @@ def _clean_citations(entry: dict, req_ids: set[str], chunk_ids: set[str]) -> lis
         if len(kept) != len(given):
             notes.append(f"dropped citations not in the supplied evidence: {sorted(set(given) - set(kept))}")
         entry[key] = kept
-    if entry["provenance"] in ("DOCUMENTED", "INFERRED") and not (entry["cited_req_ids"] or entry["cited_chunk_ids"]):
+    if entry["provenance"] in ("DOCUMENTED", "INFERRED") and not (entry["cited_req_ids"] or entry["cited_chunk_ids"] or entry.get("cited_rtl_observation_ids")):
         notes.append(f"{entry['provenance']} without citations; downgraded to ASSUMED")
         entry["provenance"] = "ASSUMED"
     return notes
@@ -187,13 +200,22 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
-def _validate_entries(G, raw: list[dict], req_ids: set[str], chunk_ids: set[str], limit: int) -> list[dict]:
+def _validate_entries(G, raw: list[dict], req_ids: set[str], chunk_ids: set[str], limit: int, rtl_ids=None) -> list[dict]:
     out = []
     for e in raw[:limit]:
         if not e.get("text", "").strip():
             continue
         e = dict(e, text=e["text"].strip(), details=[d.strip() for d in e.get("details", []) if d.strip()])
+        unknown_rtl = False
+        if e.get("cited_rtl_observation_ids"):
+            given = e["cited_rtl_observation_ids"]
+            e["cited_rtl_observation_ids"] = [i for i in dict.fromkeys(given) if i in (rtl_ids or [])]
+            unknown_rtl = bool(set(given) - set(e["cited_rtl_observation_ids"]))
+            if e["cited_rtl_observation_ids"]:
+                e.update(provenance="INFERRED", review_status="NEEDS_REVIEW", review_owner="RTL_DESIGN_ENGINEER")
         e["validation"] = _clean_citations(e, req_ids, chunk_ids)
+        if unknown_rtl:
+            e["validation"].append("dropped unknown RTL observation citations")
         out.append(e)
     return out
 
@@ -316,11 +338,17 @@ def _record(G: nx.MultiDiGraph, tracer: Tracer, out: dict, template_id: str, sco
                           metadata={"template_id": template_id, "section": out["id"], "scope": scope})
     out["artifact_id"] = art
     out["lineage_fact_ids"] = [f["req_id"] for f in lin["facts"]]
+    rtl_ids = sorted({i for e in items for i in e.get("cited_rtl_observation_ids", [])}
+                     | {a["observation_id"] for a in (out.get("strategy") or {}).get("rtl_observation_actions", [])})
+    if rtl_ids:
+        out["rtl_observation_ids"] = rtl_ids
+        G.nodes[art]["rtl_observation_ids"] = rtl_ids
+        G.nodes[art]["rtl_review_required"] = True
 
 
 def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer, template: dict,
                        scope: str = "", cfg: DocConfig | None = None,
-                       dense_fn: Callable[[str], dict] | None = None) -> dict:
+                       dense_fn: Callable[[str], dict] | None = None, *, rtl_graph=None, rtl_scope="") -> dict:
     cfg = cfg or DocConfig()
     scope = scope.strip()
     meta = dict(template_id=template["template_id"], template_hash=template["template_hash"],
@@ -333,6 +361,7 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
         registers = _registers_step(G, H, llm, tracer, template, scope, cfg, dense_fn)
         path_targets = step_targets(G, interfaces, registers)
         strategy = None
+        rtl_observations = None
         cycles: set[tuple] = set()
         for sec in template["sections"]:
             with tracer.span(f"testplan_section:{sec['id']}", input={"section": sec["id"]}) as span:
@@ -341,6 +370,18 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                     continue
                 if sec["generator"] == "register_map":
                     sections.append(_register_map_section(G, tracer, sec, registers, meta["template_id"], scope))
+                    continue
+                if sec["generator"] == "rtl_observations":
+                    from .rtl_observations import ObservationConfig, build_observations
+                    ctx = section_context(G, H, sec, scope, cfg, dense_fn, tracer=tracer) if rtl_graph is not None else {"requirements": [], "chunks": []}
+                    rtl_observations = build_observations(rtl_graph, llm, tracer, ctx, scope=rtl_scope,
+                                                         cfg=ObservationConfig(max_repairs=cfg.max_repairs))
+                    out = dict(id=sec["id"], heading=sec["heading"], generator="rtl_observations", **rtl_observations)
+                    if out["status"] == "PASS":
+                        comparison_sources = sorted({i for e in out["entries"] for i in e["cited_spec_ids"] if i in G})
+                        _record(G, tracer, out, meta["template_id"], scope, parents=comparison_sources)
+                        G.nodes[out["artifact_id"]]["rtl_graph_fingerprint"] = out["graph_fingerprint"]
+                    sections.append(out)
                     continue
                 if sec["generator"] == "configurations" and (registers is None or not registers["registers"]):
                     reason = ("register-map step disabled" if registers is None
@@ -353,7 +394,7 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 if sec["generator"] == "strategy":
                     sections.append(_strategy_section(G, tracer, llm, sec, interfaces, registers, scope, ctx,
                                                       _previous(sections, cfg.max_previous_entries), cfg,
-                                                      meta["template_id"], span))
+                                                      meta["template_id"], span, rtl_observations))
                     strategy = sections[-1].get("strategy")
                     continue
                 for d in ctx["dependencies"]:
@@ -368,6 +409,10 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 out = dict(id=sec["id"], heading=sec["heading"], generator=sec["generator"],
                            context=dict(queries=ctx["queries"], requirement_ids=req_ids, chunk_ids=chunk_ids))
                 payload = _payload(sec, scope, ctx, _previous(sections, cfg.max_previous_entries), iface_compact, cfg)
+                from .rtl_observations import compact as compact_rtl
+                rtl_ids = [e["id"] for e in (rtl_observations or {}).get("entries", [])]
+                if rtl_ids:
+                    payload["rtl_observations"] = compact_rtl(rtl_observations)
                 if ordering:
                     out["dependency_order"] = ordering
                     payload["dependency_order"] = _order_payload(G, ordering)
@@ -383,19 +428,35 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                     schema = _config_schema([f["field_id"] for f in configurable], req_ids,
                                             sorted(set(chunk_ids) | {c for f in configurable for c in f["source_chunk_ids"]}))
                 else:
-                    schema = _entries_schema(sec.get("entry_kinds"), req_ids, chunk_ids)
+                    schema = _entries_schema(sec.get("entry_kinds"), req_ids, chunk_ids, rtl_ids)
+                claims_on = cfg.claims_check and sec.get("claims_check", True)
+                claims_state: dict = {"result": None}
                 if sec["generator"] == "configurations":
-                    def check(d, conf=registers["configurable"], r=set(req_ids), c=set(chunk_ids)):
+                    def check(d, conf=registers["configurable"], r=set(req_ids), c=set(chunk_ids), st=claims_state):
+                        st["result"] = None
                         entries, notes = _validate_configs(G, d.get("configurations", []), conf, r, c)
-                        return notes + [f"{e['field_id']} ({e['register']}.{e['field']}): {v}"
-                                        for e in entries for v in e["validation"]]
+                        problems = notes + [f"{e['field_id']} ({e['register']}.{e['field']}): {v}"
+                                            for e in entries for v in e["validation"]]
+                        if problems or not claims_on:
+                            return problems
+                        st["result"] = judge(llm, tracer, config_claims(G, entries))
+                        return refusals(st["result"]["unsupported"], "configuration")
                 else:
-                    def check(d, r=set(req_ids), c=set(chunk_ids), t=tuple(targets)):
-                        entries = _validate_entries(G, d.get("entries", []), r, c, cfg.max_entries)
+                    def check(d, r=set(req_ids), c=set(chunk_ids), t=tuple(targets), st=claims_state, rtl=tuple(rtl_ids), observations=rtl_observations,
+                              required_rtl=tuple(rtl_ids) if sec["id"] == "checks" else ()):
+                        st["result"] = None
+                        entries = _validate_entries(G, d.get("entries", []), r, c, cfg.max_entries, rtl)
                         problems = [f"entry '{e['text'][:60]}': {v}" for e in entries for v in e["validation"]]
                         cited = {x for e in entries for x in e["cited_req_ids"]}
-                        return problems + [f"requirement {x} ('{G.nodes[x]['statement'][:70]}') is not cited by any "
-                                           "entry; add an entry that cites it" for x in t if x not in cited]
+                        problems += [f"requirement {x} ('{G.nodes[x]['statement'][:70]}') is not cited by any "
+                                     "entry; add an entry that cites it" for x in t if x not in cited]
+                        cited_rtl = {x for e in entries for x in e.get("cited_rtl_observation_ids", [])}
+                        problems += [f"RTL observation {oid} needs a cited proposed check or explicit review-dependent handling"
+                                     for oid in required_rtl if oid not in cited_rtl]
+                        if problems or not claims_on:
+                            return problems
+                        st["result"] = judge(llm, tracer, entry_claims(G, entries, observations))
+                        return refusals(st["result"]["unsupported"], "entry")
                 try:
                     result = structured_with_repair(llm, tracer, name=f"testplan_{sec['generator']}",
                                                     instructions=COMMON_RULES + sec.get("instructions", ""),
@@ -411,7 +472,7 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                         G, result.data.get("configurations", []), registers["configurable"], set(req_ids), set(chunk_ids))
                 else:
                     out["entries"] = _validate_entries(G, result.data.get("entries", []), set(req_ids),
-                                                       set(chunk_ids), cfg.max_entries)
+                                                       set(chunk_ids), cfg.max_entries, rtl_ids)
                     if sec.get("collect_assumed"):
                         out["entries"] += _collected_assumptions(sections, out["entries"])
                     if sec.get("include_conflicts"):
@@ -425,19 +486,57 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                         out["entries"] += strategy_questions(strategy)
                         out["entries"] += _repair_questions(interfaces, registers, sections)
                         out["entries"] += _cycle_questions(G, cycles)
+                        for e in (rtl_observations or {}).get("entries", []):
+                            out["entries"].append(dict(text=e["designer_question"], kind="question", provenance="INFERRED",
+                                                      cited_req_ids=[], cited_chunk_ids=[], cited_rtl_observation_ids=[e["id"]],
+                                                      details=["RTL design engineer review required"], validation=[],
+                                                      review_status="NEEDS_REVIEW", review_owner="RTL_DESIGN_ENGINEER"))
+                _finish_claims(out, claims_state["result"], claims_on)
                 out["status"] = "PASS"
                 _record(G, tracer, out, meta["template_id"], scope)
                 span.update(output={"status": "PASS", "items": len(out.get("entries", out.get("configurations", [])))},
                             metadata={"fact_ids": out["lineage_fact_ids"]})
                 sections.append(out)
         coverage = _coverage(G, sections)
+        rtl_coverage = [dict(observation_id=e["id"], review_status="NEEDS_REVIEW",
+                             strategy_handling=any(a["observation_id"] == e["id"] for a in (strategy or {}).get("rtl_observation_actions", [])),
+                             plan_sections=[s["id"] for s in sections if s["generator"] != "rtl_observations"
+                                            and any(e["id"] in i.get("cited_rtl_observation_ids", []) for i in s.get("entries", []))])
+                        for e in (rtl_observations or {}).get("entries", [])]
         stage.update(output={"interfaces": interfaces["status"] if interfaces else "DISABLED",
                              "registers": registers["status"] if registers else "DISABLED"}
                      | {s["id"]: s["status"] for s in sections})
     return dict(schema_version=DOC_SCHEMA_VERSION, **meta, scope=scope,
                 template_path=template["template_path"], review_status="NEEDS_REVIEW",
                 graph_build_trace_id=G.graph.get("build_trace_id"), trace_id=tracer.trace_id,
-                interfaces=interfaces, registers=registers, sections=sections, coverage=coverage)
+                interfaces=interfaces, registers=registers, sections=sections, coverage=coverage,
+                rtl_observations=rtl_observations, rtl_observation_coverage=rtl_coverage)
+
+
+def _finish_claims(out: dict, result: dict | None, enabled: bool) -> None:
+    """Record the claims check on the section and downgrade claims still unsupported after the last repair."""
+    if not enabled:
+        out["claims_check"] = dict(status="DISABLED")
+        return
+    if result is None:
+        out["claims_check"] = dict(status="NOT_RUN", reason="deterministic checks still failing")
+        return
+    items, key = (out["configurations"], "field_id") if "configurations" in out else (out["entries"], "text")
+    downgraded = apply_leftovers(items, result["unsupported"], key)
+    out["claims_check"] = dict(status=result["status"], judged=result["judged"],
+                               unsupported=len(result["unsupported"]), downgraded=downgraded,
+                               **({"error": result["error"]} if "error" in result else {}))
+
+
+def _render_claims(c: dict | None) -> list[str]:
+    if not c or c["status"] == "DISABLED":
+        return []
+    if c["status"] != "PASS":
+        return [f"> Claims check: {c['status']}" + (f" ({c.get('error') or c.get('reason')})"
+                                                     if c.get("error") or c.get("reason") else ""), ""]
+    text = f"> Claims check: {c['judged']} claim(s) judged against their cited text"
+    text += f"; {c['downgraded']} still unsupported and downgraded to ASSUMED." if c["downgraded"] else "; all supported."
+    return [text, ""]
 
 
 def _add_dependency_order(G: nx.MultiDiGraph, ctx: dict) -> dict:
@@ -520,12 +619,12 @@ def _registers_step(G, H, llm, tracer, template, scope, cfg, dense_fn) -> dict |
 
 
 def _strategy_section(G, tracer, llm, sec, interfaces, registers, scope, ctx, previous, cfg, template_id,
-                      span) -> dict:
+                      span, rtl_observations=None) -> dict:
     out = dict(id=sec["id"], heading=sec["heading"], generator="strategy",
                context=dict(queries=ctx["queries"], requirement_ids=[r["req_id"] for r in ctx["requirements"]],
                             chunk_ids=[c["chunk_id"] for c in ctx["chunks"]]))
     result = build_strategy(llm, tracer, interfaces, registers, scope, ctx, previous, cfg.chunk_chars,
-                            sec.get("instructions", ""), cfg.max_repairs)
+                            sec.get("instructions", ""), cfg.max_repairs, rtl_observations=rtl_observations)
     out |= dict(status=result["status"], strategy=result)
     if result["status"] != "PASS":
         out["error"] = result.get("error", "")
@@ -623,7 +722,7 @@ def _repair_questions(interfaces: dict | None, registers: dict | None, sections:
 
 
 def _cite(e: dict) -> str:
-    ids = e["cited_req_ids"] + e["cited_chunk_ids"]
+    ids = e["cited_req_ids"] + e["cited_chunk_ids"] + e.get("cited_rtl_observation_ids", [])
     return f" — sources: {', '.join(ids)}" if ids else ""
 
 
@@ -641,21 +740,27 @@ def render_markdown(doc: dict) -> str:
         if s["generator"] == "strategy" and s.get("strategy"):
             lines += render_strategy(s["strategy"], s["heading"])
             continue
+        if s["generator"] == "rtl_observations":
+            from .rtl_observations import render as render_rtl_observations
+            lines += render_rtl_observations(s, s["heading"])
+            continue
         lines += [f"## {s['heading']}", ""]
         if s["status"] != "PASS":
             lines += [f"**{s['status']}**: {s.get('error', '')}", ""]
             continue
         if s["generator"] == "configurations":
-            lines += _render_configurations(s) + render_repairs(s.get("repair"))
+            lines += _render_configurations(s) + render_repairs(s.get("repair")) + _render_claims(s.get("claims_check"))
             continue
         if not s["entries"]:
             lines += ["_No entries._", ""]
         for e in s["entries"]:
             lines.append(f"- [{e['provenance']}] ({e['kind']}) {e['text']}{_cite(e)}")
+            if e.get("cited_rtl_observation_ids"):
+                lines.append("  - NEEDS_REVIEW: RTL design engineer approval required.")
             lines += [f"  - {d}" for d in e["details"]]
             lines += [f"  - Validation: {v}" for v in e["validation"]]
         lines.append("")
-        lines += render_repairs(s.get("repair"))
+        lines += render_repairs(s.get("repair")) + _render_claims(s.get("claims_check"))
     lines += _render_coverage(doc.get("coverage"))
     if doc.get("token_usage"):
         lines += render_usage(doc["token_usage"])
