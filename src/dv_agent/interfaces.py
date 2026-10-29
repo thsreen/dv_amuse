@@ -14,6 +14,7 @@ import networkx as nx
 
 from .extract import locate_quote
 from .llm import LLM, LLMError
+from .repair import default_max_repairs, render_repairs, structured_with_repair
 from .retrieval import RetrievalConfig
 from .testplan_context import chunk_record, fetch_context
 from .trace import Tracer
@@ -62,6 +63,7 @@ class InterfaceConfig:
     include_kinds: tuple[str, ...] = ("interface",)
     max_chunks: int = 12
     chunk_chars: int = 2500
+    max_repairs: int = field(default_factory=default_max_repairs)
 
 
 def interface_chunks(G: nx.MultiDiGraph, H: nx.Graph, scope: str, cfg: InterfaceConfig,
@@ -205,6 +207,14 @@ def _validate_groups(raw: list[dict], signals: list[dict]) -> tuple[list[dict], 
     return groups, notes
 
 
+def interface_problems(G: nx.MultiDiGraph, data: dict, chunk_ids: set[str]) -> list[str]:
+    """Model-fixable problems in an interface answer (refusal feedback)."""
+    signals, sig_notes = _validate_signals(G, data.get("signals", []), chunk_ids)
+    _, grp_notes = _validate_groups(data.get("groups", []), signals)
+    return ([n.removesuffix("; dropped") for n in sig_notes]
+            + [f"signal {s['name']}: {v}" for s in signals for v in s["validation"]] + grp_notes)
+
+
 def extract_interfaces(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer, scope: str = "",
                        cfg: InterfaceConfig | None = None,
                        dense_fn: Callable[[str], dict] | None = None) -> dict:
@@ -217,13 +227,15 @@ def extract_interfaces(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
     payload = dict(scope=scope, chunks=[{"chunk_id": c["chunk_id"], "section": c["section"],
                                          "pages": c["pages"], "text": c["text"][:cfg.chunk_chars]} for c in chunks])
     try:
-        out = llm.structured(name="testplan_interfaces", instructions=INTERFACE_INSTRUCTIONS,
-                             payload=payload, schema=_schema(chunk_ids), tracer=tracer)
+        out = structured_with_repair(llm, tracer, name="testplan_interfaces", instructions=INTERFACE_INSTRUCTIONS,
+                                     payload=payload, schema=_schema(chunk_ids),
+                                     check=lambda d: interface_problems(G, d, set(chunk_ids)),
+                                     max_repairs=cfg.max_repairs)
     except LLMError as exc:
         return result | dict(status="BLOCKED", error=exc.kind)
     signals, sig_notes = _validate_signals(G, out.data.get("signals", []), set(chunk_ids))
     groups, grp_notes = _validate_groups(out.data.get("groups", []), signals)
-    return result | dict(signals=signals, groups=groups, validation=sig_notes + grp_notes)
+    return result | dict(signals=signals, groups=groups, validation=sig_notes + grp_notes, repair=out.summary())
 
 
 def compact(interfaces: dict) -> list[dict]:
@@ -278,4 +290,5 @@ def render(interfaces: dict, heading: str) -> list[str]:
                          f"{s['description'].replace('|', '/')} | {s['chunk_id']} p.{s['pages'][0]} [{s['provenance']}] |")
         lines.append("")
     lines += [f"> Validation: {v}" for v in interfaces["validation"]]
+    lines += render_repairs(interfaces.get("repair"))
     return lines + [""]

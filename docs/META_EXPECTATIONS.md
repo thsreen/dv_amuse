@@ -63,7 +63,8 @@ deterministic checks outside the model keep the result honest, and the model rep
 ## 5. Harness pattern to follow
 
 - **Model reasons, code executes and records.** The model makes the semantic decisions; tools perform
-  real actions and keep a record of quote-checked facts with exact locations.
+  real actions and keep a record of quote-checked facts with exact locations. (The workshop lets the
+  model choose the next tool; dv_agent keeps a user-fixed step order, D-014.)
 - **Checks outside the model's control, at fixed points.** A failing check refuses the step with
   feedback the model can act on; the model repairs and retries; repeated refusal escalates to a person.
   The model never approves its own work.

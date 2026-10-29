@@ -9,6 +9,7 @@ is an engineering proposal: everything is INFERRED (ASSUMED when nothing support
 """
 from .interfaces import compact
 from .llm import LLM, LLMError
+from .repair import render_repairs, structured_with_repair
 from .trace import Tracer
 
 AGENT_MODES = ["active", "passive", "reactive"]
@@ -88,7 +89,7 @@ def _evidence_chunks(interfaces: dict | None, registers: dict | None) -> list[st
 
 def build_strategy(llm: LLM, tracer: Tracer, interfaces: dict | None, registers: dict | None,
                    scope: str = "", context: dict | None = None, previous: list[dict] | None = None,
-                   chunk_chars: int = 1200, extra_instructions: str = "") -> dict:
+                   chunk_chars: int = 1200, extra_instructions: str = "", max_repairs: int | None = None) -> dict:
     """Structured strategy from the interface and register steps; checked against them."""
     groups = (interfaces or {}).get("groups", []) if (interfaces or {}).get("status") == "PASS" else []
     if not groups:
@@ -105,13 +106,16 @@ def build_strategy(llm: LLM, tracer: Tracer, interfaces: dict | None, registers:
                    previous_sections=previous or [])
     try:
         instructions = STRATEGY_INSTRUCTIONS + (f"\nAdditional instructions:\n{extra_instructions}" if extra_instructions else "")
-        out = llm.structured(name="testplan_strategy", instructions=instructions, payload=payload,
-                             schema=_schema([g["name"] for g in groups], signals, reg_labels, chunk_ids), tracer=tracer)
+        out = structured_with_repair(
+            llm, tracer, name="testplan_strategy", instructions=instructions, payload=payload,
+            schema=_schema([g["name"] for g in groups], signals, reg_labels, chunk_ids),
+            check=lambda d: validate_strategy(d, groups, set(reg_labels), set(chunk_ids))["validation"],
+            max_repairs=max_repairs)
     except LLMError as exc:
         return dict(status="BLOCKED", error=exc.kind, agents=[], scoreboards=[], register_model={},
                     virtual_sequences=[], gaps=[], validation=[])
     return dict(status="PASS", environment=out.data.get("environment", "").strip(),
-                **validate_strategy(out.data, groups, set(reg_labels), set(chunk_ids)))
+                **validate_strategy(out.data, groups, set(reg_labels), set(chunk_ids)), repair=out.summary())
 
 
 def validate_strategy(data: dict, groups: list[dict], reg_labels: set[str], chunk_ids: set[str]) -> dict:
@@ -249,4 +253,5 @@ def render(strategy: dict, heading: str) -> list[str]:
     for g in strategy["gaps"]:
         lines.append(f"> Gap: interface group {g['interface_group']} has no agent")
     lines += [f"> Validation: {v}" for v in strategy["validation"]]
+    lines += render_repairs(strategy.get("repair"))
     return lines + [""]

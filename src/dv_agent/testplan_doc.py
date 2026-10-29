@@ -22,6 +22,7 @@ from .interfaces import InterfaceConfig, compact, extract_interfaces, interface_
 from .interfaces import render as render_interfaces
 from .llm import LLM, LLMError
 from .registers import RegisterConfig, extract_registers, register_questions
+from .repair import default_max_repairs, render_repairs, structured_with_repair, unresolved_questions
 from .registers import render as render_registers
 from .retrieval import RetrievalConfig
 from .strategy import build_strategy, strategy_questions, strategy_summary
@@ -58,6 +59,7 @@ class DocConfig:
     chunk_chars: int = 1200
     max_previous_entries: int = 40
     max_entries: int = 40
+    max_repairs: int = field(default_factory=default_max_repairs)
 
 
 def load_template(path: Path | None = None) -> dict:
@@ -355,14 +357,25 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                                             sorted(set(chunk_ids) | {c for f in configurable for c in f["source_chunk_ids"]}))
                 else:
                     schema = _entries_schema(sec.get("entry_kinds"), req_ids, chunk_ids)
+                if sec["generator"] == "configurations":
+                    def check(d, conf=registers["configurable"], r=set(req_ids), c=set(chunk_ids)):
+                        entries, notes = _validate_configs(G, d.get("configurations", []), conf, r, c)
+                        return notes + [f"{e['field_id']} ({e['register']}.{e['field']}): {v}"
+                                        for e in entries for v in e["validation"]]
+                else:
+                    def check(d, r=set(req_ids), c=set(chunk_ids)):
+                        return [f"entry '{e['text'][:60]}': {v}" for e in
+                                _validate_entries(G, d.get("entries", []), r, c, cfg.max_entries) for v in e["validation"]]
                 try:
-                    result = llm.structured(name=f"testplan_{sec['generator']}",
-                                            instructions=COMMON_RULES + sec.get("instructions", ""),
-                                            payload=payload, schema=schema, tracer=tracer)
+                    result = structured_with_repair(llm, tracer, name=f"testplan_{sec['generator']}",
+                                                    instructions=COMMON_RULES + sec.get("instructions", ""),
+                                                    payload=payload, schema=schema, check=check,
+                                                    max_repairs=cfg.max_repairs)
                 except LLMError as exc:
                     span.update(level="ERROR", status_message=exc.kind)
                     sections.append(out | dict(status="BLOCKED", error=exc.kind, entries=[]))
                     continue
+                out["repair"] = result.summary()
                 if sec["generator"] == "configurations":
                     out["configurations"], out["validation"] = _validate_configs(
                         G, result.data.get("configurations", []), registers["configurable"], set(req_ids), set(chunk_ids))
@@ -380,6 +393,7 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                             out["entries"] += register_questions(registers)
                         out["entries"] += _config_questions(sections)
                         out["entries"] += strategy_questions(strategy)
+                        out["entries"] += _repair_questions(interfaces, registers, sections)
                 out["status"] = "PASS"
                 _record(G, tracer, out, meta["template_id"], scope)
                 span.update(output={"status": "PASS", "items": len(out.get("entries", out.get("configurations", [])))},
@@ -400,7 +414,7 @@ def _registers_step(G, H, llm, tracer, template, scope, cfg, dense_fn) -> dict |
     uses = any(s["generator"] in ("register_map", "configurations") for s in template["sections"])
     if not spec.get("enabled", uses):
         return None
-    rcfg = RegisterConfig(retrieval=cfg.retrieval)
+    rcfg = RegisterConfig(retrieval=cfg.retrieval, max_repairs=cfg.max_repairs)
     if spec.get("queries"):
         rcfg.queries = list(spec["queries"])
     with tracer.span("testplan_registers", input={"scope": scope}) as span:
@@ -427,7 +441,7 @@ def _strategy_section(G, tracer, llm, sec, interfaces, registers, scope, ctx, pr
                context=dict(queries=ctx["queries"], requirement_ids=[r["req_id"] for r in ctx["requirements"]],
                             chunk_ids=[c["chunk_id"] for c in ctx["chunks"]]))
     result = build_strategy(llm, tracer, interfaces, registers, scope, ctx, previous, cfg.chunk_chars,
-                            sec.get("instructions", ""))
+                            sec.get("instructions", ""), cfg.max_repairs)
     out |= dict(status=result["status"], strategy=result)
     if result["status"] != "PASS":
         out["error"] = result.get("error", "")
@@ -456,7 +470,7 @@ def _interfaces_step(G, H, llm, tracer, template, scope, cfg, dense_fn) -> dict 
     spec = template.get("interfaces", {})
     if not spec.get("enabled", True):
         return None
-    icfg = InterfaceConfig(retrieval=cfg.retrieval)
+    icfg = InterfaceConfig(retrieval=cfg.retrieval, max_repairs=cfg.max_repairs)
     if spec.get("queries"):
         icfg.queries = list(spec["queries"])
     with tracer.span("testplan_interfaces", input={"scope": scope}) as span:
@@ -508,6 +522,22 @@ def _gap_questions(sections: list[dict]) -> list[dict]:
             and not s["context"]["chunk_ids"]]
 
 
+# Problems that another question already covers are not repeated as "unresolved after repair".
+ALREADY_ASKED = ("is not covered by any agent", "missing from model output", "were not grouped by the model")
+
+
+def _repair_questions(interfaces: dict | None, registers: dict | None, sections: list[dict]) -> list[dict]:
+    steps = [("interface isolation", (interfaces or {}).get("repair")),
+             ("register-map", (registers or {}).get("repair"))]
+    steps += [(s["heading"], s.get("repair") or (s.get("strategy") or {}).get("repair")) for s in sections]
+    out = []
+    for name, summary in steps:
+        if summary and summary.get("unresolved"):
+            left = [p for p in summary["unresolved"] if not any(k in p for k in ALREADY_ASKED)]
+            out += unresolved_questions(name, dict(summary, unresolved=left))
+    return out
+
+
 def _cite(e: dict) -> str:
     ids = e["cited_req_ids"] + e["cited_chunk_ids"]
     return f" — sources: {', '.join(ids)}" if ids else ""
@@ -532,7 +562,7 @@ def render_markdown(doc: dict) -> str:
             lines += [f"**{s['status']}**: {s.get('error', '')}", ""]
             continue
         if s["generator"] == "configurations":
-            lines += _render_configurations(s)
+            lines += _render_configurations(s) + render_repairs(s.get("repair"))
             continue
         if not s["entries"]:
             lines += ["_No entries._", ""]
@@ -541,6 +571,7 @@ def render_markdown(doc: dict) -> str:
             lines += [f"  - {d}" for d in e["details"]]
             lines += [f"  - Validation: {v}" for v in e["validation"]]
         lines.append("")
+        lines += render_repairs(s.get("repair"))
     return "\n".join(lines)
 
 

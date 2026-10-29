@@ -121,3 +121,13 @@ Test-plan sections (template `quick_reference_v0`): 1 Title, 2 Feature Descripti
 
 ## Formats
 `.docx` (headings from Word heading styles or outline levels, tables as `cell | cell` rows, page numbers from page breaks) and `.html` (`h1`-`h6` headings, tables as rows; scripts and styles skipped) are parsed with the standard library. Legacy binary `.doc` is still reported SKIPPED.
+
+## Refuse and repair (`repair.py`)
+The step order is fixed. Inside the interface, register, strategy, configurations and test-plan section
+steps, the checks review the model's answer; if they find problems the model can fix (a quote not in the
+source, a value the specification does not state, an unknown citation, a signal an agent cannot drive,
+an uncovered interface group, a missing writable field), the answer is refused and the model gets its
+previous output plus the reasons. Up to `DV_AGENT_MAX_REPAIRS` repairs (default 2). Specification
+conflicts are never refused; they stay designer questions. Problems left after the last repair are
+cleaned up as before and raised as one designer question per step. Every refusal is a `refusal:<step>`
+trace span and is shown in the Markdown ("Refused (attempt N)", "Repaired after N refusal(s)").

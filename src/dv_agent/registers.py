@@ -14,6 +14,7 @@ import networkx as nx
 
 from .extract import locate_quote, normalize_name
 from .llm import LLM, LLMError
+from .repair import default_max_repairs, render_repairs, structured_with_repair
 from .retrieval import RetrievalConfig
 from .testplan_context import chunk_record, fetch_context
 from .trace import Tracer
@@ -46,6 +47,7 @@ class RegisterConfig:
     max_chunks: int = 24
     batch_size: int = 6
     chunk_chars: int = 2500
+    max_repairs: int = field(default_factory=default_max_repairs)
 
 
 def _norm(text: str) -> str:
@@ -159,6 +161,32 @@ def _verify_record(G: nx.MultiDiGraph, r: dict, allowed: set[str]) -> tuple[dict
     return rec, None
 
 
+def record_problems(G: nx.MultiDiGraph, data: dict, allowed: set[str]) -> list[str]:
+    """Model-fixable problems in one batch's output (refusal feedback). Cross-chunk conflicts are not included."""
+    problems = []
+    for r in data.get("registers", []):
+        rec, note = _verify_record(G, r, allowed)
+        if note:
+            problems.append(note.removesuffix("; dropped"))
+        if rec is None:
+            continue
+        label, cid = rec["abbreviation"] or rec["name"], rec["source"]["chunk_id"]
+        if not rec["source"]["quote"]:
+            problems.append(f"register {label}: quote is not verbatim text of chunk {cid}")
+        for k in ("address", "width", "access", "reset_value"):
+            if rec[k] and not rec["documented"][k]:
+                problems.append(f"register {label}: {k} {rec[k]!r} is not written in chunk {cid}; copy it exactly or use \"\"")
+        for f in rec["fields"]:
+            fname = f"{label}.{f['name'] or f['bits']}"
+            if not f["quote"]:
+                problems.append(f"{fname}: field quote is not verbatim text of chunk {cid}")
+            if f["bits"] and not f["range"]:
+                problems.append(f"{fname}: bit range {f['bits']!r} is not a bit number or range")
+            problems += [f"{fname}: value {v['value']!r} is not written in chunk {cid}"
+                         for v in f["values"] if not v["documented"]]
+    return problems
+
+
 def _key(r: dict) -> str:
     return normalize_name(r["abbreviation"] or r["name"])
 
@@ -264,18 +292,21 @@ def extract_registers(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer,
     result = dict(status="PASS", chunk_ids=ids, registers=[], conflicts=[], validation=[], failed_batches=[])
     if not chunks:
         return result | dict(status="NOT_RUN", validation=["no register-related specification chunks retrieved"])
-    records, notes = [], []
+    records, notes, repairs = [], [], []
     for start in range(0, len(chunks), cfg.batch_size):
         batch = chunks[start:start + cfg.batch_size]
         batch_ids = [c["chunk_id"] for c in batch]
         payload = dict(scope=scope, chunks=[{"chunk_id": c["chunk_id"], "section": c["section"], "pages": c["pages"],
                                              "text": c["text"][:cfg.chunk_chars]} for c in batch])
         try:
-            out = llm.structured(name="testplan_registers", instructions=REGISTER_INSTRUCTIONS, payload=payload,
-                                 schema=_schema(batch_ids), tracer=tracer)
+            out = structured_with_repair(llm, tracer, name="testplan_registers", instructions=REGISTER_INSTRUCTIONS,
+                                         payload=payload, schema=_schema(batch_ids),
+                                         check=lambda d, ids=set(batch_ids): record_problems(G, d, ids),
+                                         max_repairs=cfg.max_repairs)
         except LLMError as exc:
             result["failed_batches"].append(dict(chunk_ids=batch_ids, error=exc.kind))
             continue
+        repairs.append(out.summary() | {"chunk_ids": batch_ids})
         for r in out.data.get("registers", []):
             rec, note = _verify_record(G, r, set(batch_ids))
             if rec:
@@ -288,8 +319,10 @@ def extract_registers(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer,
     for r in registers:
         r["provenance"] = "DOCUMENTED" if any(s["quote"] for s in r["sources"]) else "INFERRED"
     status = "BLOCKED" if result["failed_batches"] else "PASS"
+    repair = dict(refusals=[r for b in repairs for r in b["refusals"]],
+                  unresolved=[p for b in repairs for p in b["unresolved"]], batches=repairs)
     return result | dict(status=status, registers=registers, conflicts=conflicts, validation=notes,
-                         configurable=configurable_fields(registers))
+                         configurable=configurable_fields(registers), repair=repair)
 
 
 def register_questions(registers: dict) -> list[dict]:
@@ -338,4 +371,5 @@ def render(registers: dict, heading: str) -> list[str]:
         target = c["register"] + (f".{c['field']}" if c.get("field") else "")
         lines.append(f"> Conflict: {target} {c['attribute']}: {' vs '.join(c['values'])} (chunks {', '.join(c['chunks'])})")
     lines += [f"> Validation: {v}" for v in registers["validation"]]
+    lines += render_repairs(registers.get("repair"))
     return lines + [""]

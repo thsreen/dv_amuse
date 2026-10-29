@@ -20,11 +20,11 @@ that saved text. Offline tests drive the real OpenAI SDK through a scripted HTTP
 
 | Workshop element | dv_agent today | Gap |
 |---|---|---|
-| Model chooses tools; no hard-coded order | Fixed pipeline: ingest → graph → interfaces → registers → strategy → sections. The model does the semantic work inside each step (extraction, grouping, register records, strategy, sections, rerank, sufficiency) but never chooses the step. | **Large** for the "Meta AI tooling" criterion |
+| Model chooses tools; no hard-coded order | Fixed pipeline by user decision (D-014): the model does the semantic work inside each step but never chooses the step | Deliberate difference; the demo must show the model's work inside the steps |
 | Facts carry exact, checked quotes | Requirements, signals, register records and fields are checked against chunk text; exact offsets and pages kept | Matches |
 | Cite only recorded facts | Citations outside the supplied evidence are dropped; DOCUMENTED/INFERRED without citations become ASSUMED | Matches |
 | Evidence separate from interpretation | `status` (DOCUMENTED) vs `interpretation` (INFERRED) on requirements; per-entry provenance tags | Matches |
-| Check fails → refusal with feedback → model repairs | Checks run, but the code silently drops or downgrades bad output; the model never sees the problem or repairs it | **Large**: no visible repair, which the demo needs |
+| Check fails → refusal with feedback → model repairs | Done (2026-10-29, D-015): interface, register, strategy, configurations and section steps refuse with feedback and the model repairs, up to `DV_AGENT_MAX_REPAIRS`; leftovers become designer questions | Closed |
 | Claims check by a separate model call | None; the model's own entries are only checked deterministically | **Medium** |
 | Escalate after repeated refusals; human request for missing evidence | Designer questions are collected in the plan; the run never stops for a person | **Medium** |
 | Human sign-off; rejection notes go back to the agent | Everything is `NEEDS_REVIEW`; no approve/reject command and no revision loop | **Medium** |
@@ -51,7 +51,7 @@ that saved text. Offline tests drive the real OpenAI SDK through a scripted HTTP
 
 1. **Run live.** Add the key, run `pytest -m live`, then the UART pipeline end to end. Confirm
    `text.format` with `json_schema` + `strict`; if it is refused, use the fallback in item 4.
-2. **Refuse and repair.** At each step (interfaces, registers, configurations, strategy, test-plan
+2. **Refuse and repair (done, D-015).** At each step (interfaces, registers, configurations, strategy, test-plan
    sections) turn the existing deterministic findings into feedback sent back to the model for up to
    2 repair attempts, then record what remains as designer questions. Log every refusal and repair
    in the trace. This is the workshop's central pattern and the clearest demo moment.
@@ -69,10 +69,7 @@ that saved text. Offline tests drive the real OpenAI SDK through a scripted HTTP
 7. **Client alignment.** Accept `MODEL_API_BASE_URL` / `MODEL_API_MODEL` alongside `META_*`; use the
    SDK's retries (honours Retry-After) and a 180 s timeout; optional `reasoning.effort` (never `none`
    on Muse Spark); pin or test the `openai` major version; add a scripted-transport test through the SDK.
-8. **Agent loop (larger).** Expose the steps as tools (retrieve, extract interfaces, extract registers,
-   record requirement, ask the designer, write section, submit plan) and let the model choose the order,
-   with the checks inside the tools. Keep the current pipeline as the deterministic baseline so the
-   demo can show what the model adds.
+8. ~~Agent loop.~~ Dropped: the user fixes the step order (D-014).
 9. **Model transcription for figures.** Files API transcription for pages with diagrams or tables
    (register bit-field figures, timing diagrams), with quotes still checked against the saved text.
 
