@@ -1,5 +1,7 @@
 # dv_agent
 
+Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ([diagram](docs/architecture.png)).
+
 Spec ingestion → dependency GraphRAG → traceable lineage, for any design repository
 (UART16550 in `../baseline_repos/uart16550` is the prototype, not a constraint).
 
