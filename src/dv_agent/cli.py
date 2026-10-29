@@ -1,4 +1,5 @@
-"""dv-agent CLI: ingest | build-graph | plan | testplan | pipeline | query | context | features | lineage."""
+"""dv-agent CLI: ingest | build-graph | interfaces | registers | strategy | plan | testplan | pipeline | query |
+context | features | lineage."""
 import argparse
 import json
 import os
@@ -10,7 +11,8 @@ from .graph import lineage, load_graph
 from .llm import MetaClient
 from .fsutil import atomic_write_text
 from .pipeline import (GRAPH_FILE, clear_llm_cache, clear_run, run_build_graph, run_context, run_features,
-                       run_ingest, run_query, run_test_plan, run_testplan_doc)
+                       run_ingest, run_interfaces, run_query, run_registers, run_strategy, run_test_plan,
+                       run_testplan_doc)
 from .planning import PlanConfig
 from .retrieval import RetrievalConfig
 
@@ -29,6 +31,9 @@ def load_env_file(path: Path) -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
+LLM_MODES = ("auto", "on", "off")
+
+
 def _llm() -> MetaClient | None:
     return MetaClient() if os.getenv("MODEL_API_KEY", "").strip() else None
 
@@ -37,6 +42,23 @@ def _embedder() -> MetaEmbedder | None:
     if not (os.getenv("MODEL_API_KEY", "").strip() and os.getenv("META_EMBED_MODEL", "").strip()):
         return None
     return MetaEmbedder()
+
+
+def _llm_mode(arg: str | None) -> str:
+    mode = (arg or os.getenv("DV_AGENT_LLM_MODE", "") or "auto").strip().lower()
+    if mode not in LLM_MODES:
+        raise UsageError(f"LLM mode must be one of {LLM_MODES}, got {mode!r}")
+    return mode
+
+
+def _models_for(mode: str):
+    """(llm, embedder) honouring the mode: off never calls the API; on requires a key."""
+    if mode == "off":
+        return None, None
+    llm = _llm()
+    if llm is None and mode == "on":
+        raise UsageError("LLM mode is 'on' but MODEL_API_KEY is not set")
+    return llm, _embedder() if llm is not None else None
 
 
 class UsageError(Exception):
@@ -83,7 +105,8 @@ def _main(argv: list[str] | None) -> int:
 
     pb = sub.add_parser("build-graph", help="build the 3-layer graph (LLM layers need MODEL_API_KEY)")
     pb.add_argument("--out", type=Path, required=True)
-    pb.add_argument("--no-llm", action="store_true", help="structural layers only")
+    pb.add_argument("--llm", choices=LLM_MODES, help="auto (default; LLM if a key is set), on (require), off "
+                    "(structural layers only, no API calls); env DV_AGENT_LLM_MODE")
     pb.add_argument("--force", action="store_true", help="rebuild the graph even if it is current")
     pb.add_argument("--fresh", action="store_true", help="delete the LLM cache and rebuild from scratch")
 
@@ -92,6 +115,16 @@ def _main(argv: list[str] | None) -> int:
     pp.add_argument("--out", type=Path, required=True)
     pp.add_argument("--force", action="store_true", help="regenerate the test plan even if it is current")
     pp.add_argument("--fresh", action="store_true", help="delete the LLM cache and regenerate")
+
+    step_help = {"interfaces": "isolate interface definitions and group them by functionality and module type",
+                 "registers": "fetch the register map definitions from the specification",
+                 "strategy": "build the verification strategy from the interface and register steps"}
+    for name, help_text in step_help.items():
+        sp = sub.add_parser(name, help=help_text)
+        sp.add_argument("--out", type=Path, required=True)
+        sp.add_argument("--scope", default="", help="block or feature to focus retrieval on (default: whole spec)")
+        sp.add_argument("--force", action="store_true", help=f"regenerate even if {name}.json is current")
+        sp.add_argument("--fresh", action="store_true", help="delete the LLM cache and regenerate")
 
     pt = sub.add_parser("testplan", help="generate the template-driven test-plan document (JSON + Markdown)")
     pt.add_argument("--out", type=Path, required=True)
@@ -111,6 +144,7 @@ def _main(argv: list[str] | None) -> int:
     pa.add_argument("--force", action="store_true", help="rerun every stage regardless of existing outputs")
     pa.add_argument("--fresh", action="store_true",
                     help="delete all generated artifacts (cache, graph, plan, trace) and run from scratch")
+    pa.add_argument("--llm", choices=LLM_MODES, help="auto (default), on, or off; env DV_AGENT_LLM_MODE")
 
     pq = sub.add_parser("query", help="retrieve ranked evidence with graph paths")
     pq.add_argument("text")
@@ -138,13 +172,12 @@ def _main(argv: list[str] | None) -> int:
         _print(run_ingest(args.repo, out, args.include, force=args.force) | {"out": str(out)})
     elif args.cmd == "build-graph":
         _require(args.out, "manifest.json", "chunks.jsonl")
+        llm, embedder = _models_for(_llm_mode(args.llm))
         removed = clear_llm_cache(args.out) if args.fresh else False
         force = args.force or args.fresh
-        llm = None if args.no_llm else _llm()
         if llm is not None:
             llm.cache_dir = args.out / "llm_cache"
-        _print(run_build_graph(args.out, llm, embedder=None if args.no_llm else _embedder(),
-                               force=force) | {"cache_cleared": removed})
+        _print(run_build_graph(args.out, llm, embedder=embedder, force=force) | {"cache_cleared": removed})
     elif args.cmd == "plan":
         _require(args.out, GRAPH_FILE)
         llm = _llm()
@@ -154,6 +187,16 @@ def _main(argv: list[str] | None) -> int:
         llm.cache_dir = args.out / "llm_cache"
         _print(run_test_plan(args.out, args.requirement_ids, llm, PlanConfig(retrieval=RetrievalConfig()),
                              embedder=_embedder(), force=args.force or args.fresh) | {"cache_cleared": removed})
+    elif args.cmd in ("interfaces", "registers", "strategy"):
+        _require(args.out, GRAPH_FILE)
+        llm = _llm()
+        if llm is None:
+            raise UsageError(f"MODEL_API_KEY is required for the {args.cmd} step")
+        removed = clear_llm_cache(args.out) if args.fresh else False
+        llm.cache_dir = args.out / "llm_cache"
+        step = {"interfaces": run_interfaces, "registers": run_registers, "strategy": run_strategy}[args.cmd]
+        _print(step(args.out, llm, scope=args.scope, embedder=_embedder(), force=args.force or args.fresh)
+               | {"cache_cleared": removed})
     elif args.cmd == "testplan":
         _require(args.out, GRAPH_FILE)
         llm = _llm()
@@ -165,9 +208,9 @@ def _main(argv: list[str] | None) -> int:
                                 embedder=_embedder(), force=args.force or args.fresh) | {"cache_cleared": removed})
     elif args.cmd == "pipeline":
         out = args.out or PACKAGE_ROOT / "runs" / args.repo.resolve().name
-        llm = _llm()
+        llm, embedder = _models_for(_llm_mode(args.llm))
         if (args.requirements or args.testplan) and llm is None:
-            raise UsageError("MODEL_API_KEY is required for test-plan generation")
+            raise UsageError("test-plan generation needs the LLM (MODEL_API_KEY set and --llm not off)")
         result = {"out": str(out)}
         force = args.force or args.fresh
         if args.fresh:
@@ -175,14 +218,14 @@ def _main(argv: list[str] | None) -> int:
         result["ingest"] = run_ingest(args.repo, out, args.include, force=force)
         if llm is not None:
             llm.cache_dir = out / "llm_cache"
-        result["build"] = run_build_graph(out, llm, embedder=_embedder(), force=force)
+        result["build"] = run_build_graph(out, llm, embedder=embedder, force=force)
         if args.requirements:
             result["plan"] = run_test_plan(out, args.requirements, llm,
                                            PlanConfig(retrieval=RetrievalConfig()),
-                                           embedder=_embedder(), force=force)
+                                           embedder=embedder, force=force)
         if args.testplan:
             result["testplan"] = run_testplan_doc(out, llm, scope=args.scope, template_path=args.template,
-                                                  embedder=_embedder(), force=force)
+                                                  embedder=embedder, force=force)
         _print(result)
     elif args.cmd == "query":
         _require(args.out, GRAPH_FILE)

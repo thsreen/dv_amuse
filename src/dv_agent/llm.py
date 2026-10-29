@@ -16,6 +16,7 @@ from .trace import Tracer
 
 DEFAULT_BASE_URL = "https://api.meta.ai/v1"
 DEFAULT_MODEL = "muse-spark-1.3"
+API_STYLES = ("responses", "chat")
 
 
 class LLMError(RuntimeError):
@@ -87,16 +88,24 @@ class _Base:
 class MetaClient(_Base):
     def __init__(self, *, api_key: str | None = None, base_url: str | None = None,
                  model: str | None = None, api_style: str | None = None, timeout: float = 90.0,
-                 max_attempts: int = 3, max_output_tokens: int = 4096,
+                 max_attempts: int = 3, max_output_tokens: int | None = None,
                  cache_dir: Path | None = None, client: Any = None,
                  sleep: Callable[[float], None] = time.sleep):
         self.api_key = api_key if api_key is not None else os.getenv("MODEL_API_KEY", "").strip()
         self.base_url = base_url or os.getenv("META_BASE_URL", DEFAULT_BASE_URL)
         self.model = model or os.getenv("META_MODEL", DEFAULT_MODEL)
-        self.api_style = api_style or os.getenv("META_API_STYLE", "responses")
+        self.api_style = (api_style or os.getenv("META_API_STYLE", "") or "responses").strip().lower()
+        if self.api_style not in API_STYLES:
+            raise ValueError(f"META_API_STYLE must be one of {API_STYLES}, got {self.api_style!r}")
+        raw_tokens = max_output_tokens if max_output_tokens is not None else os.getenv("META_MAX_OUTPUT_TOKENS", "8192")
+        try:
+            self.max_output_tokens = int(raw_tokens)
+        except ValueError:
+            raise ValueError(f"META_MAX_OUTPUT_TOKENS must be an integer, got {raw_tokens!r}") from None
+        if self.max_output_tokens <= 0:
+            raise ValueError("META_MAX_OUTPUT_TOKENS must be positive")
         self.timeout = timeout
         self.max_attempts = max_attempts
-        self.max_output_tokens = max_output_tokens
         self.cache_dir = cache_dir
         self._client = client
         self._sleep = sleep

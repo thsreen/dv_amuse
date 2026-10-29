@@ -1,7 +1,8 @@
 """Template-driven verification test-plan document built from the RAG graph.
 
 The template is data (see templates/testplan_quick_v0.json); each section names a generator
-("title", "entries" or "register_map"), retrieval queries and section instructions. Every entry
+("title", "entries", "register_map" or "configurations"), retrieval queries and section instructions.
+Two specification steps run first: interface isolation and register-map extraction. Every entry
 carries a provenance tag (DOCUMENTED / INFERRED / ASSUMED) and citations that are checked
 against the evidence supplied to the model. Each section is recorded as a graph artifact so its
 lineage can be walked and is logged to the trace.
@@ -20,13 +21,17 @@ from .graph import attach_artifact
 from .interfaces import InterfaceConfig, compact, extract_interfaces, interface_questions
 from .interfaces import render as render_interfaces
 from .llm import LLM, LLMError
+from .registers import RegisterConfig, extract_registers, register_questions
+from .registers import render as render_registers
 from .retrieval import RetrievalConfig
+from .strategy import build_strategy, strategy_questions, strategy_summary
+from .strategy import render as render_strategy
 from .testplan_context import chunk_record, fetch_context, requirement_record
 from .trace import Tracer
 
 DOC_SCHEMA_VERSION = 1
 DEFAULT_TEMPLATE = Path(__file__).parent / "templates" / "testplan_quick_v0.json"
-GENERATORS = {"title", "entries", "register_map"}
+GENERATORS = {"title", "entries", "register_map", "strategy", "configurations"}
 PROVENANCE = ["DOCUMENTED", "INFERRED", "ASSUMED"]
 
 COMMON_RULES = """You write ONE section of a hardware verification test plan.
@@ -57,8 +62,20 @@ class DocConfig:
 
 def load_template(path: Path | None = None) -> dict:
     path = path or DEFAULT_TEMPLATE
+    if not path.is_file():
+        raise ValueError(f"template not found: {path}")
     raw = path.read_text(encoding="utf-8")
-    template = json.loads(raw)
+    try:
+        template = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"template {path} is not valid JSON: {exc}") from None
+    if not isinstance(template.get("template_id"), str) or not isinstance(template.get("sections"), list):
+        raise ValueError(f"template {path} needs a string template_id and a sections list")
+    for s in template["sections"]:
+        if not isinstance(s, dict) or not isinstance(s.get("id"), str) or not isinstance(s.get("heading"), str):
+            raise ValueError(f"template {path}: every section needs string id and heading")
+        if not all(isinstance(q, str) for q in s.get("queries", [])):
+            raise ValueError(f"template {path}: section {s['id']} queries must be strings")
     ids = [s["id"] for s in template["sections"]]
     if len(ids) != len(set(ids)):
         raise ValueError("template section ids must be unique")
@@ -85,23 +102,6 @@ def _entries_schema(kinds: list[str] | None, req_ids: list[str], chunk_ids: list
                                "cited_req_ids": _ids_schema(req_ids),
                                "cited_chunk_ids": _ids_schema(chunk_ids),
                                "details": {"type": "array", "items": {"type": "string"}}}}}}}
-
-
-def _register_schema(req_ids: list[str], chunk_ids: list[str]) -> dict:
-    text = {"type": "string"}
-    fld = {"type": "object", "additionalProperties": False,
-           "required": ["bits", "name", "access", "reset_value", "description"],
-           "properties": {k: text for k in ("bits", "name", "access", "reset_value", "description")}}
-    reg_keys = ("name", "abbreviation", "address", "width", "access", "reset_value", "description")
-    return {"type": "object", "additionalProperties": False, "required": ["registers"],
-            "properties": {"registers": {"type": "array", "items": {
-                "type": "object", "additionalProperties": False,
-                "required": list(reg_keys) + ["fields", "provenance", "cited_req_ids", "cited_chunk_ids"],
-                "properties": {**{k: text for k in reg_keys},
-                               "fields": {"type": "array", "items": fld},
-                               "provenance": {"type": "string", "enum": PROVENANCE},
-                               "cited_req_ids": _ids_schema(req_ids),
-                               "cited_chunk_ids": _ids_schema(chunk_ids)}}}}}
 
 
 def section_context(G: nx.MultiDiGraph, H: nx.Graph, section: dict, scope: str, cfg: DocConfig,
@@ -171,12 +171,6 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
-def _cited_text(G: nx.MultiDiGraph, entry: dict) -> str:
-    texts = [G.nodes[c]["text"] for c in entry["cited_chunk_ids"]]
-    texts += [G.nodes[G.nodes[r]["chunk_id"]]["text"] for r in entry["cited_req_ids"]]
-    return _norm(" ".join(texts))
-
-
 def _validate_entries(G, raw: list[dict], req_ids: set[str], chunk_ids: set[str], limit: int) -> list[dict]:
     out = []
     for e in raw[:limit]:
@@ -188,23 +182,70 @@ def _validate_entries(G, raw: list[dict], req_ids: set[str], chunk_ids: set[str]
     return out
 
 
-def _validate_registers(G, raw: list[dict], req_ids: set[str], chunk_ids: set[str]) -> list[dict]:
-    out = []
-    for r in raw:
-        if not r.get("name", "").strip():
+def _config_schema(field_ids: list[str], req_ids: list[str], chunk_ids: list[str]) -> dict:
+    t = {"type": "string"}
+    return {"type": "object", "additionalProperties": False, "required": ["configurations"],
+            "properties": {"configurations": {"type": "array", "items": {
+                "type": "object", "additionalProperties": False,
+                "required": ["field_id", "randomize", "legal_values", "distribution", "constraints",
+                             "reserved_handling", "notes", "provenance", "cited_req_ids", "cited_chunk_ids"],
+                "properties": {"field_id": {"type": "string", "enum": field_ids or [""]},
+                               "randomize": {"type": "boolean"},
+                               "legal_values": {"type": "array", "items": t}, "distribution": t,
+                               "constraints": {"type": "array", "items": t}, "reserved_handling": t, "notes": t,
+                               "provenance": {"type": "string", "enum": PROVENANCE},
+                               "cited_req_ids": _ids_schema(req_ids), "cited_chunk_ids": _ids_schema(chunk_ids)}}}}}
+
+
+def _validate_configs(G: nx.MultiDiGraph, raw: list[dict], configurable: list[dict], req_ids: set[str],
+                      chunk_ids: set[str]) -> tuple[list[dict], list[str]]:
+    by_id = {f["field_id"]: f for f in configurable}
+    out, notes, seen = [], [], set()
+    for c in raw:
+        fid = c.get("field_id", "")
+        if fid not in by_id or fid in seen:
+            notes.append(f"configuration for {fid!r} dropped ({'duplicate' if fid in seen else 'unknown field'})")
             continue
-        r = dict(r)
-        r["validation"] = _clean_citations(r, req_ids, chunk_ids)
-        if r["provenance"] == "DOCUMENTED":
-            cited = _cited_text(G, r)
-            missing = [k for k in ("address", "reset_value") if r.get(k, "").strip()
-                       and _norm(r[k]) not in cited]
-            if missing:
-                r["provenance"] = "INFERRED"
-                r["validation"].append(f"{', '.join(missing)} not found verbatim in cited text; "
-                                       "downgraded to INFERRED")
-        out.append(r)
-    return out
+        seen.add(fid)
+        f = by_id[fid]
+        e = dict(field_id=fid, register=f["register"], field=f["field"], bits=f["bits"], access=f["access"],
+                 randomize=bool(c["randomize"]), legal_values=[v.strip() for v in c["legal_values"] if v.strip()],
+                 distribution=c["distribution"].strip(), constraints=[x.strip() for x in c["constraints"] if x.strip()],
+                 reserved_handling=c["reserved_handling"].strip(), notes=c["notes"].strip(),
+                 provenance=c["provenance"], cited_req_ids=list(c.get("cited_req_ids", [])),
+                 cited_chunk_ids=[x for x in c.get("cited_chunk_ids", []) if x] or list(f["source_chunk_ids"]))
+        e["validation"] = _clean_citations(e, req_ids, chunk_ids | set(f["source_chunk_ids"]))
+        spec_values = {_norm(v["value"]) for v in f["values"]} | {_norm(v["meaning"]) for v in f["values"]}
+        source = _norm(" ".join(G.nodes[x]["text"] for x in set(f["source_chunk_ids"]) | set(e["cited_chunk_ids"])))
+        undocumented = [v for v in e["legal_values"] if _norm(v) not in spec_values and _norm(v) not in source]
+        if undocumented:
+            e["validation"].append(f"legal values not stated in the specification: {undocumented}")
+            if e["provenance"] == "DOCUMENTED":
+                e["provenance"] = "INFERRED"
+        out.append(e)
+    for f in configurable:
+        if f["field_id"] not in seen:
+            out.append(dict(field_id=f["field_id"], register=f["register"], field=f["field"], bits=f["bits"],
+                            access=f["access"], randomize=None, legal_values=[], distribution="", constraints=[],
+                            reserved_handling="", notes="No randomisation proposed for this writable field.",
+                            provenance="ASSUMED", cited_req_ids=[], cited_chunk_ids=list(f["source_chunk_ids"]),
+                            validation=["missing from model output; needs designer input"]))
+    out.sort(key=lambda e: e["field_id"])
+    return out, notes
+
+
+def _config_questions(sections: list[dict]) -> list[dict]:
+    qs = []
+    for s in sections:
+        for e in s.get("configurations", []):
+            target = f"{e['register']}.{e['field']}" + (f" [{e['bits']}]" if e["bits"] else "")
+            if e["randomize"] is None:
+                qs.append(f"How should writable field {target} be configured in verification? "
+                          "No randomisation could be derived from the specification.")
+            elif e["randomize"] and not e["legal_values"]:
+                qs.append(f"What are the legal values of {target}? The specification does not list them.")
+    return [dict(text=q, kind="question", provenance="INFERRED", cited_req_ids=[], cited_chunk_ids=[],
+                 details=["Raised by the Configurations section"], validation=[]) for q in qs]
 
 
 def _previous(sections: list[dict], limit: int) -> list[dict]:
@@ -212,8 +253,13 @@ def _previous(sections: list[dict], limit: int) -> list[dict]:
     for s in sections:
         if s["generator"] == "title" or s["status"] != "PASS":
             continue
-        items = [f"{e['kind']}: {e['text']}" for e in s.get("entries", [])] or [
-            f"register {r['name']} ({r['abbreviation']}) at {r['address']}" for r in s.get("registers", [])]
+        items = ([f"{e['kind']}: {e['text']}" for e in s.get("entries", [])]
+                 or strategy_summary(s.get("strategy") or {})
+                 or [f"register {r}" for r in s.get("register_labels", [])]
+                 or [f"configure {e['register']}.{e['field']}: "
+                     + (f"randomise over {', '.join(e['legal_values']) or 'unstated values'}" if e["randomize"]
+                        else "fixed" if e["randomize"] is False else "undecided")
+                     for e in s.get("configurations", [])])
         items = items[:max(0, limit - count)]
         count += len(items)
         if items:
@@ -237,9 +283,15 @@ def _artifact_id(template_id: str, section_id: str, scope: str) -> str:
     return "TPS-" + hashlib.sha256(f"{template_id}|{section_id}|{scope}".encode()).hexdigest()[:10]
 
 
-def _record(G: nx.MultiDiGraph, tracer: Tracer, out: dict, template_id: str, scope: str) -> None:
-    items = out.get("entries", []) + out.get("registers", [])
-    parents = sorted({i for e in items for i in e["cited_req_ids"] + e["cited_chunk_ids"]})
+def _record(G: nx.MultiDiGraph, tracer: Tracer, out: dict, template_id: str, scope: str,
+            parents: list[str] | None = None) -> None:
+    items = out.get("entries", []) + out.get("configurations", [])
+    if parents is None and out.get("strategy"):
+        st = out["strategy"]
+        parents = sorted({c for x in st["agents"] + st["scoreboards"] for c in x["cited_chunk_ids"]})
+        items = st["agents"] + st["scoreboards"]
+    if parents is None:
+        parents = sorted({i for e in items for i in e["cited_req_ids"] + e["cited_chunk_ids"]})
     art = _artifact_id(template_id, out["id"], scope)
     if art in G:
         G.remove_node(art)  # regenerated section replaces the old artifact and its edges
@@ -262,12 +314,29 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
     with tracer.span("testplan_doc", input={"template": meta["template_id"], "scope": scope}) as stage:
         interfaces = _interfaces_step(G, H, llm, tracer, template, scope, cfg, dense_fn)
         iface_compact = compact(interfaces) if interfaces and interfaces["status"] == "PASS" else []
+        registers = _registers_step(G, H, llm, tracer, template, scope, cfg, dense_fn)
+        strategy = None
         for sec in template["sections"]:
             with tracer.span(f"testplan_section:{sec['id']}", input={"section": sec["id"]}) as span:
                 if sec["generator"] == "title":
                     sections.append(_title_section(G, sec, scope, meta))
                     continue
+                if sec["generator"] == "register_map":
+                    sections.append(_register_map_section(G, tracer, sec, registers, meta["template_id"], scope))
+                    continue
+                if sec["generator"] == "configurations" and (registers is None or not registers["registers"]):
+                    reason = ("register-map step disabled" if registers is None
+                              else f"register map is {registers['status']} with no registers")
+                    sections.append(dict(id=sec["id"], heading=sec["heading"], generator=sec["generator"],
+                                         status="NOT_RUN", error=reason, configurations=[]))
+                    continue
                 ctx = section_context(G, H, sec, scope, cfg, dense_fn)
+                if sec["generator"] == "strategy":
+                    sections.append(_strategy_section(G, tracer, llm, sec, interfaces, registers, scope, ctx,
+                                                      _previous(sections, cfg.max_previous_entries), cfg,
+                                                      meta["template_id"], span))
+                    strategy = sections[-1].get("strategy")
+                    continue
                 for d in ctx["dependencies"]:
                     if d["type"] == "CONFLICTS_WITH":
                         conflicts[(d["src"], d["dst"])] = d
@@ -275,21 +344,28 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 chunk_ids = [c["chunk_id"] for c in ctx["chunks"]]
                 out = dict(id=sec["id"], heading=sec["heading"], generator=sec["generator"],
                            context=dict(queries=ctx["queries"], requirement_ids=req_ids, chunk_ids=chunk_ids))
-                schema = (_register_schema(req_ids, chunk_ids) if sec["generator"] == "register_map"
-                          else _entries_schema(sec.get("entry_kinds"), req_ids, chunk_ids))
+                payload = _payload(sec, scope, ctx, _previous(sections, cfg.max_previous_entries), iface_compact, cfg)
+                if sec["generator"] == "configurations":
+                    configurable = registers["configurable"]
+                    payload["configurable_fields"] = [
+                        {k: f[k] for k in ("field_id", "register", "register_name", "address", "bits", "field",
+                                           "access", "reset_value", "description", "values", "availability",
+                                           "reserved")} for f in configurable]
+                    schema = _config_schema([f["field_id"] for f in configurable], req_ids,
+                                            sorted(set(chunk_ids) | {c for f in configurable for c in f["source_chunk_ids"]}))
+                else:
+                    schema = _entries_schema(sec.get("entry_kinds"), req_ids, chunk_ids)
                 try:
                     result = llm.structured(name=f"testplan_{sec['generator']}",
                                             instructions=COMMON_RULES + sec.get("instructions", ""),
-                                            payload=_payload(sec, scope, ctx, _previous(sections, cfg.max_previous_entries),
-                                                             iface_compact, cfg),
-                                            schema=schema, tracer=tracer)
+                                            payload=payload, schema=schema, tracer=tracer)
                 except LLMError as exc:
                     span.update(level="ERROR", status_message=exc.kind)
                     sections.append(out | dict(status="BLOCKED", error=exc.kind, entries=[]))
                     continue
-                if sec["generator"] == "register_map":
-                    out["registers"] = _validate_registers(G, result.data.get("registers", []),
-                                                           set(req_ids), set(chunk_ids))
+                if sec["generator"] == "configurations":
+                    out["configurations"], out["validation"] = _validate_configs(
+                        G, result.data.get("configurations", []), registers["configurable"], set(req_ids), set(chunk_ids))
                 else:
                     out["entries"] = _validate_entries(G, result.data.get("entries", []), set(req_ids),
                                                        set(chunk_ids), cfg.max_entries)
@@ -300,17 +376,79 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                         out["entries"] += _gap_questions(sections)
                         if interfaces:
                             out["entries"] += interface_questions(interfaces)
+                        if registers:
+                            out["entries"] += register_questions(registers)
+                        out["entries"] += _config_questions(sections)
+                        out["entries"] += strategy_questions(strategy)
                 out["status"] = "PASS"
                 _record(G, tracer, out, meta["template_id"], scope)
-                span.update(output={"status": "PASS", "items": len(out.get("entries", out.get("registers", [])))},
+                span.update(output={"status": "PASS", "items": len(out.get("entries", out.get("configurations", [])))},
                             metadata={"fact_ids": out["lineage_fact_ids"]})
                 sections.append(out)
-        stage.update(output={"interfaces": interfaces["status"] if interfaces else "DISABLED"}
+        stage.update(output={"interfaces": interfaces["status"] if interfaces else "DISABLED",
+                             "registers": registers["status"] if registers else "DISABLED"}
                      | {s["id"]: s["status"] for s in sections})
     return dict(schema_version=DOC_SCHEMA_VERSION, **meta, scope=scope,
                 template_path=template["template_path"], review_status="NEEDS_REVIEW",
                 graph_build_trace_id=G.graph.get("build_trace_id"), trace_id=tracer.trace_id,
-                interfaces=interfaces, sections=sections)
+                interfaces=interfaces, registers=registers, sections=sections)
+
+
+def _registers_step(G, H, llm, tracer, template, scope, cfg, dense_fn) -> dict | None:
+    """Fetch the register map definitions from the specification (feeds Register Map and Configurations)."""
+    spec = template.get("registers", {})
+    uses = any(s["generator"] in ("register_map", "configurations") for s in template["sections"])
+    if not spec.get("enabled", uses):
+        return None
+    rcfg = RegisterConfig(retrieval=cfg.retrieval)
+    if spec.get("queries"):
+        rcfg.queries = list(spec["queries"])
+    with tracer.span("testplan_registers", input={"scope": scope}) as span:
+        result = extract_registers(G, H, llm, tracer, scope, rcfg, dense_fn)
+        if result["registers"]:
+            art = _artifact_id(template["template_id"], "registers", scope)
+            if art in G:
+                G.remove_node(art)
+            parents = sorted({src["chunk_id"] for r in result["registers"] for src in r["sources"]})
+            attach_artifact(G, tracer, art, "register_map", parents,
+                            content=json.dumps([r["abbreviation"] or r["name"] for r in result["registers"]]),
+                            metadata={"template_id": template["template_id"], "scope": scope})
+            result["artifact_id"] = art
+        span.update(output={"status": result["status"], "registers": len(result["registers"]),
+                            "configurable_fields": len(result.get("configurable", [])),
+                            "conflicts": len(result["conflicts"])},
+                    level="ERROR" if result["status"] == "BLOCKED" else None)
+    return result
+
+
+def _strategy_section(G, tracer, llm, sec, interfaces, registers, scope, ctx, previous, cfg, template_id,
+                      span) -> dict:
+    out = dict(id=sec["id"], heading=sec["heading"], generator="strategy",
+               context=dict(queries=ctx["queries"], requirement_ids=[r["req_id"] for r in ctx["requirements"]],
+                            chunk_ids=[c["chunk_id"] for c in ctx["chunks"]]))
+    result = build_strategy(llm, tracer, interfaces, registers, scope, ctx, previous, cfg.chunk_chars,
+                            sec.get("instructions", ""))
+    out |= dict(status=result["status"], strategy=result)
+    if result["status"] != "PASS":
+        out["error"] = result.get("error", "")
+        span.update(level="ERROR" if result["status"] == "BLOCKED" else None, status_message=out["error"])
+        return out
+    _record(G, tracer, out, template_id, scope)
+    span.update(output={"status": "PASS", "agents": len(result["agents"]), "gaps": len(result["gaps"])},
+                metadata={"fact_ids": out["lineage_fact_ids"]})
+    return out
+
+
+def _register_map_section(G, tracer, sec: dict, registers: dict | None, template_id: str, scope: str) -> dict:
+    out = dict(id=sec["id"], heading=sec["heading"], generator="register_map")
+    if registers is None:
+        return out | dict(status="NOT_RUN", error="register-map step disabled in the template")
+    out |= dict(status="PASS" if registers["status"] == "PASS" else registers["status"],
+                register_labels=[r["abbreviation"] or r["name"] for r in registers["registers"]])
+    if registers["registers"]:
+        _record(G, tracer, out, template_id, scope,
+                parents=sorted({src["chunk_id"] for r in registers["registers"] for src in r["sources"]}))
+    return out
 
 
 def _interfaces_step(G, H, llm, tracer, template, scope, cfg, dense_fn) -> dict | None:
@@ -383,24 +521,18 @@ def render_markdown(doc: dict) -> str:
             if doc.get("interfaces"):
                 lines += render_interfaces(doc["interfaces"], doc["interfaces"]["heading"])
             continue
+        if s["generator"] == "register_map" and doc.get("registers"):
+            lines += render_registers(doc["registers"], s["heading"])
+            continue
+        if s["generator"] == "strategy" and s.get("strategy"):
+            lines += render_strategy(s["strategy"], s["heading"])
+            continue
         lines += [f"## {s['heading']}", ""]
         if s["status"] != "PASS":
             lines += [f"**{s['status']}**: {s.get('error', '')}", ""]
             continue
-        if s["generator"] == "register_map":
-            if not s["registers"]:
-                lines += ["_No registers found in the retrieved specification text._", ""]
-            for r in s["registers"]:
-                lines += [f"### {r['name']} ({r['abbreviation'] or '-'}) [{r['provenance']}]",
-                          f"Address: {r['address'] or 'not stated'} | Width: {r['width'] or 'not stated'} | "
-                          f"Access: {r['access'] or 'not stated'} | Reset: {r['reset_value'] or 'not stated'}"
-                          + _cite(r), "", r["description"], ""]
-                if r["fields"]:
-                    lines += ["| Bits | Field | Access | Reset | Description |", "|---|---|---|---|---|"]
-                    lines += [f"| {f['bits']} | {f['name']} | {f['access']} | {f['reset_value']} | "
-                              f"{f['description'].replace('|', '/')} |" for f in r["fields"]]
-                    lines.append("")
-                lines += [f"> Validation: {v}" for v in r["validation"]]
+        if s["generator"] == "configurations":
+            lines += _render_configurations(s)
             continue
         if not s["entries"]:
             lines += ["_No entries._", ""]
@@ -410,3 +542,24 @@ def render_markdown(doc: dict) -> str:
             lines += [f"  - Validation: {v}" for v in e["validation"]]
         lines.append("")
     return "\n".join(lines)
+
+
+def _render_configurations(s: dict) -> list[str]:
+    if not s["configurations"]:
+        return ["_No writable register fields were found in the specification._", ""]
+    lines = ["| Register.Field | Bits | Access | Randomise | Legal values | Distribution | Constraints | "
+             "Reserved handling | Provenance | Sources |", "|---|---|---|---|---|---|---|---|---|---|"]
+    for e in s["configurations"]:
+        rnd = {True: "yes", False: "no", None: "undecided"}[e["randomize"]]
+        cells = [f"{e['register']}.{e['field']}", e["bits"] or "-", e["access"], rnd,
+                 "; ".join(e["legal_values"]) or "not stated", e["distribution"] or "-",
+                 "; ".join(e["constraints"]) or "-", e["reserved_handling"] or "-", e["provenance"],
+                 ", ".join(e["cited_req_ids"] + e["cited_chunk_ids"]) or "-"]
+        lines.append("| " + " | ".join(c.replace("|", "/") for c in cells) + " |")
+    lines.append("")
+    for e in s["configurations"]:
+        lines += [f"> {e['register']}.{e['field']}: {v}" for v in e["validation"]]
+        if e["notes"]:
+            lines.append(f"> {e['register']}.{e['field']} note: {e['notes']}")
+    lines += [f"> Validation: {v}" for v in s.get("validation", [])]
+    return lines + [""]

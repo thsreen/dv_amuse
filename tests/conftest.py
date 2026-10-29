@@ -133,21 +133,21 @@ def plan_handler(payload: dict) -> dict:
 def interfaces_handler(payload: dict) -> dict:
     cid = next(c["chunk_id"] for c in payload["chunks"] if "Interface Signals" in c["text"])
 
-    def sig(name, width, direction, desc, availability=""):
+    def sig(name, width, direction, desc, availability="", level="not_applicable"):
         row = next(line for line in payload["chunks"][[c["chunk_id"] for c in payload["chunks"]].index(cid)]["text"].splitlines()
                    if line.startswith(name + " "))
-        return {"name": name, "width": width, "direction": direction, "availability": availability,
-                "description": desc, "quote": row, "chunk_id": cid}
+        return {"name": name, "width": width, "direction": direction, "active_level": level,
+                "availability": availability, "description": desc, "quote": row, "chunk_id": cid}
     return {"signals": [
-        sig("CLK", "1", "input", "Clock input"),
-        sig("RST_N", "1", "input", "Active-low asynchronous reset"),
+        sig("CLK", "1", "input", "Clock input", level="rising_edge"),
+        sig("RST_N", "1", "input", "Active-low asynchronous reset", level="low"),
         sig("BUS_ADDR", "4", "input", "Register address"),
         sig("BUS_WDATA", "32", "input", "Write data"),
         sig("BUS_RDATA", "32", "output", "Read data"),
         sig("BUS_WE", "1", "input", "Write enable"),
-        sig("IRQ", "1", "output", "Interrupt request"),
+        sig("IRQ", "1", "output", "Interrupt request", level="high"),
         sig("TICK_O", "1", "output", "Optional tick pulse", "TMR_HAS_TICK defined"),
-        {"name": "GHOST_SIG", "width": "1", "direction": "input", "availability": "", "description": "invented",
+        {"name": "GHOST_SIG", "width": "1", "direction": "input", "active_level": "unknown", "availability": "", "description": "invented",
          "quote": "GHOST_SIG 1 Input", "chunk_id": cid}],
         "groups": [
             {"name": "Register bus", "function": "Register read/write", "category": "bus", "protocol": "",

@@ -5,6 +5,9 @@
     "enabled": true,
     "heading": "Interface Definitions (step 0: grouped by functionality and connected module type)"
   },
+  "registers": {
+    "enabled": true
+  },
   "sections": [
     {
       "id": "title",
@@ -34,22 +37,12 @@
     {
       "id": "register_map",
       "heading": "3. Register Map",
-      "generator": "register_map",
-      "queries": [
-        "{scope} register map addresses",
-        "{scope} register fields bits access reset value"
-      ],
-      "include_kinds": [
-        "register",
-        "reset",
-        "configuration"
-      ],
-      "instructions": "List every register the supplied text describes with its address or offset, width, access, reset value and description, and every field with bits, name, access, reset value and description. Copy values exactly as written; use an empty string when the text does not state a value."
+      "generator": "register_map"
     },
     {
       "id": "strategy",
       "heading": "4. High Level Verification Strategy",
-      "generator": "entries",
+      "generator": "strategy",
       "queries": [
         "{scope} bus interface signals",
         "{scope} external interface signals",
@@ -64,11 +57,23 @@
         "agent_scoreboard",
         "top_level_scoreboard"
       ],
-      "instructions": "Propose the UVM environment from the supplied interface groups: one agent per bus, serial-data or flow-control group, named after the group and stating whether it is active or passive and what it drives or monitors; say how sideband groups (single wires or bundles) are driven or monitored, either by their own small agent or by a sideband monitor, and which group they belong with. Then the sequence library (for example reset, register access, transfer, error injection, loopback, interrupt), the reference model, and how checking is split between scoreboards inside agents and a top-level scoreboard that spans several agents. These are engineering proposals: mark them INFERRED and cite the specification text that motivates them; never claim the specification mandates the testbench."
+      "instructions": "Use the reset, register-access, transfer, error-injection, loopback and interrupt sequence families where the specification supports them."
+    },
+    {
+      "id": "configurations",
+      "heading": "5. Configurations",
+      "generator": "configurations",
+      "queries": [
+        "{scope} configuration options modes",
+        "{scope} register settings and valid values",
+        "{scope} programming sequence initialization",
+        "{scope} register access conditions"
+      ],
+      "instructions": "Configurations: for every writable register field in configurable_fields, state whether verification should randomise it and how. legal_values are copied exactly from the field's specification-stated values (values list) or from the cited specification text; distribution gives the weighting or sweep (for example uniform, weighted toward corner values, exhaustive); constraints lists dependencies the specification states (programming order, fields that must be set first, combinations that are not allowed, access conditions); reserved_handling says how reserved or ignored bits are driven (for example keep at reset value) and whether writing them is a negative test. Set randomize false for fields the specification requires to hold a fixed value. Do not invent values; if the specification states none, leave legal_values empty, explain in notes and mark the entry ASSUMED."
     },
     {
       "id": "stimulus",
-      "heading": "5. Stimulus",
+      "heading": "6. Stimulus",
       "generator": "entries",
       "queries": [
         "{scope} configuration options",
@@ -87,7 +92,7 @@
     },
     {
       "id": "checks",
-      "heading": "6. Checks",
+      "heading": "7. Checks",
       "generator": "entries",
       "queries": [
         "{scope} status indicators",
@@ -107,7 +112,7 @@
     },
     {
       "id": "coverage",
-      "heading": "7. Coverage",
+      "heading": "8. Coverage",
       "generator": "entries",
       "queries": [
         "{scope} configuration options",
@@ -124,7 +129,7 @@
     },
     {
       "id": "callouts",
-      "heading": "8. Callouts to Higher Testbenches",
+      "heading": "9. Callouts to Higher Testbenches",
       "generator": "entries",
       "queries": [
         "{scope} external connections pads",
@@ -141,7 +146,7 @@
     },
     {
       "id": "assumptions",
-      "heading": "9. Assumptions",
+      "heading": "10. Assumptions",
       "generator": "entries",
       "queries": [
         "{scope} optional features defines",
@@ -155,7 +160,7 @@
     },
     {
       "id": "questions",
-      "heading": "10. Questions to Designers",
+      "heading": "11. Questions to Designers",
       "generator": "entries",
       "queries": [
         "{scope} undefined unclear behaviour",

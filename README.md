@@ -12,11 +12,11 @@ cp .env.example .env   # add MODEL_API_KEY and optional Langfuse keys
 ## Use
 ```
 .venv/bin/dv-agent ingest ../baseline_repos/uart16550          # -> runs/uart16550/
-.venv/bin/dv-agent build-graph --out runs/uart16550            # L2 needs MODEL_API_KEY
+.venv/bin/dv-agent build-graph --out runs/uart16550            # L2 needs MODEL_API_KEY; --llm auto|on|off
 .venv/bin/dv-agent query "THRE interrupt clear condition" --out runs/uart16550
 .venv/bin/dv-agent lineage REQ-xxxxxxxxxx --out runs/uart16550
 ```
-`ingest` discovers spec files (prefers `doc/`, `docs/`, `spec/`; skips design-source, bench and tool-output directories;
+`ingest` discovers spec files (PDF, DOCX, HTML, Markdown, text) (prefers `doc/`, `docs/`, `spec/`; skips design-source, bench and tool-output directories;
 `--include GLOB` overrides) and records every skip with a reason in `manifest.json`.
 
 ## Run directory
@@ -102,3 +102,22 @@ Runs before any test-plan section (template `interfaces` block; `"enabled": fals
   a designer question. Grouping is always INFERRED.
 - Groups are passed to every section and rendered after the title; recorded as an `interface_definitions`
   graph node with lineage.
+
+## LLM mode and model settings
+`--llm` on `build-graph` and `pipeline` (or `DV_AGENT_LLM_MODE`): `auto` (default) uses the LLM when
+`MODEL_API_KEY` is set, `on` fails if it is not, `off` never calls the API (structural graph only).
+`META_API_STYLE` must be `responses` or `chat`; `META_MAX_OUTPUT_TOKENS` (default 8192) must be a positive integer.
+
+## Specification steps (each also runs inside `testplan`)
+| Command | Output | What it does |
+|---|---|---|
+| `dv-agent interfaces --out runs/<repo>` | `interfaces.json`, `.md` | Signals grouped by functionality and connected module type; names, directions, widths and active levels checked against the spec text |
+| `dv-agent registers --out runs/<repo>` | `registers.json`, `.md` | Register map: batched extraction per chunk, verified against chunk text, merged across chunks; conflicting values and overlapping fields are reported, not resolved; writable fields derived from access codes |
+| `dv-agent strategy --out runs/<repo>` | `strategy.json`, `.md` | Agents per interface group (mode, drives, monitors, registers, sequences, correctness mechanisms), agent and top-level scoreboards, register model, virtual sequences; built from the saved interface and register steps (regenerated only if missing or stale) and checked against them |
+
+All accept `--scope`, `--force` and `--fresh`. Strategy checks: every interface group covered by exactly one agent (uncovered groups become gaps and designer questions); agents drive only DUT inputs of their own groups; passive agents never drive; registers must exist in the register map; scoreboard and virtual-sequence agents must exist.
+
+Test-plan sections (template `quick_reference_v0`): 1 Title, 2 Feature Description, 3 Register Map (from the register step, no model call), 4 High Level Verification Strategy (strategy step), 5 Configurations (every writable field with spec-stated legal values, distribution, constraints and reserved-bit handling; missing fields are added as ASSUMED and raised as questions), 6 Stimulus, 7 Checks, 8 Coverage, 9 Callouts, 10 Assumptions, 11 Questions to Designers.
+
+## Formats
+`.docx` (headings from Word heading styles or outline levels, tables as `cell | cell` rows, page numbers from page breaks) and `.html` (`h1`-`h6` headings, tables as rows; scripts and styles skipped) are parsed with the standard library. Legacy binary `.doc` is still reported SKIPPED.

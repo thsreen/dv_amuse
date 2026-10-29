@@ -13,7 +13,13 @@ from .llm import LLM, LLMError
 from .planning import PlanConfig, build_test_plan
 from .retrieval import RetrievalConfig, layered_view, retrieve
 from .testplan_context import feature_index, fetch_context, requirement_context
-from .testplan_doc import DocConfig, build_testplan_doc, load_template, render_markdown
+from .interfaces import InterfaceConfig, extract_interfaces
+from .interfaces import render as render_interfaces
+from .registers import RegisterConfig, extract_registers
+from .registers import render as render_registers
+from .strategy import build_strategy
+from .strategy import render as render_strategy
+from .testplan_doc import DocConfig, build_testplan_doc, load_template, render_markdown, section_context
 from .trace import Tracer
 
 TRACE_FILE = "trace.jsonl"
@@ -23,7 +29,14 @@ BUILD_STATS = "build_stats.json"
 TEST_PLAN = "test_plan.json"
 TESTPLAN_DOC = "testplan_doc.json"
 TESTPLAN_MD = "testplan_doc.md"
-DERIVED_FILES = (GRAPH_FILE, BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD)
+REGISTERS_JSON = "registers.json"
+REGISTERS_MD = "registers.md"
+INTERFACES_JSON = "interfaces.json"
+INTERFACES_MD = "interfaces.md"
+STRATEGY_JSON = "strategy.json"
+STRATEGY_MD = "strategy.md"
+STEP_FILES = (REGISTERS_JSON, REGISTERS_MD, INTERFACES_JSON, INTERFACES_MD, STRATEGY_JSON, STRATEGY_MD)
+DERIVED_FILES = (GRAPH_FILE, BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD) + STEP_FILES
 RUN_MARKERS = ("manifest.json", BUILD_STATS, GRAPH_FILE, TRACE_FILE)
 
 
@@ -52,7 +65,7 @@ def _ingest_current(repo: Path, out: Path, include: list[str] | None) -> bool:
 
 
 RUN_ARTIFACTS = ("manifest.json", "chunks.jsonl", "text", GRAPH_FILE, BUILD_STATS,
-                 TEST_PLAN, TESTPLAN_DOC, TESTPLAN_MD, DENSE_DIR, "llm_cache", TRACE_FILE)
+                 TEST_PLAN, TESTPLAN_DOC, TESTPLAN_MD, *STEP_FILES, DENSE_DIR, "llm_cache", TRACE_FILE)
 
 
 def _remove(p: Path) -> bool:
@@ -133,7 +146,7 @@ def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None
         reused = _build_reusable(out, mode, dense_mode)
         if reused is not None:
             return reused
-    for name in (BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD):
+    for name in (BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD, *STEP_FILES):
         _remove(out / name)
     manifest, chunks = load_manifest(out), load_chunks(out)
     with Tracer(out / TRACE_FILE, "build_graph",
@@ -257,8 +270,12 @@ def _doc_summary(doc: dict, out: Path) -> dict:
                     status=doc["interfaces"]["status"], groups=[
                         dict(name=g["name"], category=g["category"], sideband=g["is_sideband"],
                              signals=len(g["signals"])) for g in doc["interfaces"]["groups"]]),
-                sections=[dict(id=s["id"], status=s["status"],
-                               items=len(s.get("entries", s.get("registers", s.get("details", [])))))
+                registers=None if doc.get("registers") is None else dict(
+                    status=doc["registers"]["status"], registers=len(doc["registers"]["registers"]),
+                    configurable_fields=len(doc["registers"].get("configurable", [])),
+                    conflicts=len(doc["registers"]["conflicts"])),
+                sections=[dict(id=s["id"], status=s["status"], items=len(
+                    s.get("entries") or s.get("configurations") or s.get("register_labels") or s.get("details") or []))
                           for s in doc["sections"]])
 
 
@@ -278,7 +295,8 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
                 and prev.get("model") == llm.model
                 and prev.get("graph_build_trace_id") == G.graph.get("build_trace_id")
                 and all(s["status"] == "PASS" for s in prev.get("sections", [])) and prev.get("sections")
-                and (prev.get("interfaces") is None or prev["interfaces"]["status"] in ("PASS", "NOT_RUN"))):
+                and (prev.get("interfaces") is None or prev["interfaces"]["status"] in ("PASS", "NOT_RUN"))
+                and (prev.get("registers") is None or prev["registers"]["status"] in ("PASS", "NOT_RUN"))):
             return _doc_summary(prev, out) | {"reused": True}
     H = layered_view(G)
     index = _load_dense(out, embedder)
@@ -291,3 +309,119 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
     atomic_write_text(doc_path, json.dumps(doc, indent=2, default=str))
     atomic_write_text(out / TESTPLAN_MD, render_markdown(doc))
     return _doc_summary(doc, out) | _trace_info(tracer) | {"reused": False}
+
+
+def run_registers(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | None = None,
+                  force: bool = False) -> dict:
+    """Fetch the register map definitions from the specification into registers.json / registers.md."""
+    G = load_graph(out / GRAPH_FILE)
+    path = out / REGISTERS_JSON
+    prev = None if force else _load_current(path, scope.strip(), llm.model, G)
+    if prev is not None:
+        return _registers_summary(prev, out) | {"reused": True}
+    H = layered_view(G)
+    index = _load_dense(out, embedder)
+    dense_fn = (lambda q: dense_scores(embedder, index[0], index[1], q)) if index else None
+    with Tracer(out / TRACE_FILE, "registers", input={"scope": scope}, metadata={"model": llm.model}) as tracer:
+        result = extract_registers(G, H, llm, tracer, scope.strip(), RegisterConfig(), dense_fn)
+        tracer.root.update(output={"status": result["status"], "registers": len(result["registers"])})
+    result |= dict(scope=scope.strip(), model=llm.model, graph_build_trace_id=G.graph.get("build_trace_id"),
+                   trace_id=tracer.trace_id)
+    atomic_write_text(path, json.dumps(result, indent=2, default=str))
+    atomic_write_text(out / REGISTERS_MD, "\n".join(render_registers(result, "Register Map")))
+    return _registers_summary(result, out) | _trace_info(tracer) | {"reused": False}
+
+
+def _registers_summary(result: dict, out: Path) -> dict:
+    return dict(json=str(out / REGISTERS_JSON), markdown=str(out / REGISTERS_MD), status=result["status"],
+                step_trace_id=result["trace_id"],
+                registers=[dict(name=r["name"], abbreviation=r["abbreviation"], address=r["address"],
+                                fields=len(r["fields"]), provenance=r["provenance"]) for r in result["registers"]],
+                configurable_fields=len(result.get("configurable", [])), conflicts=result["conflicts"],
+                validation=result["validation"], failed_batches=result["failed_batches"])
+
+
+STRATEGY_QUERIES = ["{scope} bus interface signals", "{scope} external interface signals", "{scope} interrupts reset",
+                    "{scope} test or loopback modes", "{scope} data transfer"]
+
+
+def _load_current(path: Path, scope: str, model: str, G, extra: dict | None = None) -> dict | None:
+    if not path.exists():
+        return None
+    try:
+        prev = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    ok = (prev.get("scope") == scope and prev.get("model") == model
+          and prev.get("graph_build_trace_id") == G.graph.get("build_trace_id")
+          and prev.get("status") in ("PASS", "NOT_RUN")
+          and all(prev.get(k) == v for k, v in (extra or {}).items()))
+    return prev if ok else None
+
+
+def _dense_fn(out: Path, embedder: Embedder | None):
+    index = _load_dense(out, embedder)
+    return (lambda q: dense_scores(embedder, index[0], index[1], q)) if index else None
+
+
+def run_interfaces(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | None = None,
+                   force: bool = False) -> dict:
+    """Isolate and group interface definitions into interfaces.json / interfaces.md."""
+    G = load_graph(out / GRAPH_FILE)
+    scope = scope.strip()
+    prev = None if force else _load_current(out / INTERFACES_JSON, scope, llm.model, G)
+    if prev is not None:
+        return _interfaces_summary(prev, out) | {"reused": True}
+    with Tracer(out / TRACE_FILE, "interfaces", input={"scope": scope}, metadata={"model": llm.model}) as tracer:
+        result = extract_interfaces(G, layered_view(G), llm, tracer, scope, InterfaceConfig(), _dense_fn(out, embedder))
+        tracer.root.update(output={"status": result["status"], "groups": len(result["groups"])})
+    result |= dict(scope=scope, model=llm.model, graph_build_trace_id=G.graph.get("build_trace_id"),
+                   trace_id=tracer.trace_id)
+    atomic_write_text(out / INTERFACES_JSON, json.dumps(result, indent=2, default=str))
+    atomic_write_text(out / INTERFACES_MD, "\n".join(render_interfaces(result, "Interface Definitions")))
+    return _interfaces_summary(result, out) | _trace_info(tracer) | {"reused": False}
+
+
+def _interfaces_summary(result: dict, out: Path) -> dict:
+    return dict(json=str(out / INTERFACES_JSON), markdown=str(out / INTERFACES_MD), status=result["status"],
+                step_trace_id=result["trace_id"],
+                groups=[dict(name=g["name"], category=g["category"], peer_type=g["peer_type"],
+                             sideband=g["is_sideband"], signals=[s["name"] for s in g["signals"]])
+                        for g in result["groups"]], validation=result["validation"])
+
+
+def run_strategy(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | None = None,
+                 force: bool = False) -> dict:
+    """Verification strategy built from the documented interface and register steps."""
+    scope = scope.strip()
+    ifs = run_interfaces(out, llm, scope=scope, embedder=embedder)
+    regs = run_registers(out, llm, scope=scope, embedder=embedder)
+    interfaces = json.loads((out / INTERFACES_JSON).read_text(encoding="utf-8"))
+    registers = json.loads((out / REGISTERS_JSON).read_text(encoding="utf-8"))
+    G = load_graph(out / GRAPH_FILE)
+    inputs = dict(interfaces_trace_id=interfaces["trace_id"], registers_trace_id=registers["trace_id"])
+    prev = None if force else _load_current(out / STRATEGY_JSON, scope, llm.model, G, inputs)
+    if prev is not None:
+        return _strategy_summary(prev, out) | {"reused": True, "inputs": dict(interfaces=ifs["reused"], registers=regs["reused"])}
+    H = layered_view(G)
+    dense_fn = _dense_fn(out, embedder)
+    ctx = section_context(G, H, {"queries": STRATEGY_QUERIES}, scope, DocConfig(), dense_fn)
+    with Tracer(out / TRACE_FILE, "strategy", input={"scope": scope} | inputs, metadata={"model": llm.model}) as tracer:
+        result = build_strategy(llm, tracer, interfaces, registers, scope, ctx)
+        tracer.root.update(output={"status": result["status"], "agents": len(result["agents"])},
+                           metadata={"chunk_ids": sorted({c for a in result["agents"] for c in a["cited_chunk_ids"]})})
+    result |= dict(scope=scope, model=llm.model, graph_build_trace_id=G.graph.get("build_trace_id"),
+                   trace_id=tracer.trace_id, **inputs)
+    atomic_write_text(out / STRATEGY_JSON, json.dumps(result, indent=2, default=str))
+    atomic_write_text(out / STRATEGY_MD, "\n".join(render_strategy(result, "High Level Verification Strategy")))
+    return (_strategy_summary(result, out) | _trace_info(tracer)
+            | {"reused": False, "inputs": dict(interfaces=ifs["reused"], registers=regs["reused"])})
+
+
+def _strategy_summary(result: dict, out: Path) -> dict:
+    return dict(json=str(out / STRATEGY_JSON), markdown=str(out / STRATEGY_MD), status=result["status"],
+                error=result.get("error"),
+                agents=[dict(name=a["name"], mode=a["mode"], interface_groups=a["interface_groups"],
+                             registers=a["registers"]) for a in result["agents"]],
+                scoreboards=[dict(name=s["name"], level=s["level"], inputs=s["inputs"]) for s in result["scoreboards"]],
+                gaps=result["gaps"], validation=result["validation"])

@@ -66,11 +66,11 @@ def test_interfaces_come_first_and_feed_every_section(spec_repo, tmp_path):
         return entries_handler(payload)
     summary = run_testplan_doc(out, _llm(testplan_entries=capture))
     assert summary["interfaces"]["status"] == "PASS"
-    assert {g["group"] for g in seen["strategy"]} >= {"Register bus", "Interrupt"}
-    assert all(seen[s] == seen["strategy"] for s in seen)
+    assert {g["group"] for g in seen["stimulus"]} >= {"Register bus", "Interrupt"}
+    assert all(seen[s] == seen["stimulus"] for s in seen)
     md = (out / "testplan_doc.md").read_text()
     assert md.index("## Interface Definitions") < md.index("## 2. Feature Description")
-    assert "| TICK_O | 1 | output | TMR_HAS_TICK defined |" in md
+    assert "| TICK_O | 1 | output | not applicable | TMR_HAS_TICK defined |" in md
     doc = json.loads((out / "testplan_doc.json").read_text())
     questions = next(s for s in doc["sections"] if s["id"] == "questions")["entries"]
     assert any("TICK_O" in q["text"] and "Which interface" in q["text"] for q in questions)
@@ -87,7 +87,9 @@ def test_blocked_interface_step_does_not_stop_the_plan(spec_repo, tmp_path):
         raise LLMError("transient", "simulated")
     summary = run_testplan_doc(out, _llm(testplan_interfaces=failing))
     assert summary["interfaces"]["status"] == "BLOCKED"
-    assert all(s["status"] == "PASS" for s in summary["sections"])
+    status = {s["id"]: s["status"] for s in summary["sections"]}
+    assert status.pop("strategy") == "NOT_RUN"  # the strategy is built from verified interface groups
+    assert set(status.values()) == {"PASS"}
     assert "**BLOCKED**" in (out / "testplan_doc.md").read_text()
     assert run_testplan_doc(out, _llm())["reused"] is False
 
@@ -133,3 +135,16 @@ def test_markdown_shows_connected_module_type(spec_repo, tmp_path):
     run_testplan_doc(out, _llm())
     md = (out / "testplan_doc.md").read_text()
     assert "Connected module type: interrupt_controller (interrupt controller)" in md
+
+
+def test_active_level_is_checked_against_the_quote(spec_repo, tmp_path):
+    _, G = _graph(spec_repo, tmp_path)
+    res = _extract(G, tmp_path)
+    sigs = {s["name"]: s for s in res["signals"]}
+    assert sigs["RST_N"]["active_level"] == "low" and sigs["RST_N"]["active_level_documented"]
+    assert sigs["IRQ"]["active_level"] == "high" and not sigs["IRQ"]["active_level_documented"]
+    from dv_agent.interfaces import interface_questions
+    qs = [q["text"] for q in interface_questions(res)]
+    assert any("active level of IRQ" in q for q in qs) and not any("active level of RST_N" in q for q in qs)
+    bus = next(c for c in compact(res) if c["group"] == "Reset")
+    assert bus["signals"] == ["RST_N[1] input active-low"]

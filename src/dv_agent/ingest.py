@@ -4,10 +4,13 @@ import hashlib
 import os
 import re
 import subprocess
+import xml.etree.ElementTree as ET
+import zipfile
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from fnmatch import fnmatch
+from html.parser import HTMLParser
 from pathlib import Path
 
 from .fsutil import atomic_write_text
@@ -17,7 +20,7 @@ DOC_KINDS = {".pdf": "pdf", ".docx": "docx", ".md": "markdown", ".html": "html",
              ".htm": "html", ".txt": "text", ".rst": "text", ".doc": "doc"}
 # Lower rank wins when the same document exists in several formats.
 FORMAT_RANK = {"pdf": 0, "docx": 1, "markdown": 2, "html": 3, "text": 4, "doc": 5}
-SUPPORTED = {"pdf", "markdown", "text"}
+SUPPORTED = {"pdf", "markdown", "text", "docx", "html"}
 DOC_DIRS = {"doc", "docs", "documentation", "spec", "specs", "specification"}
 # Design-source, testbench and tool-output trees are not specification sources.
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", "rtl", "src_rtl", "hdl",
@@ -100,12 +103,169 @@ def discover(repo: Path, include: list[str] | None = None) -> list[SourceDoc]:
     return docs
 
 
-def extract_pages(path: Path, kind: str) -> list[str]:
+W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+PAGE_BREAK = object()
+
+
+def _docx_heading_level(p: ET.Element) -> int | None:
+    ppr = p.find(f"{W_NS}pPr")
+    if ppr is None:
+        return None
+    outline = ppr.find(f"{W_NS}outlineLvl")
+    if outline is not None and outline.get(f"{W_NS}val", "").isdigit():
+        return int(outline.get(f"{W_NS}val")) + 1
+    style = ppr.find(f"{W_NS}pStyle")
+    m = re.match(r"^heading\s*(\d)$", style.get(f"{W_NS}val", "") if style is not None else "", re.I)
+    return int(m.group(1)) if m else None
+
+
+def _docx_runs(p: ET.Element) -> list:
+    """Paragraph text pieces in order, with PAGE_BREAK markers for rendered or explicit page breaks."""
+    out: list = []
+    for el in p.iter():
+        tag = el.tag
+        if tag == f"{W_NS}t":
+            out.append(el.text or "")
+        elif tag == f"{W_NS}tab":
+            out.append(" ")
+        elif tag == f"{W_NS}lastRenderedPageBreak":
+            out.append(PAGE_BREAK)
+        elif tag == f"{W_NS}br":
+            out.append(PAGE_BREAK if el.get(f"{W_NS}type") == "page" else "\n")
+    return out
+
+
+def _docx_pages(path: Path) -> tuple[list[str], str]:
+    with zipfile.ZipFile(path) as z:
+        root = ET.fromstring(z.read("word/document.xml"))
+    body = root.find(f"{W_NS}body")
+    pages: list[list[str]] = [[]]
+    has_heading = False
+
+    def add_paragraph(p: ET.Element, prefix: str = "") -> None:
+        line = prefix
+        for piece in _docx_runs(p):
+            if piece is PAGE_BREAK:
+                if line.strip():
+                    pages[-1].append(line.rstrip())
+                line = prefix if prefix.startswith("#") else ""
+                if pages[-1]:
+                    pages.append([])
+            else:
+                line += piece
+        if line.strip() and line.strip() != prefix.strip():
+            pages[-1].append(line.rstrip())
+        elif not prefix:
+            pages[-1].append("")
+
+    for el in list(body) if body is not None else []:
+        if el.tag == f"{W_NS}p":
+            level = _docx_heading_level(el)
+            if level:
+                has_heading = True
+                add_paragraph(el, "#" * min(level, 6) + " ")
+            else:
+                add_paragraph(el)
+        elif el.tag == f"{W_NS}tbl":
+            for tr in el.iter(f"{W_NS}tr"):
+                cells = [" ".join("".join(x for x in _docx_runs(cp) if x is not PAGE_BREAK).strip()
+                                  for cp in tc.iter(f"{W_NS}p")).strip()
+                         for tc in tr.findall(f"{W_NS}tc")]
+                if any(cells):
+                    pages[-1].append(" | ".join(cells))
+            pages[-1].append("")
+    return ["\n".join(lines) for lines in pages if any(x.strip() for x in lines)] or [""], (
+        "markdown" if has_heading else "numbered")
+
+
+class _HTMLText(HTMLParser):
+    SKIP = {"script", "style", "head", "noscript", "template"}
+    BLOCK = {"p", "div", "li", "ul", "ol", "section", "article", "table", "pre", "dt", "dd", "caption",
+             "blockquote", "header", "footer", "main", "figure", "figcaption", "hr"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.lines: list[str] = []
+        self.cur: list[str] = []
+        self.row: list[str] | None = None
+        self.skip_depth = 0
+        self.heading: int | None = None
+        self.has_heading = False
+        self.pre = 0
+
+    def _flush(self) -> None:
+        text = "".join(self.cur)
+        text = text if self.pre else re.sub(r"\s+", " ", text)
+        if text.strip():
+            prefix = "#" * self.heading + " " if self.heading else ""
+            self.lines.append(prefix + text.strip())
+        self.cur = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.SKIP:
+            self.skip_depth += 1
+            return
+        if re.fullmatch(r"h[1-6]", tag):
+            self._flush()
+            self.heading = int(tag[1])
+            self.has_heading = True
+        elif tag == "tr":
+            self._flush()
+            self.row = []
+        elif tag in ("td", "th"):
+            self.cur = []
+        elif tag == "br":
+            self._flush()
+        elif tag in self.BLOCK:
+            self._flush()
+            self.pre += tag == "pre"
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP:
+            self.skip_depth = max(0, self.skip_depth - 1)
+            return
+        if re.fullmatch(r"h[1-6]", tag):
+            self._flush()
+            self.heading = None
+        elif tag in ("td", "th") and self.row is not None:
+            self.row.append(re.sub(r"\s+", " ", "".join(self.cur)).strip())
+            self.cur = []
+        elif tag == "tr" and self.row is not None:
+            if any(self.row):
+                self.lines.append(" | ".join(self.row))
+            self.row = None
+        elif tag in self.BLOCK:
+            self._flush()
+            if tag == "pre":
+                self.pre = max(0, self.pre - 1)
+            if tag in ("p", "table", "pre", "ul", "ol"):
+                self.lines.append("")
+
+    def handle_data(self, data):
+        if not self.skip_depth:
+            self.cur.append(data)
+
+
+def _html_pages(path: Path) -> tuple[list[str], str]:
+    parser = _HTMLText()
+    parser.feed(path.read_text(encoding="utf-8", errors="replace"))
+    parser.close()
+    parser._flush()
+    text = re.sub(r"\n{3,}", "\n\n", "\n".join(parser.lines)).strip()
+    return [text], "markdown" if parser.has_heading else "numbered"
+
+
+def extract_document(path: Path, kind: str) -> tuple[list[str], str]:
+    """Pages of text plus the heading mode ("markdown" or "numbered") for section detection."""
     if kind == "pdf":
         from pypdf import PdfReader
-        return [page.extract_text() or "" for page in PdfReader(str(path)).pages]
+        return [page.extract_text() or "" for page in PdfReader(str(path)).pages], "numbered"
+    if kind == "docx":
+        return _docx_pages(path)
+    if kind == "html":
+        return _html_pages(path)
     text = path.read_text(encoding="utf-8", errors="replace")
-    return text.split("\f")
+    return text.split("\f"), "markdown" if kind == "markdown" else "numbered"
 
 
 def _edge_key(line: str) -> str:
@@ -181,10 +341,17 @@ def find_headings(text: str, kind: str) -> list[Heading]:
         if kind == "markdown":
             m = MARKDOWN.match(line)
             if m:
-                depth = len(m.group(1))
-                counters = (counters + [0] * depth)[:depth]
-                counters[-1] += 1
-                headings.append(Heading(".".join(map(str, counters)), m.group(2), depth, offsets[i]))
+                title = m.group(2)
+                numbered = NUMBERED.match(title)
+                if numbered and _title_like(numbered.group(2)):
+                    # Keep the document's own numbering ("4.3 Interrupt ...") instead of synthesizing one.
+                    counters = [int(x) for x in numbered.group(1).split(".")]
+                    title = numbered.group(2).strip()
+                else:
+                    depth = len(m.group(1))
+                    counters = (counters + [0] * depth)[:depth]
+                    counters[-1] += 1
+                headings.append(Heading(".".join(map(str, counters)), title, len(counters), offsets[i]))
             continue
         number, title = None, None
         m = NUMBERED.match(line)
@@ -264,7 +431,8 @@ def ingest(repo: Path, out: Path, include: list[str] | None = None,
         if doc.status != "INGESTED":
             continue
         try:
-            pages = clean_pages(extract_pages(repo / doc.path, doc.kind))
+            raw_pages, heading_mode = extract_document(repo / doc.path, doc.kind)
+            pages = clean_pages(raw_pages)
         except Exception as exc:  # extractor failures are recorded, not fatal
             doc.status, doc.reason = "FAILED", f"extraction error: {type(exc).__name__}"
             continue
@@ -277,7 +445,7 @@ def ingest(repo: Path, out: Path, include: list[str] | None = None,
         doc.pages, doc.page_offsets = len(pages), offsets
         doc.text_path = f"text/{doc.doc_id}.txt"
         atomic_write_text(out / doc.text_path, text)
-        doc_chunks = chunk_document(doc, text, doc.kind, cfg)
+        doc_chunks = chunk_document(doc, text, heading_mode, cfg)
         if not doc_chunks:
             doc.status, doc.reason = "FAILED", "no extractable text"
         chunks.extend(doc_chunks)

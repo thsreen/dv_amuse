@@ -30,6 +30,7 @@ Rules:
 - Each requirement is atomic and testable. 'statement' restates it precisely and self-contained (name the register/signal). 'quote' is a contiguous span copied verbatim from the chunk that is the evidence for the statement.
 - Return no requirements for boilerplate such as cover pages, revision history, contact details or tables of contents.
 - 'entities' lists the named things in the chunk: signals, registers, register fields, modules, interfaces, parameters, states, features. Put the full name in 'name' and abbreviations or alternate spellings in 'aliases'.
+- 'parent' is the entity that owns this one, exactly as that entity's 'name': the register for a register field, the interface for one of its signals; "" when it has no owner. Same-named fields of different registers are different entities.
 - In each requirement, 'entities' lists the names (exactly as in an entity 'name') that the requirement involves.
 - 'summary' is a one or two sentence navigation summary of the chunk."""
 
@@ -38,9 +39,10 @@ EXTRACT_SCHEMA = {
     "properties": {
         "summary": {"type": "string"},
         "entities": {"type": "array", "items": {
-            "type": "object", "additionalProperties": False, "required": ["name", "kind", "aliases"],
+            "type": "object", "additionalProperties": False, "required": ["name", "kind", "aliases", "parent"],
             "properties": {"name": {"type": "string"}, "kind": {"type": "string", "enum": ENT_KINDS},
-                           "aliases": {"type": "array", "items": {"type": "string"}}}}},
+                           "aliases": {"type": "array", "items": {"type": "string"}},
+                           "parent": {"type": "string"}}}},
         "requirements": {"type": "array", "items": {
             "type": "object", "additionalProperties": False,
             "required": ["statement", "quote", "kind", "entities"],
@@ -78,31 +80,35 @@ def normalize_name(name: str) -> str:
     return re.sub(r"\s+", " ", name).strip(" .,:;'\"")
 
 
-def _name_keys(name: str, aliases: list[str]) -> list[str]:
+def _name_keys(name: str, aliases: list[str], parent: str = "") -> list[str]:
+    """Merge keys; owned entities (e.g. register fields) are qualified by their parent."""
     keys = [name] + list(aliases)
     m = re.match(r"^(.*?)\s*\(([^()]+)\)\s*$", name)
     if m:
         keys += [m.group(1), m.group(2)]
-    return sorted({k for k in (normalize_name(x) for x in keys) if len(k) >= 2})
+    base = sorted({k for k in (normalize_name(x) for x in keys) if len(k) >= 2})
+    owner = normalize_name(parent)
+    return [f"{owner}::{k}" for k in base] if owner else base
 
 
-def _entity_id(name: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "_", normalize_name(name)).strip("_")[:40]
-    return f"ENT-{slug}-{_h(normalize_name(name), 6)}" if slug else f"ENT-{_h(name)}"
+def _entity_id(name: str, parent: str = "") -> str:
+    full = f"{parent} {name}" if parent.strip() else name
+    slug = re.sub(r"[^a-z0-9]+", "_", normalize_name(full)).strip("_")[:40]
+    return f"ENT-{slug}-{_h(normalize_name(full), 6)}" if slug else f"ENT-{_h(full)}"
 
 
 def _alias_index(G: nx.MultiDiGraph) -> dict[str, str]:
     index: dict[str, str] = {}
     for nid, n in sorted(G.nodes(data=True)):
         if n.get("type") == "entity":
-            for k in _name_keys(n["name"], n["aliases"]):
+            for k in _name_keys(n["name"], n["aliases"], n.get("parent", "")):
                 index.setdefault(k, nid)
     return index
 
 
 def merge_entity(G: nx.MultiDiGraph, index: dict[str, str], name: str, kind: str,
-                 aliases: list[str], chunk_id: str) -> str:
-    keys = _name_keys(name, aliases)
+                 aliases: list[str], chunk_id: str, parent: str = "") -> str:
+    keys = _name_keys(name, aliases, parent)
     if not keys:
         raise ValueError("entity has no usable name")
     existing = next((index[k] for k in keys if k in index), None)
@@ -112,8 +118,8 @@ def merge_entity(G: nx.MultiDiGraph, index: dict[str, str], name: str, kind: str
                                                          if normalize_name(a) != normalize_name(node["name"])})
         eid = existing
     else:
-        eid = _entity_id(name)
-        G.add_node(eid, layer=2, type="entity", name=name.strip(), kind=kind,
+        eid = _entity_id(name, parent)
+        G.add_node(eid, layer=2, type="entity", name=name.strip(), kind=kind, parent=parent.strip(),
                    aliases=sorted({a.strip() for a in aliases if a.strip()}), first_chunk=chunk_id,
                    status="DOCUMENTED")
     for k in keys:
@@ -168,14 +174,15 @@ def _apply_extraction(G, index, cid, result, span, tracer, cfg) -> tuple[list[st
     n = G.nodes[cid]
     data = result.data
     n["summary"] = data.get("summary", "").strip()
-    names: dict[str, str] = {}
+    names: dict[str, set[str]] = {}  # unqualified name -> local entities (several if owners differ)
     for ent in data.get("entities", []):
+        parent = ent.get("parent", "")
         try:
-            eid = merge_entity(G, index, ent["name"], ent["kind"], ent.get("aliases", []), cid)
+            eid = merge_entity(G, index, ent["name"], ent["kind"], ent.get("aliases", []), cid, parent)
         except ValueError:
             continue
         for k in _name_keys(ent["name"], ent.get("aliases", [])):
-            names[k] = eid
+            names.setdefault(k, set()).add(eid)
     accepted, rejected = [], []
     for req in data.get("requirements", [])[:cfg.max_requirements_per_chunk]:
         quote, statement = req.get("quote", ""), req.get("statement", "").strip()
@@ -201,14 +208,36 @@ def _apply_extraction(G, index, cid, result, span, tracer, cfg) -> tuple[list[st
                        trace_id=tracer.trace_id, span_id=span.id)
             add_edge(G, rid, cid, "DERIVED_FROM", status="DOCUMENTED")
         for ref in req.get("entities", []):
-            key = normalize_name(ref)
-            eid = names.get(key) or index.get(key)
-            if eid is None and len(key) >= 2:
+            eid = _resolve_ref(G, names, index, ref, statement + " " + exact)
+            if eid == "":
+                rejected.append({"statement": statement, "quote": quote,
+                                 "reason": f"entity '{ref}' is ambiguous (several owners); link skipped"})
+                continue
+            if eid is None and len(normalize_name(ref)) >= 2:
                 eid = merge_entity(G, index, ref, "other", [], cid)
             if eid:
                 add_edge(G, rid, eid, "MENTIONS")
         accepted.append(rid)
     return accepted, rejected
+
+
+def _resolve_ref(G: nx.MultiDiGraph, names: dict[str, set[str]], index: dict[str, str], ref: str,
+                 context: str) -> str | None:
+    """Entity for a requirement's reference: None if unknown, "" if ambiguous between owners."""
+    key = normalize_name(ref)
+    local = sorted(names.get(key, set()))
+    if len(local) == 1:
+        return local[0]
+    if len(local) > 1:
+        ctx = normalize_name(context)
+
+        def owner_named(eid: str) -> bool:
+            parent = G.nodes[eid].get("parent", "")
+            return bool(parent) and any(re.search(rf"(?<![a-z0-9_]){re.escape(k)}(?![a-z0-9_])", ctx)
+                                        for k in _name_keys(parent, []))
+        owned = [e for e in local if owner_named(e)]
+        return owned[0] if len(owned) == 1 else ""
+    return index.get(key)
 
 
 def dependency_groups(G: nx.MultiDiGraph, cfg: ExtractConfig) -> list[tuple[str, list[str]]]:
