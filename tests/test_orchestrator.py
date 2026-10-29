@@ -528,9 +528,12 @@ def test_dashboard_expands_testplan_and_middle_progress(tmp_path):
     assert "progress" in frame and "current task" in frame
     assert "Recover registers" in frame and "registers batch [2/3]" in frame
     assert "task progress" in frame and "2/3" in frame
-    assert "started" in frame and "elapsed" in frame and "00:01:05" in frame
+    assert "started" in frame and "elapsed" in frame and "00:00:00" in frame
     assert "Configurations" in frame and "Observations from RTL" in frame
+    frames_before_completion = len(shown)
     dash.handle({"event": "substep_done", "step": "testplan", "id": "registers", "status": "PASS"})
+    assert len(shown) == frames_before_completion + 1
+    assert "00:01:05" in shown[-1]
     assert dash.substatus["registers"] == "PASS"
 
 

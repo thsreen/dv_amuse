@@ -74,7 +74,7 @@ fault), `2` usage error.
 `/plan` shows a live three-pane dashboard on interactive terminals. The right
 pane lists graph steps and each testplan substep; the middle shows an overall
 progress bar, current task name, task progress checkpoints, start timestamp and
-live elapsed time. The left shows tool-call budgets and observed tokens. A
+elapsed time updated when a task completes. The left shows tool-call budgets and observed tokens. A
 non-TTY session gets a plain event log with the same substep events. The
 non-interactive `run` CLI keeps pure JSON stdout and no dashboard.
 

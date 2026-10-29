@@ -123,15 +123,9 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
         ask = dict(requirement=requirement, flow=str(flow_path), out=str(out), variables=variables)
         (out / ASK_FILE).write_text(json.dumps(ask, indent=2), encoding="utf-8")
         dash = Dashboard(out, show, flow=flow, title=requirement, ansi=interactive) if use_dashboard else None
-        if dash:
-            dash.start_heartbeat()
-        try:
-            result = run_flow(flow_path, out_dir=out, variables=dict(variables), llm=use_llm,
-                              embedder=use_embedder, registry=registry,
-                              event_sink=dash.handle if dash else None)
-        finally:
-            if dash:
-                dash.stop_heartbeat()
+        result = run_flow(flow_path, out_dir=out, variables=dict(variables), llm=use_llm,
+                          embedder=use_embedder, registry=registry,
+                          event_sink=dash.handle if dash else None)
         show(f"Plan: {result['status']} — {result['reason']}")
         if (out / "dv" / "testplan_doc.json").is_file():
             show(f"Testplan: {out / 'dv' / 'testplan_doc.md'}")

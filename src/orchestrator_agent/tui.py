@@ -94,26 +94,11 @@ class Dashboard:
         self.finish: dict = {}
         self.started = time.monotonic()
         self.started_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self.elapsed_s = 0
         self.task_name = "Waiting to start"
         self.task_detail = ""
         self.task_fraction: tuple[int, int] | None = None
         self._lock = threading.RLock()
-        self._heartbeat_stop = threading.Event()
-        self._heartbeat: threading.Thread | None = None
-
-    def start_heartbeat(self) -> None:
-        if not self.ansi or self._heartbeat is not None:
-            return
-        def pulse():
-            while not self._heartbeat_stop.wait(1):
-                self.redraw()
-        self._heartbeat = threading.Thread(target=pulse, name="orchestrator-dashboard", daemon=True)
-        self._heartbeat.start()
-
-    def stop_heartbeat(self) -> None:
-        self._heartbeat_stop.set()
-        if self._heartbeat is not None:
-            self._heartbeat.join(timeout=2)
 
     def handle(self, event: dict) -> None:
         with self._lock:
@@ -121,6 +106,8 @@ class Dashboard:
 
     def _handle(self, event: dict) -> None:
         kind = event.get("event")
+        if kind in ("substep_done", "tool_done", "run_finish"):
+            self.elapsed_s = max(0, int(time.monotonic() - self.started))
         if kind == "run_start":
             self.steps = list(event.get("steps", self.steps))
             self.status = {sid: "...." for sid in self.steps}
@@ -250,12 +237,11 @@ class Dashboard:
     def _left(self, width: int) -> list[str]:
         policy = self.flow.get("policy", {})
         tokens = scan_tokens(self.out_dir)
-        elapsed = int(time.monotonic() - self.started)
         lines = ["run" + (f": {_short(self.title, width - 5)}" if self.title else ""),
                  f"calls {self.calls}/{policy.get('max_total_tool_calls', '?')}",
                  f"overrides {self.overrides}/{policy.get('max_overrides', '?')} "
                  f"invalid {self.invalid}",
-                 f"elapsed {elapsed}s",
+                 f"elapsed {self.elapsed_s}s",
                  f"model calls {tokens['calls']}",
                  f"tokens in {tokens['input']} out {tokens['output']} "
                  f"cached {tokens['cached_input']}",
@@ -289,8 +275,7 @@ class Dashboard:
         percent = round(100 * done / total) if total else 0
         bar_w = max(8, width - 8)
         filled = round(bar_w * done / total) if total else 0
-        elapsed = int(time.monotonic() - self.started)
-        hours, rem = divmod(elapsed, 3600)
+        hours, rem = divmod(self.elapsed_s, 3600)
         minutes, seconds = divmod(rem, 60)
         return ["progress", f"{done}/{total} tasks complete",
                 "[" + "#" * filled + "-" * (bar_w - filled) + f"] {percent}%",
