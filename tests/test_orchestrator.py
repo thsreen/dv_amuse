@@ -414,6 +414,40 @@ def test_repl_code_generates_plan_first(tmp_path, monkeypatch):
     assert called == ["plan", "code"]
 
 
+def test_repl_opens_local_viewer_after_report_is_written(tmp_path, monkeypatch):
+    import threading
+    from orchestrator_agent import repl as terminal
+    repo = _prompt_repo(tmp_path)
+    out = tmp_path / "run"
+    monkeypatch.setattr(terminal, "_default_out", lambda: out)
+    closed = threading.Event()
+    class FakeServer:
+        server_port = 9345
+        def serve_forever(self):
+            closed.wait(2)
+        def shutdown(self):
+            closed.set()
+        def server_close(self):
+            closed.set()
+    roots = []
+    monkeypatch.setattr(terminal, "create_report_server", lambda root, port: roots.append((root, port)) or FakeServer())
+    def fake_flow(flow_path, *, out_dir, variables, **kwargs):
+        report = out_dir / "dv"
+        report.mkdir(parents=True)
+        (report / "testplan_doc.json").write_text("{}")
+        (report / "testplan_doc.md").write_text("# Plan\n")
+        (report / "testplan_doc.html").write_text("<h1>Plan</h1>")
+        return dict(status="PASS", reason="done")
+    monkeypatch.setattr(terminal, "run_flow", fake_flow)
+    shown = []
+    assert terminal.repl(input_fn=scripted([f"Verify {repo}", "/plan"]),
+                         output_fn=shown.append, llm=object()) == 0
+    assert roots == [(out, 0)] and closed.is_set()
+    text = "\n".join(shown)
+    assert "For the polished testplan, open: http://127.0.0.1:9345/?plan=dv" in text
+    assert "HTML file:" in text and "Editable Markdown:" in text
+
+
 def test_entry_point_starts_repl(monkeypatch):
     from orchestrator_agent import cli
     seen = []
@@ -431,6 +465,24 @@ def test_runner_event_sink_receives_lifecycle(tmp_path):
     kinds = [e["event"] for e in events]
     assert kinds[0] == "run_start" and kinds[-1] == "run_finish"
     assert kinds.count("tool_start") == 2 and kinds.count("tool_done") == 2
+
+
+def test_runner_forwards_dv_progress_and_substep_events(tmp_path):
+    from dv_agent.progress import emit, emit_event
+    calls, events = [], []
+    registry = stub_registry(calls)
+    def stage(args, ctx):
+        emit("extracting requirements")
+        emit_event("substep_start", id="registers", label="Recover registers")
+        emit_event("substep_done", id="registers", status="PASS")
+        return dict(status="PASS", summary="done", files=[])
+    registry["stub_a"] = ToolSpec("dv", SPEC, False, stage)
+    result = runner.run_flow(write_flow(tmp_path, base_flow()), out_dir=tmp_path / "run",
+                             variables={}, registry=registry, event_sink=events.append)
+    assert result["status"] == "PASS"
+    assert [(e["event"], e.get("id")) for e in events if e["event"].startswith("substep_")] == [
+        ("substep_start", "registers"), ("substep_done", "registers")]
+    assert any(e["event"] == "task_progress" and "requirements" in e["message"] for e in events)
 
 
 def test_dashboard_frame_lists_steps_and_tool_call(tmp_path):
@@ -458,6 +510,28 @@ def test_dashboard_plain_mode_without_ansi(tmp_path):
                  "attempt": 1, "revisit": 0, "extra_prompt": ""})
     dash.handle({"event": "tool_done", "step": "first", "status": "PASS", "summary": "ok"})
     assert shown == ["[run] first: stub_a", "[PASS] first: ok"]
+
+
+def test_dashboard_expands_testplan_and_middle_progress(tmp_path):
+    from orchestrator_agent.tui import Dashboard
+    flow = load_flow(Path(__file__).resolve().parents[1] /
+                     "src/orchestrator_agent/flows/testplan_flow.json")
+    shown = []
+    dash = Dashboard(tmp_path, shown.append, flow=flow, title="UART plan", ansi=True)
+    dash.started -= 65
+    dash.handle({"event": "run_start", "steps": [s["id"] for s in flow["steps"]]})
+    dash.handle({"event": "tool_start", "step": "testplan", "tool": "dv_testplan", "attempt": 1})
+    dash.handle({"event": "substep_start", "step": "testplan", "id": "registers",
+                 "label": "Recover registers and configurable controls"})
+    dash.handle({"event": "task_progress", "step": "testplan", "message": "registers batch [2/3]"})
+    frame = shown[-1]
+    assert "progress" in frame and "current task" in frame
+    assert "Recover registers" in frame and "registers batch [2/3]" in frame
+    assert "task progress" in frame and "2/3" in frame
+    assert "started" in frame and "elapsed" in frame and "00:01:05" in frame
+    assert "Configurations" in frame and "Observations from RTL" in frame
+    dash.handle({"event": "substep_done", "step": "testplan", "id": "registers", "status": "PASS"})
+    assert dash.substatus["registers"] == "PASS"
 
 
 def test_repl_plan_requires_repository_and_model(tmp_path, monkeypatch):

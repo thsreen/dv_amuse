@@ -12,6 +12,7 @@ from .html_report import render_html
 from .graph import build_structure, load_graph, save_graph
 from .ingest import ChunkConfig, discover, ingest, load_chunks, load_manifest
 from .llm import LLM, LLMError
+from .progress import emit_event
 from .planning import PlanConfig, build_test_plan
 from .retrieval import RetrievalConfig, layered_view, retrieve
 from .testplan_context import feature_index, fetch_context, requirement_context
@@ -345,6 +346,7 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
                         for s in prev.get("sections", [])) and prev.get("sections")
                 and (prev.get("interfaces") is None or prev["interfaces"]["status"] in ("PASS", "NOT_RUN"))
                 and (prev.get("registers") is None or prev["registers"]["status"] in ("PASS", "NOT_RUN"))):
+            emit_event("substeps_reused")
             _write_doc_views(prev, out, preserve_markdown=True)
             return _doc_summary(prev, out) | {"reused": True}
     H = layered_view(G)
@@ -367,6 +369,7 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
 
 
 def _write_doc_views(doc: dict, out: Path, *, preserve_markdown: bool = False) -> None:
+    emit_event("substep_start", id="render_views", label="Render Markdown and HTML reports")
     if not doc.get("evidence_index") and (out / GRAPH_FILE).is_file():
         doc["evidence_index"] = build_evidence_index(load_graph(out / GRAPH_FILE), doc)
     md_path = out / TESTPLAN_MD
@@ -376,6 +379,7 @@ def _write_doc_views(doc: dict, out: Path, *, preserve_markdown: bool = False) -
         markdown = render_markdown(doc)
         atomic_write_text(md_path, markdown)
     atomic_write_text(out / TESTPLAN_HTML, render_html(markdown))
+    emit_event("substep_done", id="render_views", status="PASS")
 
 
 def render_testplan(out: Path) -> dict:

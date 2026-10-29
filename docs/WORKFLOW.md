@@ -343,9 +343,11 @@ repository, which is scanned read-only and followed by an English execution
 preview. Four commands are exposed: `/plan` generates the spec/RTL grounded
 testplan, `/code` builds only cited documented items (running `/plan` first when
 needed), `/run` executes the basic built smoke test, and `/regress` executes
-every built test. `/plan` shows a live split-pane dashboard (`tui.py`):
-steps checking off on the right, run counters plus observed token usage and
-the current tool call on the left. Non-interactive `run|validate|status`
+every built test. `/plan` shows a three-pane dashboard (`tui.py`):
+testplan sections checking off on the right, current task/progress/start/elapsed
+in the middle, and observed usage on the left. Once the report is written,
+the terminal opens a local viewer port and prints the polished HTML URL and
+file path. Non-interactive `run|validate|status`
 unchanged. Interactive flow `src/orchestrator_agent/flows/testplan_flow.json`;
 advanced CLI flow `src/orchestrator_agent/flows/default_flow.json`;
 full contract in `docs/ORCHESTRATOR.md`.

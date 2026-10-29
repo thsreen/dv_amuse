@@ -147,6 +147,31 @@ def test_document_has_all_sections_in_template_order(run):
     assert "| bus_agent | Register bus | active |" in md
 
 
+def test_document_emits_named_substeps(run):
+    from dv_agent.progress import set_event_sink
+    events = []
+    set_event_sink(events.append)
+    try:
+        run_testplan_doc(run, _llm())
+    finally:
+        set_event_sink(None)
+    names = [e["id"] for e in events if e["kind"] == "substep_start"]
+    assert names[:2] == ["interfaces", "registers"]
+    assert "register_map" in names and "rtl_observations" in names and "coverage" in names
+    assert names[-1] == "render_views"
+    assert any(e["kind"] == "substep_done" and e["id"] == "render_views" and e["status"] == "PASS"
+               for e in events)
+    events.clear()
+    set_event_sink(events.append)
+    try:
+        reused = run_testplan_doc(run, _llm())
+    finally:
+        set_event_sink(None)
+    assert reused["reused"] is True
+    assert any(e["kind"] == "substeps_reused" for e in events)
+    assert any(e["kind"] == "substep_done" and e["id"] == "render_views" for e in events)
+
+
 def test_citations_are_enforced_and_provenance_downgraded(run):
     run_testplan_doc(run, _llm())
     checks = next(s for s in _doc(run)["sections"] if s["id"] == "checks")

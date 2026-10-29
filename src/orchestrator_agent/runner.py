@@ -254,7 +254,20 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
         else:
             context = StepContext(out_dir=out_dir, llm=llm, embedder=embedder,
                                   extra_prompt=extra_prompt, force=force)
-            outcome, value = call_with_timeout(lambda: spec.run(args, context),
+            def invoke():
+                if event_sink is None or spec.agent != "dv":
+                    return spec.run(args, context)
+                from dv_agent import progress
+                progress.set_sink(lambda message: emit("task_progress", step=step_id, message=message))
+                progress.set_event_sink(lambda detail: emit(
+                    detail["kind"], step=step_id,
+                    **{key: value for key, value in detail.items() if key != "kind"}))
+                try:
+                    return spec.run(args, context)
+                finally:
+                    progress.set_sink(None)
+                    progress.set_event_sink(None)
+            outcome, value = call_with_timeout(invoke,
                                                step["timeout_s"])
             if outcome == "timeout":
                 result = dict(status="TIMEOUT",

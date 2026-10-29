@@ -19,7 +19,9 @@ orch> Generate a UART16550 verification testplan from its specification and RTL.
 
 The terminal scans the named repository without writing to it, identifies the
 specification documents and RTL top, and immediately prints the steps it will
-run in English. The interactive terminal has four commands:
+run in English. The testplan step expands into interface isolation, register
+recovery, every section from the template, and Markdown/HTML rendering.
+The interactive terminal has four commands:
 
 | Command | Action |
 | --- | --- |
@@ -33,6 +35,12 @@ executable on `PATH` or `XEZIM_BIN` set to its full path. A missing simulator
 or plan reports BLOCKED; it never reports a simulated PASS. The smoke test
 does not claim functional correctness. Ctrl-D leaves the terminal. The
 advanced non-interactive CLI below remains available for custom flow files.
+
+As soon as `/plan` saves the report, the terminal opens a loopback-only viewer
+on an available port and prints its URL, the polished HTML file path and the
+editable Markdown path. The viewer lists all generated plans under `runs/`.
+Keep the orchestrator terminal open while using the URL. If local port binding
+is unavailable, the HTML file remains readable directly.
 
 ## Advanced CLI
 
@@ -63,9 +71,11 @@ advanced non-interactive CLI below remains available for custom flow files.
 Exit codes: `0` PASS, `3` NEEDS_REVIEW (owner gate), `1` BLOCKED (flow/config
 fault), `2` usage error.
 
-`/plan` shows a live split-pane dashboard on interactive terminals. The right
-pane lists graph/testplan steps; the left shows tool-call budgets, observed
-tokens and the current tool. A non-TTY session gets a plain event log. The
+`/plan` shows a live three-pane dashboard on interactive terminals. The right
+pane lists graph steps and each testplan substep; the middle shows an overall
+progress bar, current task name, task progress checkpoints, start timestamp and
+live elapsed time. The left shows tool-call budgets and observed tokens. A
+non-TTY session gets a plain event log with the same substep events. The
 non-interactive `run` CLI keeps pure JSON stdout and no dashboard.
 
 ## Flow JSON

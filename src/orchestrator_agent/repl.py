@@ -1,14 +1,18 @@
 """Four-command interactive path: plan, documented code, basic run, regression."""
 import json
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
+
+from dv_agent.testplan_viewer import create_report_server
 
 from .actions import build_code, run_tests
 from .flow import load_flow
 from .repo_intake import find_repo, inspect_repo
 from .runner import REVIEW_FILE, run_flow
-from .tui import Dashboard
+from .tui import Dashboard, testplan_substeps
 
 ASK_FILE = "orchestrator_ask.json"
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
@@ -42,6 +46,9 @@ def ask_card(flow: dict, flow_path: Path, variables: dict, requirement: str,
     lines.append("/plan will:")
     for i, step in enumerate(flow["steps"], 1):
         lines.append(f"  {i}. {descriptions.get(step['tool'], step.get('description', step['tool']))}")
+        if step["tool"] == "dv_testplan":
+            for subid, label in testplan_substeps():
+                lines.append(f"     - {label}")
     lines += [f"output: {out / 'dv' / 'testplan_doc.md'} and testplan_doc.html",
               "Then /code builds only cited DOCUMENTED plan items and a basic smoke test.",
               "/run executes the basic built test; /regress executes every built test.",
@@ -63,6 +70,8 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
     variables: dict = {"include": [], "scope": ""}
     requirement = ""
     scan = None
+    viewer = None
+    viewer_thread = None
     show("Describe the design and local repository. I will scan it and show the testplan steps.")
     show(HELP)
 
@@ -72,6 +81,31 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
             from .cli import _models_for
             llm, embedder = _models_for(mode)
         return llm, embedder
+
+    def show_viewer() -> None:
+        nonlocal viewer, viewer_thread
+        report = out / "dv"
+        if not (report / "testplan_doc.html").is_file():
+            return
+        runs_root = PACKAGE_ROOT / "runs"
+        root = runs_root if report.resolve().is_relative_to(runs_root.resolve()) else out
+        if viewer is None:
+            try:
+                viewer = create_report_server(root, port=0)
+            except ValueError as exc:
+                show(f"Local viewer unavailable: {exc}")
+                show(f"For the polished testplan, open the HTML file: {report / 'testplan_doc.html'}")
+                return
+            viewer_thread = threading.Thread(target=viewer.serve_forever,
+                                             name="orchestrator-testplan-viewer", daemon=True)
+            viewer_thread.start()
+        plan_id = report.relative_to(root).as_posix()
+        url = f"http://127.0.0.1:{viewer.server_port}/?plan={quote(plan_id, safe='')}"
+        show(f"For the polished testplan, open: {url}")
+        show(f"HTML file: {report / 'testplan_doc.html'}")
+        show(f"Editable Markdown: {report / 'testplan_doc.md'}")
+        show("The local viewer stays open while the orchestrator terminal is running.")
+        show("On a remote host, forward the printed port to your browser before opening the URL.")
 
     def plan():
         if not scan or not scan["specs"] or not all(variables.get(k) for k in ("repo", "rtl_files", "rtl_graph_files", "rtl_top")):
@@ -89,13 +123,20 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
         ask = dict(requirement=requirement, flow=str(flow_path), out=str(out), variables=variables)
         (out / ASK_FILE).write_text(json.dumps(ask, indent=2), encoding="utf-8")
         dash = Dashboard(out, show, flow=flow, title=requirement, ansi=interactive) if use_dashboard else None
-        result = run_flow(flow_path, out_dir=out, variables=dict(variables), llm=use_llm,
-                          embedder=use_embedder, registry=registry,
-                          event_sink=dash.handle if dash else None)
+        if dash:
+            dash.start_heartbeat()
+        try:
+            result = run_flow(flow_path, out_dir=out, variables=dict(variables), llm=use_llm,
+                              embedder=use_embedder, registry=registry,
+                              event_sink=dash.handle if dash else None)
+        finally:
+            if dash:
+                dash.stop_heartbeat()
         show(f"Plan: {result['status']} — {result['reason']}")
         if (out / "dv" / "testplan_doc.json").is_file():
             show(f"Testplan: {out / 'dv' / 'testplan_doc.md'}")
             show(f"Readable copy: {out / 'dv' / 'testplan_doc.html'}")
+            show_viewer()
         if result["status"] != "PASS":
             show(f"Review details: {out / REVIEW_FILE}")
         return result["status"] == "PASS"
@@ -104,6 +145,11 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
         try:
             line = read("orch> ").strip()
         except (EOFError, KeyboardInterrupt):
+            if viewer is not None:
+                viewer.shutdown()
+                viewer.server_close()
+                if viewer_thread is not None:
+                    viewer_thread.join(timeout=2)
             show("")
             return 0
         if not line:

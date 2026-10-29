@@ -24,7 +24,7 @@ from .combined_fetch import step_targets
 from .interfaces import InterfaceConfig, compact, extract_interfaces, interface_questions
 from .interfaces import render as render_interfaces
 from .llm import LLM, LLMError
-from .progress import emit
+from .progress import emit, emit_event
 from .registers import RegisterConfig, extract_registers, register_questions
 from .repair import default_max_repairs, render_repairs, structured_with_repair, unresolved_questions
 from .registers import render as render_registers
@@ -368,10 +368,17 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 model=llm.model, generated_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"))
     sections: list[dict] = []
     conflicts: dict[tuple, dict] = {}
+    def record_section(section: dict) -> None:
+        sections.append(section)
+        emit_event("substep_done", id=section["id"], status=section["status"])
     with tracer.span("testplan_doc", input={"template": meta["template_id"], "scope": scope}) as stage:
+        emit_event("substep_start", id="interfaces", label="Identify specification interfaces")
         interfaces = _interfaces_step(G, H, llm, tracer, template, scope, cfg, dense_fn)
+        emit_event("substep_done", id="interfaces", status=interfaces["status"] if interfaces else "NOT_RUN")
         iface_compact = compact(interfaces) if interfaces and interfaces["status"] == "PASS" else []
+        emit_event("substep_start", id="registers", label="Recover registers and configurable controls")
         registers = _registers_step(G, H, llm, tracer, template, scope, cfg, dense_fn)
+        emit_event("substep_done", id="registers", status=registers["status"] if registers else "NOT_RUN")
         path_targets = step_targets(G, interfaces, registers)
         strategy = None
         rtl_observations = None
@@ -380,12 +387,13 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
         emit(f"writing {total} test-plan sections with {llm.model}")
         for pos, sec in enumerate(template["sections"], 1):
             emit(f"[{pos}/{total}] section {sec['id']}: {sec.get('heading', '')} ({sec['generator']})")
+            emit_event("substep_start", id=sec["id"], label=sec["heading"])
             with tracer.span(f"testplan_section:{sec['id']}", input={"section": sec["id"]}) as span:
                 if sec["generator"] == "title":
-                    sections.append(_title_section(G, sec, scope, meta))
+                    record_section(_title_section(G, sec, scope, meta))
                     continue
                 if sec["generator"] == "register_map":
-                    sections.append(_register_map_section(G, tracer, sec, registers, meta["template_id"], scope))
+                    record_section(_register_map_section(G, tracer, sec, registers, meta["template_id"], scope))
                     continue
                 if sec["generator"] == "rtl_observations":
                     from .rtl_observations import ObservationConfig, build_observations
@@ -397,19 +405,19 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                         comparison_sources = sorted({i for e in out["entries"] for i in e["cited_spec_ids"] if i in G})
                         _record(G, tracer, out, meta["template_id"], scope, parents=comparison_sources)
                         G.nodes[out["artifact_id"]]["rtl_graph_fingerprint"] = out["graph_fingerprint"]
-                    sections.append(out)
+                    record_section(out)
                     continue
                 if sec["generator"] == "configurations" and (registers is None or not registers["registers"]):
                     reason = ("register-map step disabled" if registers is None
                               else f"register map is {registers['status']} with no registers")
-                    sections.append(dict(id=sec["id"], heading=sec["heading"], generator=sec["generator"],
+                    record_section(dict(id=sec["id"], heading=sec["heading"], generator=sec["generator"],
                                          status="BLOCKED" if registers and registers["status"] == "BLOCKED" else "NOT_RUN",
                                          error=reason, configurations=[]))
                     continue
                 ctx = section_context(G, H, sec, scope, cfg, dense_fn, targets=path_targets, covered=_cited(sections),
                                       tracer=tracer)
                 if sec["generator"] == "strategy":
-                    sections.append(_strategy_section(G, tracer, llm, sec, interfaces, registers, scope, ctx,
+                    record_section(_strategy_section(G, tracer, llm, sec, interfaces, registers, scope, ctx,
                                                       _previous(sections, cfg.max_previous_entries), cfg,
                                                       meta["template_id"], span, rtl_observations))
                     strategy = sections[-1].get("strategy")
@@ -481,7 +489,7 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                                                     max_repairs=cfg.max_repairs)
                 except LLMError as exc:
                     span.update(level="ERROR", status_message=exc.kind)
-                    sections.append(out | dict(status="BLOCKED", error=exc.kind, entries=[]))
+                    record_section(out | dict(status="BLOCKED", error=exc.kind, entries=[]))
                     continue
                 out["repair"] = result.summary()
                 if sec["generator"] == "configurations":
@@ -519,7 +527,7 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 _record(G, tracer, out, meta["template_id"], scope)
                 span.update(output={"status": out["status"], "items": len(out.get("entries", out.get("configurations", [])))},
                             metadata={"fact_ids": out["lineage_fact_ids"]})
-                sections.append(out)
+                record_section(out)
         coverage = _coverage(G, sections)
         rtl_coverage = [dict(observation_id=e["id"], review_status="NEEDS_REVIEW",
                              strategy_handling=any(a["observation_id"] == e["id"] for a in (strategy or {}).get("rtl_observation_actions", [])),
