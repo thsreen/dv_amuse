@@ -21,6 +21,8 @@ dependencies = [
 test = ["pytest>=8"]
 
 [project.scripts]
+e2e-sim = "e2e_sim.cli:main"
+e2e-exec = "e2e_sim.cli:exec_main"
 dv-agent = "dv_agent.cli:main"
 rtl-agent = "rtl_agent.cli:main"
 orchestrate-agent = "orchestrator_agent.cli:main"

@@ -24,6 +24,7 @@ from .combined_fetch import step_targets
 from .interfaces import InterfaceConfig, compact, extract_interfaces, interface_questions
 from .interfaces import render as render_interfaces
 from .llm import LLM, LLMError
+from .progress import emit
 from .registers import RegisterConfig, extract_registers, register_questions
 from .repair import default_max_repairs, render_repairs, structured_with_repair, unresolved_questions
 from .registers import render as render_registers
@@ -363,7 +364,10 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
         strategy = None
         rtl_observations = None
         cycles: set[tuple] = set()
-        for sec in template["sections"]:
+        total = len(template["sections"])
+        emit(f"writing {total} test-plan sections with {llm.model}")
+        for pos, sec in enumerate(template["sections"], 1):
+            emit(f"[{pos}/{total}] section {sec['id']}: {sec.get('heading', '')} ({sec['generator']})")
             with tracer.span(f"testplan_section:{sec['id']}", input={"section": sec["id"]}) as span:
                 if sec["generator"] == "title":
                     sections.append(_title_section(G, sec, scope, meta))
@@ -506,6 +510,8 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
         stage.update(output={"interfaces": interfaces["status"] if interfaces else "DISABLED",
                              "registers": registers["status"] if registers else "DISABLED"}
                      | {s["id"]: s["status"] for s in sections})
+    done = sum(1 for s in sections if s["status"] == "PASS")
+    emit(f"test-plan document done: {done}/{total} sections PASS")
     return dict(schema_version=DOC_SCHEMA_VERSION, **meta, scope=scope,
                 template_path=template["template_path"], review_status="NEEDS_REVIEW",
                 graph_build_trace_id=G.graph.get("build_trace_id"), trace_id=tracer.trace_id,
@@ -726,6 +732,15 @@ def _cite(e: dict) -> str:
     return f" — sources: {', '.join(ids)}" if ids else ""
 
 
+def _render_entry(e: dict) -> list[str]:
+    lines = [f"- [{e['provenance']}] ({e['kind']}) {e['text']}{_cite(e)}"]
+    if e.get("cited_rtl_observation_ids"):
+        lines.append("  - NEEDS_REVIEW: RTL design engineer approval required.")
+    lines += [f"  - {d}" for d in e["details"]]
+    lines += [f"  - Validation: {v}" for v in e["validation"]]
+    return lines
+
+
 def render_markdown(doc: dict) -> str:
     lines = []
     for s in doc["sections"]:
@@ -753,12 +768,17 @@ def render_markdown(doc: dict) -> str:
             continue
         if not s["entries"]:
             lines += ["_No entries._", ""]
-        for e in s["entries"]:
-            lines.append(f"- [{e['provenance']}] ({e['kind']}) {e['text']}{_cite(e)}")
-            if e.get("cited_rtl_observation_ids"):
-                lines.append("  - NEEDS_REVIEW: RTL design engineer approval required.")
-            lines += [f"  - {d}" for d in e["details"]]
-            lines += [f"  - Validation: {v}" for v in e["validation"]]
+        entries = s["entries"]
+        trailing: list[dict] = []
+        if s["id"] == "coverage":
+            trailing = [e for e in entries if e.get("cited_rtl_observation_ids")]
+            entries = [e for e in entries if not e.get("cited_rtl_observation_ids")]
+        for e in entries:
+            lines += _render_entry(e)
+        if trailing:
+            lines += ["### Coverage from RTL observations (NEEDS_REVIEW; RTL design engineer)", ""]
+            for e in trailing:
+                lines += _render_entry(e)
         lines.append("")
         lines += render_repairs(s.get("repair")) + _render_claims(s.get("claims_check"))
     lines += _render_coverage(doc.get("coverage"))

@@ -14,6 +14,7 @@ import networkx as nx
 
 from .extract import locate_quote
 from .llm import LLM, LLMError
+from .progress import emit
 from .repair import default_max_repairs, render_repairs, structured_with_repair
 from .retrieval import RetrievalConfig
 from .testplan_context import chunk_record, fetch_context
@@ -226,6 +227,7 @@ def extract_interfaces(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
         return result | dict(status="NOT_RUN", validation=["no specification chunks retrieved for interfaces"])
     payload = dict(scope=scope, chunks=[{"chunk_id": c["chunk_id"], "section": c["section"],
                                          "pages": c["pages"], "text": c["text"][:cfg.chunk_chars]} for c in chunks])
+    emit(f"isolating interfaces from {len(chunks)} chunks with {llm.model}")
     try:
         out = structured_with_repair(llm, tracer, name="testplan_interfaces", instructions=INTERFACE_INSTRUCTIONS,
                                      payload=payload, schema=_schema(chunk_ids),
@@ -235,6 +237,7 @@ def extract_interfaces(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
         return result | dict(status="BLOCKED", error=exc.kind)
     signals, sig_notes = _validate_signals(G, out.data.get("signals", []), set(chunk_ids))
     groups, grp_notes = _validate_groups(out.data.get("groups", []), signals)
+    emit(f"interfaces done: {len(signals)} signals in {len(groups)} groups")
     return result | dict(signals=signals, groups=groups, validation=sig_notes + grp_notes, repair=out.summary())
 
 

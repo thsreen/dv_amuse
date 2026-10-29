@@ -9,6 +9,7 @@ is an engineering proposal: everything is INFERRED (ASSUMED when nothing support
 """
 from .interfaces import compact
 from .llm import LLM, LLMError
+from .progress import emit
 from .repair import render_repairs, structured_with_repair
 from .trace import Tracer
 
@@ -120,6 +121,7 @@ def build_strategy(llm: LLM, tracer: Tracer, interfaces: dict | None, registers:
     def check(data):
         return (validate_strategy(data, groups, set(reg_labels), set(chunk_ids))["validation"]
                 + _rtl_actions(data, observations)[1])
+    emit(f"building verification strategy from {len(groups)} interface groups with {llm.model}")
     try:
         instructions = STRATEGY_INSTRUCTIONS + (f"\nAdditional instructions:\n{extra_instructions}" if extra_instructions else "")
         if observations:
@@ -136,6 +138,7 @@ def build_strategy(llm: LLM, tracer: Tracer, interfaces: dict | None, registers:
                     virtual_sequences=[], gaps=[], validation=[])
     result = dict(status="PASS", environment=out.data.get("environment", "").strip(),
                   **validate_strategy(out.data, groups, set(reg_labels), set(chunk_ids)), repair=out.summary())
+    emit(f"strategy done: {len(result['agents'])} agents, {len(result['scoreboards'])} scoreboards")
     if observations:
         actions, notes = _rtl_actions(out.data, observations)
         result["rtl_observation_actions"] = actions

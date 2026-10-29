@@ -12,11 +12,12 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from .fsutil import atomic_write_text
+from .progress import emit
 from .trace import Tracer
 from .usage import estimate_usage
 
 DEFAULT_BASE_URL = "https://api.meta.ai/v1"
-DEFAULT_MODEL = "muse-spark-1.3"
+DEFAULT_MODEL = "muse-spark-1.3-contributor"
 API_STYLES = ("responses", "chat")
 
 
@@ -176,7 +177,10 @@ class MetaClient(_Base):
             except transient as exc:
                 if attempt == self.max_attempts:
                     raise LLMError("transient", f"{type(exc).__name__} after {attempt} attempts")
-                self._sleep(2.0 * 2 ** (attempt - 1))
+                delay = 2.0 * 2 ** (attempt - 1)
+                emit(f"model call {name!r} hit {type(exc).__name__}; retrying in {delay:.0f}s "
+                     f"(attempt {attempt}/{self.max_attempts})")
+                self._sleep(delay)
             except openai.AuthenticationError:
                 raise LLMError("auth", "authentication failed") from None
             except openai.APIStatusError as exc:

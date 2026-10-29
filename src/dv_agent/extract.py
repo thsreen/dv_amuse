@@ -6,6 +6,7 @@ import networkx as nx
 
 from .graph import DEPENDENCY_EDGES, _h, add_edge, edges_of_type, page_of
 from .llm import LLM, LLMError
+from .progress import emit
 from .trace import Tracer
 
 REQ_KINDS = ["functional", "interface", "register", "timing", "reset", "configuration",
@@ -142,9 +143,12 @@ def extract_requirements(G: nx.MultiDiGraph, llm: LLM, tracer: Tracer,
     stats = dict(chunks=len(selected), chunks_skipped_by_cap=len(chunk_ids) - len(selected),
                  requirements=0, rejected=0, entities=0, failed_chunks=[])
     index = _alias_index(G)
+    total = len(selected)
+    emit(f"extracting requirements from {total} chunks with {llm.model} (one model call per chunk)")
     with tracer.span("extract_requirements", input={"chunk_ids": selected}) as stage:
-        for cid in selected:
+        for pos, cid in enumerate(selected, 1):
             n = G.nodes[cid]
+            emit(f"[{pos}/{total}] chunk {cid} ({' > '.join(n['section_path']) or 'untitled'})")
             with tracer.span(f"extract:{cid}", input={"chunk_id": cid, "section": n["section_path"]}) as span:
                 try:
                     result = llm.structured(name="spec_requirements", instructions=EXTRACT_INSTRUCTIONS,
@@ -153,6 +157,7 @@ def extract_requirements(G: nx.MultiDiGraph, llm: LLM, tracer: Tracer,
                 except LLMError as exc:
                     span.update(level="ERROR", status_message=exc.kind)
                     stats["failed_chunks"].append({"chunk_id": cid, "error": exc.kind})
+                    emit(f"[{pos}/{total}] chunk {cid} failed: {exc.kind}")
                     if exc.kind in ("config", "auth"):
                         raise
                     continue
@@ -167,6 +172,8 @@ def extract_requirements(G: nx.MultiDiGraph, llm: LLM, tracer: Tracer,
                                   if G.nodes[c].get("type") == "chunk" and G.nodes[c]["summary"]]
         stats["entities"] = sum(1 for _, n in G.nodes(data=True) if n.get("type") == "entity")
         stage.update(output=stats)
+    emit(f"extraction done: {stats['requirements']} requirements, {stats['entities']} entities, "
+         f"{len(stats['failed_chunks'])} failed chunks")
     return stats
 
 
@@ -259,8 +266,10 @@ def extract_dependencies(G: nx.MultiDiGraph, llm: LLM, tracer: Tracer,
     cfg = cfg or ExtractConfig()
     stats = dict(groups=0, edges=0, rejected=0, failed_groups=[])
     evaluated: set[frozenset] = set()
+    groups = dependency_groups(G, cfg)
+    emit(f"extracting dependencies for up to {min(len(groups), cfg.max_dependency_groups)} entity groups")
     with tracer.span("extract_dependencies") as stage:
-        for eid, reqs in dependency_groups(G, cfg):
+        for eid, reqs in groups:
             if stats["groups"] >= cfg.max_dependency_groups:
                 break
             pairs = {frozenset((a, b)) for i, a in enumerate(reqs) for b in reqs[i + 1:]}
@@ -268,6 +277,7 @@ def extract_dependencies(G: nx.MultiDiGraph, llm: LLM, tracer: Tracer,
                 continue
             evaluated |= pairs
             stats["groups"] += 1
+            emit(f"dependencies group {stats['groups']}: {G.nodes[eid]['name']} ({len(reqs)} requirements)")
             schema = _dependency_schema(reqs)
             payload = {"entity": G.nodes[eid]["name"], "requirements": [
                 {"req_id": r, "statement": G.nodes[r]["statement"], "quote": G.nodes[r]["quote"],
@@ -300,6 +310,8 @@ def extract_dependencies(G: nx.MultiDiGraph, llm: LLM, tracer: Tracer,
                 stats["rejected"] += len(rejected)
                 span.update(output={"added": added, "rejected": rejected})
         stage.update(output=stats)
+    emit(f"dependencies done: {stats['edges']} edges from {stats['groups']} groups, "
+         f"{len(stats['failed_groups'])} failed groups")
     return stats
 
 

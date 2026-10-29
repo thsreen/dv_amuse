@@ -14,6 +14,7 @@ from .pipeline import (GRAPH_FILE, clear_llm_cache, clear_run, run_build_graph, 
                        run_ingest, run_interfaces, run_query, run_registers, run_strategy, run_test_plan, run_usage,
                        run_testplan_doc)
 from .planning import PlanConfig
+from .progress import emit, set_sink, stderr_sink
 from .usage import run_totals
 from .retrieval import RetrievalConfig
 
@@ -203,6 +204,9 @@ def _main(argv: list[str] | None) -> int:
     puvm.add_argument("--force", action="store_true", help="replace generated files in the output directory")
 
     args = p.parse_args(argv)
+    if args.cmd in ("ingest", "build-graph", "plan", "interfaces", "registers", "strategy",
+                    "testplan", "pipeline"):
+        set_sink(stderr_sink)  # progress goes to stderr; stdout stays pure JSON
     if args.cmd == "build-uvm":
         from .uvm import build_uvm, write_uvm
         if not args.interface.is_file():
@@ -233,7 +237,10 @@ def _main(argv: list[str] | None) -> int:
         _print(run_rtl_command(args))
     elif args.cmd == "ingest":
         out = args.out or PACKAGE_ROOT / "runs" / args.repo.resolve().name
-        _print(run_ingest(args.repo, out, args.include, force=args.force) | {"out": str(out)})
+        emit(f"ingesting {args.repo} into {out}")
+        result = run_ingest(args.repo, out, args.include, force=args.force)
+        emit(f"ingest done: {result['chunks']} chunks" + (" (reused cached output)" if result.get("reused") else ""))
+        _print(result | {"out": str(out)})
     elif args.cmd == "build-graph":
         _require(args.out, "manifest.json", "chunks.jsonl")
         llm, embedder = _models_for(_llm_mode(args.llm))
@@ -241,7 +248,14 @@ def _main(argv: list[str] | None) -> int:
         force = args.force or args.fresh
         if llm is not None:
             llm.cache_dir = args.out / "llm_cache"
-        _print(run_build_graph(args.out, llm, embedder=embedder, force=force) | {"cache_cleared": removed})
+        emit(f"building graph in {args.out} (--llm {_llm_mode(args.llm)})")
+        result = run_build_graph(args.out, llm, embedder=embedder, force=force)
+        if result.get("reused"):
+            emit("build done: reused cached graph")
+        else:
+            nodes = sum(result.get("nodes", {}).values())
+            emit(f"build done: {nodes} nodes, {result.get('edges', 0)} edges, llm={result['llm']['status']}")
+        _print(result | {"cache_cleared": removed})
     elif args.cmd == "plan":
         _require(args.out, GRAPH_FILE)
         llm = _llm()
@@ -249,8 +263,11 @@ def _main(argv: list[str] | None) -> int:
             raise UsageError("MODEL_API_KEY is required for test-plan generation")
         removed = clear_llm_cache(args.out) if args.fresh else False
         llm.cache_dir = args.out / "llm_cache"
-        _print(run_test_plan(args.out, args.requirement_ids, llm, PlanConfig(retrieval=RetrievalConfig()),
-                             embedder=_embedder(), force=args.force or args.fresh) | {"cache_cleared": removed})
+        emit(f"planning {len(args.requirement_ids)} requirements")
+        result = run_test_plan(args.out, args.requirement_ids, llm, PlanConfig(retrieval=RetrievalConfig()),
+                               embedder=_embedder(), force=args.force or args.fresh)
+        emit(f"plan done: {len(result['items'])} items" + (" (reused cached output)" if result.get("reused") else ""))
+        _print(result | {"cache_cleared": removed})
     elif args.cmd in ("interfaces", "registers", "strategy"):
         _require(args.out, GRAPH_FILE)
         llm = _llm()
@@ -259,8 +276,10 @@ def _main(argv: list[str] | None) -> int:
         removed = clear_llm_cache(args.out) if args.fresh else False
         llm.cache_dir = args.out / "llm_cache"
         step = {"interfaces": run_interfaces, "registers": run_registers, "strategy": run_strategy}[args.cmd]
-        _print(step(args.out, llm, scope=args.scope, embedder=_embedder(), force=args.force or args.fresh)
-               | {"cache_cleared": removed})
+        emit(f"running the {args.cmd} step")
+        result = step(args.out, llm, scope=args.scope, embedder=_embedder(), force=args.force or args.fresh)
+        emit(f"{args.cmd} done: {result['status']}" + (" (reused cached output)" if result.get("reused") else ""))
+        _print(result | {"cache_cleared": removed})
     elif args.cmd == "testplan":
         _require(args.out, GRAPH_FILE)
         llm = _llm()
@@ -268,9 +287,15 @@ def _main(argv: list[str] | None) -> int:
             raise UsageError("MODEL_API_KEY is required for test-plan generation")
         removed = clear_llm_cache(args.out) if args.fresh else False
         llm.cache_dir = args.out / "llm_cache"
-        _print(run_testplan_doc(args.out, llm, scope=args.scope, template_path=args.template,
-                                embedder=_embedder(), force=args.force or args.fresh,
-                                rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope) | {"cache_cleared": removed})
+        emit("generating the test-plan document")
+        result = run_testplan_doc(args.out, llm, scope=args.scope, template_path=args.template,
+                                  embedder=_embedder(), force=args.force or args.fresh,
+                                  rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope)
+        if result.get("reused"):
+            emit("testplan done: reused cached document")
+        else:
+            emit(f"testplan done: {len(result['sections'])} sections written")
+        _print(result | {"cache_cleared": removed})
     elif args.cmd == "pipeline":
         out = args.out or PACKAGE_ROOT / "runs" / args.repo.resolve().name
         llm, embedder = _models_for(_llm_mode(args.llm))
@@ -280,20 +305,31 @@ def _main(argv: list[str] | None) -> int:
             raise UsageError("test-plan generation needs the LLM (MODEL_API_KEY set and --llm not off)")
         result = {"out": str(out)}
         force = args.force or args.fresh
+        stages = ["ingest", "build"] + (["plan"] if args.requirements else []) + (["testplan"] if args.testplan else [])
         if args.fresh:
             result["cleared"] = clear_run(out)
+            emit(f"cleared {len(result['cleared'])} cached artifacts (--fresh)")
+        emit(f"[1/{len(stages)}] ingest: {args.repo} -> {out}")
         result["ingest"] = run_ingest(args.repo, out, args.include, force=force)
+        emit(f"ingest done: {result['ingest']['chunks']} chunks")
         if llm is not None:
             llm.cache_dir = out / "llm_cache"
+        emit(f"[2/{len(stages)}] build-graph (--llm {_llm_mode(args.llm)})")
         result["build"] = run_build_graph(out, llm, embedder=embedder, force=force)
+        pos = 2
         if args.requirements:
+            pos += 1
+            emit(f"[{pos}/{len(stages)}] plan: {len(args.requirements)} requirements")
             result["plan"] = run_test_plan(out, args.requirements, llm,
                                            PlanConfig(retrieval=RetrievalConfig()),
                                            embedder=embedder, force=force)
         if args.testplan:
+            pos += 1
+            emit(f"[{pos}/{len(stages)}] testplan: generating the test-plan document")
             result["testplan"] = run_testplan_doc(out, llm, scope=args.scope, template_path=args.template,
                                                   embedder=embedder, force=force,
                                                   rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope)
+        emit("pipeline done")
         ran = [r["trace_id"] for r in (result.get(k) for k in ("ingest", "build", "plan", "testplan"))
                if r and not r.get("reused") and r.get("trace_id")]
         result["usage"] = run_totals(out / "trace.jsonl", ran) if ran else None

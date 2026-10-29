@@ -14,6 +14,7 @@ import networkx as nx
 
 from .extract import locate_quote, normalize_name
 from .llm import LLM, LLMError
+from .progress import emit
 from .repair import default_max_repairs, render_repairs, structured_with_repair
 from .retrieval import RetrievalConfig
 from .testplan_context import chunk_record, fetch_context
@@ -293,9 +294,12 @@ def extract_registers(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer,
     if not chunks:
         return result | dict(status="NOT_RUN", validation=["no register-related specification chunks retrieved"])
     records, notes, repairs = [], [], []
-    for start in range(0, len(chunks), cfg.batch_size):
+    batches = (len(chunks) + cfg.batch_size - 1) // cfg.batch_size
+    emit(f"extracting registers from {len(chunks)} chunks in {batches} batches with {llm.model}")
+    for num, start in enumerate(range(0, len(chunks), cfg.batch_size), 1):
         batch = chunks[start:start + cfg.batch_size]
         batch_ids = [c["chunk_id"] for c in batch]
+        emit(f"registers batch [{num}/{batches}]: {', '.join(batch_ids)}")
         payload = dict(scope=scope, chunks=[{"chunk_id": c["chunk_id"], "section": c["section"], "pages": c["pages"],
                                              "text": c["text"][:cfg.chunk_chars]} for c in batch])
         try:
@@ -319,6 +323,7 @@ def extract_registers(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer,
     for r in registers:
         r["provenance"] = "DOCUMENTED" if any(s["quote"] for s in r["sources"]) else "INFERRED"
     status = "BLOCKED" if result["failed_batches"] else "PASS"
+    emit(f"registers done: {len(registers)} registers, {len(conflicts)} conflicts, {status}")
     repair = dict(refusals=[r for b in repairs for r in b["refusals"]],
                   unresolved=[p for b in repairs for p in b["unresolved"]], batches=repairs)
     return result | dict(status=status, registers=registers, conflicts=conflicts, validation=notes,

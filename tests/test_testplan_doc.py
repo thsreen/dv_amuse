@@ -259,3 +259,22 @@ def test_pipeline_testplan_flag(spec_repo, tmp_path, capsys, monkeypatch):
     assert main(["pipeline", str(spec_repo), "--out", str(out), "--fresh", "--testplan"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["testplan"]["reused"] is False and (out / "testplan_doc.md").exists()
+
+
+def test_coverage_observation_entries_render_as_subsection():
+    from dv_agent.testplan_doc import render_markdown
+
+    def entry(text, obs):
+        return {"text": text, "kind": "covergroup", "provenance": "INFERRED",
+                "cited_req_ids": [], "cited_chunk_ids": [],
+                "cited_rtl_observation_ids": obs, "details": [], "validation": []}
+
+    doc = {"sections": [
+        {"id": "coverage", "heading": "9. Coverage", "generator": "entries", "status": "PASS",
+         "entries": [entry("observation-driven cover", ["RTLOBS-1"]),
+                     entry("plain scenario cover", [])]}],
+           "coverage": None, "token_usage": None}
+    md = render_markdown(doc)
+    head = md.index("### Coverage from RTL observations")
+    assert md.index("plain scenario cover") < head < md.index("observation-driven cover")
+    assert "NEEDS_REVIEW: RTL design engineer approval required." in md

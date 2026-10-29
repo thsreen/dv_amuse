@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from .llm import LLM, LLMError
+from .progress import emit
 from .trace import Tracer
 
 REPAIR_INSTRUCTIONS = """
@@ -58,6 +59,8 @@ def structured_with_repair(llm: LLM, tracer: Tracer, *, name: str, instructions:
     while problems and len(outcome.history) < budget:
         attempt = len(outcome.history) + 1
         outcome.history.append(dict(attempt=attempt, problems=problems))
+        emit(f"{name}: checks refused the answer, repair attempt {attempt}/{budget} "
+             f"({len(problems)} problems)")
         with tracer.span(f"refusal:{name}", input={"attempt": attempt, "problems": problems}) as span:
             try:
                 result = llm.structured(

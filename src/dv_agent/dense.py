@@ -13,6 +13,7 @@ import networkx as nx
 import numpy as np
 
 from .fsutil import atomic_write_text
+from .progress import emit
 from .retrieval import node_text, tokenize
 
 
@@ -73,7 +74,10 @@ class MetaEmbedder:
             return np.zeros((0, self.dim), dtype=np.float32)
         rows = []
         client = self._get_client()
-        for i in range(0, len(texts), self.batch):
+        batches = (len(texts) + self.batch - 1) // self.batch
+        emit(f"embedding {len(texts)} texts in {batches} batches with {self.model}")
+        for num, i in enumerate(range(0, len(texts), self.batch), 1):
+            emit(f"embedding batch [{num}/{batches}]")
             resp = client.embeddings.create(model=self.model, input=texts[i:i + self.batch])
             rows += [d.embedding for d in sorted(resp.data, key=lambda d: d.index)]
         arr = np.asarray(rows, dtype=np.float32)

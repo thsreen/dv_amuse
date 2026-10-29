@@ -10,6 +10,7 @@ import numpy as np
 from .dense import Embedder, dense_scores
 from .graph import DEPENDENCY_EDGES, attach_artifact, edges_of_type
 from .llm import LLM, LLMError
+from .progress import emit
 from .retrieval import RetrievalConfig, retrieve
 from .testplan_context import dependencies_of
 from .trace import Tracer
@@ -188,9 +189,12 @@ def build_test_plan(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer, r
              and d.get("metadata", {}).get("requirement") in set(requirement_ids)]
     G.remove_nodes_from(stale)
     items = []
+    total = len(requirement_ids)
+    emit(f"planning {total} requirements with {llm.model}")
     with tracer.span("build_test_plan", input={"requirements": requirement_ids},
                      metadata={"replaced_items": stale}) as stage:
-        for req_id in requirement_ids:
+        for pos, req_id in enumerate(requirement_ids, 1):
+            emit(f"[{pos}/{total}] planning {req_id}")
             with tracer.span(f"plan:{req_id}", input={"req_id": req_id}) as span:
                 evidence = iterative_retrieve(G, H, G.nodes[req_id]["statement"], llm, tracer, cfg,
                                               embedder, index)
@@ -212,4 +216,5 @@ def build_test_plan(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer, r
                                       lineage=lineage, evidence=evidence))
                 span.update(output={"items": [i["id"] for i in items if i.get("requirement") == req_id and "id" in i]})
         stage.update(output={"items": len(items)})
+    emit(f"planning done: {len(items)} items for {total} requirements")
     return items
