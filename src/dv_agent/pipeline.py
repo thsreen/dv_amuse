@@ -4,33 +4,33 @@ import shutil
 from dataclasses import replace
 from pathlib import Path
 
-from .community import build_communities
-from .graph_fetch import add_owner_edges, dependency_closure, dependency_order
-from .dense import Embedder, build_index, dense_scores, load_index, save_index
-from .extract import MAX_WORKERS_CAP, ExtractConfig, extract_dependencies, extract_requirements
-from .fsutil import atomic_write_text
-from .html_report import render_html
-from .graph import build_structure, load_graph, save_graph
-from .ingest import ChunkConfig, discover, ingest, load_chunks, load_manifest
-from .llm import LLM, LLMError
-from .progress import emit, emit_event
-from .planning import PlanConfig, build_test_plan
-from .retrieval import RetrievalConfig, layered_view, retrieve
-from .testplan_context import feature_index, fetch_context, requirement_context
-from .interfaces import InterfaceConfig, extract_interfaces
-from .interfaces import render as render_interfaces
-from .registers import RegisterConfig, extract_registers, extraction_signature
-from .registers import render as render_registers
-from .combined_fetch import step_targets
-from .strategy import build_strategy
-from .strategy import render as render_strategy
-from .slim_index import INDEX_FILE
-from .slim_index import build_index as build_slim_index
-from .slim_index import load_index as load_slim_index
-from .testplan_doc import DocConfig, build_evidence_index, build_testplan_doc, load_template, render_markdown, section_context
-from .trace import Tracer
-from .usage import run_totals, summarize
-from .evidence_policy import POLICY_VERSION
+from .graph.community import build_communities
+from .retrieval.graph_fetch import add_owner_edges, dependency_closure, dependency_order
+from .retrieval.dense import Embedder, build_index, dense_scores, load_index, save_index
+from .ingest.extract import MAX_WORKERS_CAP, ExtractConfig, extract_dependencies, extract_requirements
+from .core.fsutil import atomic_write_text
+from .report.html_report import render_html
+from .graph.graph import build_structure, load_graph, save_graph
+from .ingest.ingest import ChunkConfig, discover, ingest, load_chunks, load_manifest
+from .core.llm import LLM, LLMError
+from .core.progress import emit, emit_event
+from .plan.planning import PlanConfig, build_test_plan
+from .retrieval.retrieval import RetrievalConfig, layered_view, retrieve
+from .plan.testplan_context import feature_index, fetch_context, requirement_context
+from .plan.interfaces import InterfaceConfig, extract_interfaces
+from .plan.interfaces import render as render_interfaces
+from .plan.registers import RegisterConfig, extract_registers, extraction_signature
+from .plan.registers import render as render_registers
+from .retrieval.combined_fetch import step_targets
+from .plan.strategy import build_strategy
+from .plan.strategy import render as render_strategy
+from .retrieval.slim_index import INDEX_FILE
+from .retrieval.slim_index import build_index as build_slim_index
+from .retrieval.slim_index import load_index as load_slim_index
+from .plan.testplan_doc import DocConfig, build_evidence_index, build_testplan_doc, load_template, render_markdown, section_context
+from .core.trace import Tracer
+from .core.usage import run_totals, summarize
+from .quality.evidence_policy import POLICY_VERSION
 
 TRACE_FILE = "trace.jsonl"
 GRAPH_FILE = "graph.json"
@@ -48,7 +48,7 @@ STRATEGY_JSON = "strategy.json"
 STRATEGY_MD = "strategy.md"
 STEP_FILES = (REGISTERS_JSON, REGISTERS_MD, INTERFACES_JSON, INTERFACES_MD, STRATEGY_JSON, STRATEGY_MD)
 DERIVED_FILES = (GRAPH_FILE, BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD, TESTPLAN_HTML) + STEP_FILES
-MODES = ("full", "fast", "basic")
+MODES = ("basic", "graph")
 
 
 def _check_mode(mode: str) -> str:
@@ -158,16 +158,16 @@ def _build_reusable(out: Path, mode: str, dense_mode: str) -> dict | None:
         return None
     if prev.get("dense", {}).get("status") == "BLOCKED":
         return None
-    if prev.get("mode") in ("fast", "basic") and load_slim_index(out) is None:
+    if prev.get("mode") == "basic" and load_slim_index(out) is None:
         return None
     return prev | {"reused": True}
 
 
 def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None,
-                    embedder: Embedder | None = None, force: bool = False, mode: str = "full") -> dict:
+                    embedder: Embedder | None = None, force: bool = False, mode: str = "basic") -> dict:
     _check_mode(mode)
-    fast = mode in ("fast", "basic")
-    build_mode = mode if fast else (f"llm:{llm.model}" if llm is not None else "structural")
+    slim_mode = mode == "basic"
+    build_mode = mode if slim_mode else (f"llm:{llm.model}" if llm is not None else "structural")
     if mode == "basic":
         embedder = None
     dense_mode = f"dense:{embedder.model}" if embedder is not None else "none"
@@ -200,7 +200,7 @@ def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None
             if getattr(llm, "base_url", ""):
                 parts.append(f"endpoint {llm.base_url}")
             emit("build config: " + ", ".join(parts))
-            from .graph_checkpoint import CheckpointLLM
+            from .graph.graph_checkpoint import CheckpointLLM
             graph_llm = CheckpointLLM(llm, out / "llm_cache" / "spec_graph")
             cfg = replace(cfg or ExtractConfig(), checkpoint=lambda graph: save_graph(graph, out / GRAPH_FILE))
             try:
@@ -234,7 +234,7 @@ def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None
             counts[n["type"]] = counts.get(n["type"], 0) + 1
         stats["nodes"] = counts
         stats["edges"] = G.number_of_edges()
-        if fast:
+        if slim_mode:
             index = build_slim_index(out)
             stats["slim_index"] = {"status": "PASS", "chunks": len(index.chunks)}
         G.graph["build_trace_id"] = tracer.trace_id
@@ -359,7 +359,7 @@ def _doc_summary(doc: dict, out: Path) -> dict:
 def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Path | None = None,
                      cfg: DocConfig | None = None, embedder: Embedder | None = None,
                      force: bool = False, rtl_graph_path: Path | None = None, rtl_scope: str = "",
-                     mode: str = "full") -> dict:
+                     mode: str = "basic", methodology_rules_path: Path | None = None) -> dict:
     """Generate the template-driven test-plan document (JSON + Markdown + HTML) from the graph."""
     _check_mode(mode)
     if mode == "basic":
@@ -367,6 +367,10 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
         cfg = cfg or DocConfig(max_chunks=6, max_register_chunks=10, max_entries=12,
                                max_previous_entries=20, max_repairs=0, claims_check=False,
                                register_workers=2)
+    cfg = cfg or DocConfig()
+    cfg.methodology_rules_path = str(methodology_rules_path or "")
+    from .plan.methodology import load_methodology_rules, rules_fingerprint
+    meth_fingerprint = rules_fingerprint(load_methodology_rules(methodology_rules_path))
     template = load_template(template_path)
     rtl_graph, rtl_input = None, None
     if rtl_scope and rtl_graph_path is None:
@@ -390,8 +394,10 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
         except json.JSONDecodeError:
             prev = {}
         if (prev.get("provenance_policy") == POLICY_VERSION
-                and prev.get("template_hash") == template["template_hash"] and prev.get("scope") == scope.strip()
-                and prev.get("model") == llm.model and prev.get("mode", "full") == mode
+                and prev.get("template_hash") == template["template_hash"]
+                and prev.get("methodology_fingerprint") == meth_fingerprint
+                and prev.get("scope") == scope.strip()
+                and prev.get("model") == llm.model and prev.get("mode", "graph") == mode
                 and prev.get("source_authority", "DOCUMENTED") == G.graph.get("source_authority", "DOCUMENTED")
                 and prev.get("graph_build_trace_id") == G.graph.get("build_trace_id")
                 and prev.get("rtl_input") == rtl_input
@@ -407,17 +413,17 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
     H = layered_view(G)
     index = _load_dense(out, embedder)
     dense_fn = (lambda q: dense_scores(embedder, index[0], index[1], q)) if index else None
-    slim = load_slim_index(out) or build_slim_index(out) if mode in ("fast", "basic") else None
+    slim = load_slim_index(out) or build_slim_index(out) if mode == "basic" else None
     with Tracer(out / TRACE_FILE, "testplan_doc",
                 input={"template": template["template_id"], "scope": scope, "mode": mode},
                 metadata={"model": llm.model}) as tracer:
-        from .graph_checkpoint import CheckpointLLM
+        from .graph.graph_checkpoint import CheckpointLLM
         plan_llm = CheckpointLLM(llm, out / "llm_cache" / "testplan", stage="testplan")
         def checkpoint(snapshot):
             # Copy before applying authority/presentation metadata to avoid mutating
             # the builder's active sections. Persist lineage alongside partial views.
             snapshot = json.loads(json.dumps(snapshot, default=str))
-            from .testplan_doc import enforce_source_authority
+            from .plan.testplan_doc import enforce_source_authority
             enforce_source_authority(snapshot, G.graph.get('source_authority','DOCUMENTED'))
             snapshot.update(mode=mode, rtl_input=rtl_input, provenance_policy=POLICY_VERSION)
             snapshot['evidence_index'] = build_evidence_index(G, snapshot)
@@ -449,7 +455,7 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
                                      "or requirement-coverage measurement. Model claim judging disabled; source citation/quote "
                                      "checks remain active. Engineer review required.")
         save_graph(G, out / GRAPH_FILE)
-    from .testplan_doc import enforce_source_authority
+    from .plan.testplan_doc import enforce_source_authority
     enforce_source_authority(doc, G.graph.get("source_authority", "DOCUMENTED"))
     doc["rtl_input"] = rtl_input
     doc["provenance_policy"] = POLICY_VERSION
@@ -491,7 +497,7 @@ def render_testplan(out: Path) -> dict:
 
 
 def run_registers(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | None = None,
-                  force: bool = False, mode: str = "full") -> dict:
+                  force: bool = False, mode: str = "basic") -> dict:
     """Fetch the register map definitions from the specification into registers.json / registers.md."""
     _check_mode(mode)
     G = load_graph(out / GRAPH_FILE)
@@ -504,7 +510,7 @@ def run_registers(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | 
     H = layered_view(G)
     index = _load_dense(out, embedder)
     dense_fn = (lambda q: dense_scores(embedder, index[0], index[1], q)) if index else None
-    slim = load_slim_index(out) or build_slim_index(out) if mode in ("fast", "basic") else None
+    slim = load_slim_index(out) or build_slim_index(out) if mode == "basic" else None
     with Tracer(out / TRACE_FILE, "registers", input={"scope": scope, "mode": mode},
                 metadata={"model": llm.model}) as tracer:
         result = extract_registers(G, H, llm, tracer, scope.strip(), RegisterConfig(), dense_fn, slim)
@@ -551,7 +557,7 @@ def _dense_fn(out: Path, embedder: Embedder | None):
 
 
 def run_interfaces(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | None = None,
-                   force: bool = False, mode: str = "full") -> dict:
+                   force: bool = False, mode: str = "basic") -> dict:
     """Isolate and group interface definitions into interfaces.json / interfaces.md."""
     _check_mode(mode)
     G = load_graph(out / GRAPH_FILE)
@@ -559,7 +565,7 @@ def run_interfaces(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder |
     prev = None if force else _load_current(out / INTERFACES_JSON, scope, llm.model, G, extra={"mode": mode})
     if prev is not None:
         return _interfaces_summary(prev, out) | {"reused": True}
-    slim = load_slim_index(out) or build_slim_index(out) if mode in ("fast", "basic") else None
+    slim = load_slim_index(out) or build_slim_index(out) if mode == "basic" else None
     with Tracer(out / TRACE_FILE, "interfaces", input={"scope": scope, "mode": mode},
                 metadata={"model": llm.model}) as tracer:
         result = extract_interfaces(G, layered_view(G), llm, tracer, scope, InterfaceConfig(),
@@ -581,7 +587,7 @@ def _interfaces_summary(result: dict, out: Path) -> dict:
 
 
 def run_strategy(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | None = None,
-                 force: bool = False, mode: str = "full") -> dict:
+                 force: bool = False, mode: str = "basic") -> dict:
     """Verification strategy built from the documented interface and register steps."""
     _check_mode(mode)
     scope = scope.strip()
@@ -597,7 +603,7 @@ def run_strategy(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | N
         return _strategy_summary(prev, out) | {"reused": True, "inputs": dict(interfaces=ifs["reused"], registers=regs["reused"])}
     H = layered_view(G)
     dense_fn = _dense_fn(out, embedder)
-    slim = load_slim_index(out) or build_slim_index(out) if mode in ("fast", "basic") else None
+    slim = load_slim_index(out) or build_slim_index(out) if mode == "basic" else None
     with Tracer(out / TRACE_FILE, "strategy", input={"scope": scope, "mode": mode} | inputs,
                 metadata={"model": llm.model}) as tracer:
         ctx = section_context(G, H, {"queries": STRATEGY_QUERIES}, scope, DocConfig(), dense_fn,

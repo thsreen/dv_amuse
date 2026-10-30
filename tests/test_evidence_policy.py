@@ -1,5 +1,5 @@
-from dv_agent.evidence_policy import PROVENANCE_RULES, assessment
-from dv_agent.interfaces import _validate_groups
+from dv_agent.quality.evidence_policy import PROVENANCE_RULES, assessment
+from dv_agent.plan.interfaces import _validate_groups
 
 
 def test_direct_normalization_can_be_documented_but_missing_quote_cannot():

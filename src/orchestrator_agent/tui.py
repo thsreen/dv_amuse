@@ -20,6 +20,7 @@ GREEN, YELLOW, RED, DIM, RESET = "\x1b[32m", "\x1b[33m", "\x1b[31m", "\x1b[2m", 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 MARK = {"PASS": ("*", GREEN), "RUN": (">", YELLOW), "....": ("o", DIM),
+        "INTERRUPTED": ("x", RED),
         "FAIL": ("x", RED), "BLOCKED": ("x", RED), "TIMEOUT": ("x", RED),
         "SKIPPED": ("-", DIM), "REUSED": ("*", DIM), "NOT_RUN": ("-", DIM)}
 
@@ -62,7 +63,7 @@ def _pad_ansi(value: str, width: int) -> str:
 
 def testplan_substeps() -> list[tuple[str, str]]:
     """Show the template's actual sections, including the two extraction stages."""
-    from dv_agent.testplan_doc import load_template
+    from dv_agent.plan.testplan_doc import load_template
     template = load_template()
     return ([('interfaces', 'Specification interfaces'), ('registers', 'Registers and controls')]
             + [(s['id'], s['heading']) for s in template['sections']]
@@ -71,17 +72,19 @@ def testplan_substeps() -> list[tuple[str, str]]:
 
 class Dashboard:
     def __init__(self, out_dir, show, *, flow: dict | None = None,
-                 title: str = "", ansi: bool = True):
+                 title: str = "", ansi: bool = True, substeps=None, substep_owner=None):
         self.out_dir = out_dir
         self.show = show
         self.flow = flow or {"steps": [], "policy": {}}
         self.title = title
         self.ansi = ansi
         self.steps = [s["id"] for s in self.flow.get("steps", [])]
-        self.substep_owner = next((s["id"] for s in self.flow.get("steps", [])
+        self.substep_owner = substep_owner or next((s["id"] for s in self.flow.get("steps", [])
                                    if s.get("tool") == "dv_testplan"), None)
         self.substeps: list[tuple[str, str]] = []
-        if self.substep_owner:
+        if substeps is not None:
+            self.substeps=list(substeps)
+        elif self.substep_owner:
             self.substeps = testplan_substeps()
         self.substatus = {sid: "...." for sid, _ in self.substeps}
         self.status = {sid: "...." for sid in self.steps}
@@ -108,7 +111,10 @@ class Dashboard:
         kind = event.get("event")
         if kind in ("substep_done", "tool_done", "run_finish"):
             self.elapsed_s = max(0, int(time.monotonic() - self.started))
-        if kind == "run_start":
+        if kind == 'substeps_configured':
+            self.substeps=[(s['id'],s['label']) for s in event['steps']]
+            self.substatus={sid:self.substatus.get(sid,'....') for sid,label in self.substeps}
+        elif kind == "run_start":
             self.steps = list(event.get("steps", self.steps))
             self.status = {sid: "...." for sid in self.steps}
             self.substatus = {sid: "...." for sid, _ in self.substeps}
@@ -126,7 +132,10 @@ class Dashboard:
             if event["step"] == self.substep_owner and event.get("status") == "PASS":
                 for sid in self.substatus:
                     if self.substatus[sid] == "....":
-                        self.substatus[sid] = "REUSED"
+                        self.substatus[sid] = 'NOT_RUN' if self.substep_owner=='code' else "REUSED"
+            elif event['step']==self.substep_owner:
+                for sid,status in self.substatus.items():
+                    if status=='RUN': self.substatus[sid]=event.get('status','FAIL')
             if event.get("status") not in ("PASS", "NOT_RUN"):
                 self.current = {}
             self.task_name = self._step_label(event["step"])
@@ -210,6 +219,8 @@ class Dashboard:
         self.show("\n".join(lines))
 
     def _plain(self, kind: str, event: dict) -> str:
+        if kind == 'run_start' and self.substep_owner == 'code':
+            return f"[started] {self.started_utc}"
         if kind == "tool_start":
             line = f"{event['step']}: {event['tool']}"
             if event.get("extra_prompt"):
@@ -225,13 +236,15 @@ class Dashboard:
             return f"[progress] {event.get('message', '')}"
         if kind == "substeps_reused":
             return "[reused] saved testplan sections"
+        if kind == 'substeps_configured': return f"[steps] {len(event['steps'])} code tasks identified"
         if kind == "decider":
             decision = event.get("decision") or {}
             return f"[decider] {decision.get('action')} {decision.get('target_step', '')}".rstrip()
         if kind in ("guard_block", "review_gate", "budget_exhausted"):
             return f"[gate] {event.get('step') or event.get('what') or kind}"
         if kind == "run_finish":
-            return f"[{event.get('status')}] {event.get('reason', '')}"
+            elapsed = f" (elapsed {event['elapsed_s']:.1f}s)" if 'elapsed_s' in event else ''
+            return f"[{event.get('status')}] {event.get('reason', '')}{elapsed}"
         return f"[{kind}]"
 
     def _left(self, width: int) -> list[str]:
@@ -308,4 +321,10 @@ class Dashboard:
                         marker = f"{color}{marker}{RESET}"
                     text = _short(label, max(5, id_w - 2))
                     lines.append(f"  {marker} {text.ljust(max(5, id_w - 2))} {substatus}")
+        if self.substep_owner=='code':
+            budget=max(18,shutil.get_terminal_size((120,30)).lines-4)
+            if len(lines)>budget:
+                current=next((i for i,line in enumerate(lines) if ' RUN' in line and i>1),len(lines)-1)
+                start=max(1,min(current-3,len(lines)-budget+2))
+                lines=[lines[0],f'({start} earlier rows; full details in code trace)']+lines[start:start+budget-3]
         return lines

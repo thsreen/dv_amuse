@@ -4,14 +4,14 @@ import pytest
 
 from conftest import dependency_handler, extraction_handler, plan_handler, rerank_handler
 from dv_agent.cli import main
-from dv_agent.graph import load_graph
-from dv_agent.llm import FakeLLM
+from dv_agent.graph.graph import load_graph
+from dv_agent.core.llm import FakeLLM
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_context, run_features, run_ingest, run_test_plan
-from dv_agent.planning import PlanConfig
-from dv_agent.retrieval import RetrievalConfig
-from dv_agent.testplan_context import (BUNDLE_SCHEMA_VERSION, feature_index, fetch_context, fetch_context_slim,
+from dv_agent.plan.planning import PlanConfig
+from dv_agent.retrieval.retrieval import RetrievalConfig
+from dv_agent.plan.testplan_context import (BUNDLE_SCHEMA_VERSION, feature_index, fetch_context, fetch_context_slim,
                                          requirement_context)
-from dv_agent.trace import read_trace
+from dv_agent.core.trace import read_trace
 
 
 def _llm(**overrides):
@@ -25,7 +25,7 @@ def _llm(**overrides):
 def built(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm())
+    run_build_graph(out, _llm(), mode="graph")
     return out, load_graph(out / GRAPH_FILE)
 
 
@@ -111,7 +111,7 @@ def test_planner_offers_dependency_preconditions_for_citation(built):
 
 
 def test_fetch_context_slim_matches_full_bundle_shape(built):
-    from dv_agent.slim_index import build_index, load_index
+    from dv_agent.retrieval.slim_index import build_index, load_index
 
     out, G = built
     index = build_index(out)

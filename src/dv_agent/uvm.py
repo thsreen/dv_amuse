@@ -9,8 +9,8 @@ import re
 import textwrap
 from pathlib import Path
 
-from .fsutil import atomic_write_text
-from .llm import LLM
+from .core.fsutil import atomic_write_text
+from .core.llm import LLM
 from rtl_agent.builder import _name, _range_width, _validate_definition
 
 MAX_SEQUENCES = 32
@@ -210,6 +210,32 @@ def _template_text(filename: str, values: dict[str, str]) -> str:
     return re.sub(r"\{\{([A-Z_]+)\}\}", lambda m: values[m.group(1)], template)
 
 
+def _x_error_lines(signals: list[dict], indent: str) -> list[str]:
+    return [f"{indent}if ($isunknown(cfg.vif.{p['name']})) "
+            f"`uvm_error(\"XPROP\", \"X/Z sampled on {p['name']}\");"
+            for p in signals]
+
+
+def _monitor_x_checks(driven: list[dict], observed: list[dict],
+                      reset: str | None, reset_active: str | None) -> str:
+    """Forced METH-XPROP-1 monitor checks: throw a uvm_error on sampled X/Z.
+
+    Testbench-driven inputs are checked unconditionally. DUT outputs are
+    checked only while reset is inactive (skipped while reset is asserted
+    or unknown, when X outputs are expected).
+    """
+    lines = ["      // METH-XPROP-1: fail fast on X/Z sampled in the monitor."]
+    lines += _x_error_lines(driven, "      ")
+    if observed and reset:
+        inactive = "1'b1" if reset_active == "low" else "1'b0"
+        lines.append(f"      if (cfg.vif.{reset} != {inactive}) begin")
+        lines += _x_error_lines(observed, "        ")
+        lines.append("      end")
+    else:
+        lines += _x_error_lines(observed, "      ")
+    return "\n".join(lines)
+
+
 def _render(prefix: str, ports: list[dict], clock: str, reset: str | None,
             reset_active: str | None, sequences: list[dict], controls: dict,
             plan_configs: list[dict], arguments: dict, catalog: dict,
@@ -244,6 +270,7 @@ def _render(prefix: str, ports: list[dict], clock: str, reset: str | None,
             f"      if (cfg.drive_{p['name']}) cfg.vif.{p['name']} <= tr.{p['name']};" for p in driven),
         "MONITOR_ASSIGNMENTS": "\n".join(
             f"      tr.{p['name']} = cfg.vif.{p['name']};" for p in driven + observed),
+        "MONITOR_X_CHECKS": _monitor_x_checks(driven, observed, reset, reset_active),
         "RESET_IMPORT": "  import reset_pkg::*;" if reset else "",
         "CUSTOM_IMPORTS": "\n".join(f"  import {name}::*;" for name in arguments["imports"]),
         "RESET_TEST_MEMBERS": ("    reset_agent reset_uvc;\n    reset_cfg reset_control;" if reset else ""),

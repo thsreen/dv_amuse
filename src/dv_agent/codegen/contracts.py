@@ -112,6 +112,34 @@ class Hook(Model):
     fact_ids: list[str] = Field(min_length=1)
 
 
+class CoverageBin(Model):
+    name: str
+    values: list[int] = Field(min_length=1,max_length=64)
+
+
+class CoveragePoint(Model):
+    name: str
+    field: Literal['data','address','kind','error','data_bits','parity_mode','stop_bits']
+    mask: int = Field(default=18446744073709551615,ge=0,le=18446744073709551615)
+    shift: int = Field(default=0,ge=0,le=63)
+    bins: list[CoverageBin] = Field(min_length=1,max_length=32)
+
+
+class CoverageCross(Model):
+    name: str
+    points: list[str] = Field(min_length=2,max_length=4)
+
+
+class CoverageGoal(Model):
+    id: str
+    agent: str
+    points: list[CoveragePoint] = Field(min_length=1,max_length=8)
+    crosses: list[CoverageCross] = Field(default_factory=list,max_length=8)
+    sample_kinds: list[int] = Field(default_factory=list,max_length=5)
+    sample_address: int | None = Field(default=None,ge=0)
+    fact_ids: list[str] = Field(min_length=1)
+
+
 class CodePlan(Model):
     contract: Literal["verification_codegen_v1"] = "verification_codegen_v1"
     top: str
@@ -131,6 +159,7 @@ class CodePlan(Model):
     checks: list[Check] = Field(default_factory=list, max_length=64)
     tests: list[Test] = Field(default_factory=list, max_length=64)
     hooks: list[Hook] = Field(default_factory=list, max_length=32)
+    coverage: list[CoverageGoal] = Field(default_factory=list,max_length=64)
     questions: list[str] = Field(default_factory=list)
 
 

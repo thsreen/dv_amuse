@@ -35,8 +35,8 @@ def _llm_mode(arg: str | None) -> str:
 
 
 def _models_for(mode: str):
-    from dv_agent.dense import MetaEmbedder
-    from dv_agent.llm import MetaClient
+    from dv_agent.retrieval.dense import MetaEmbedder
+    from dv_agent.core.llm import MetaClient
     if mode == "off":
         return None, None
     key = os.getenv("MODEL_API_KEY", "").strip()
@@ -44,7 +44,7 @@ def _models_for(mode: str):
         if mode == "on":
             raise UsageError("LLM mode is 'on' but MODEL_API_KEY is not set")
         return None, None
-    basic = os.getenv("DV_AGENT_MODE", "full") == "basic"
+    basic = os.getenv("DV_AGENT_MODE", "basic") == "basic"
     llm = MetaClient(max_attempts=2) if basic else MetaClient()
     embedder = MetaEmbedder() if not basic and os.getenv("META_EMBED_MODEL", "").strip() else None
     return llm, embedder
@@ -97,8 +97,8 @@ def _main(argv: list[str] | None) -> int:
     parser = argparse.ArgumentParser(prog="orchestrate-agent")
     parser.add_argument("--llm", choices=LLM_MODES,
                         help="model use for the interactive terminal (default: auto)")
-    parser.add_argument("--mode", choices=("full", "fast", "basic"),
-                        help="basic: lexical RAG demo; skips requirement/dependency extraction")
+    parser.add_argument("--mode", choices=("basic", "graph"),
+                        help="basic (default): lexical RAG demo; graph: model-built knowledge graph")
     sub = parser.add_subparsers(dest="cmd", required=False)
 
     pr = sub.add_parser("run", help="execute a flow file step by step")
@@ -120,7 +120,7 @@ def _main(argv: list[str] | None) -> int:
     pr.add_argument("--approve", action="append", default=[],
                     help="approved step id(s), comma-separated (repeatable)")
     pr.add_argument("--llm", choices=LLM_MODES, help="auto (default), on, or off")
-    pr.add_argument("--mode", choices=("full", "fast", "basic"), default=argparse.SUPPRESS)
+    pr.add_argument("--mode", choices=("basic", "graph"), default=argparse.SUPPRESS)
     pr.add_argument("--dry-run", action="store_true", help="resolve and guard every step, run nothing")
     pr.add_argument("--force", action="store_true", help="rerun stages even if outputs exist")
     pr.add_argument("--fresh", action="store_true",

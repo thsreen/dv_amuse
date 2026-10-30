@@ -1,8 +1,8 @@
 from conftest import dependency_handler, extraction_handler, plan_handler, rerank_handler
-from dv_agent.llm import FakeLLM
+from dv_agent.core.llm import FakeLLM
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_test_plan
-from dv_agent.planning import PlanConfig
-from dv_agent.retrieval import RetrievalConfig
+from dv_agent.plan.planning import PlanConfig
+from dv_agent.retrieval.retrieval import RetrievalConfig
 
 
 def _llm():
@@ -34,7 +34,7 @@ def test_changing_include_selection_forces_reingest(spec_repo, tmp_path):
 def test_reingest_invalidates_graph_and_plan(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm())
+    run_build_graph(out, _llm(), mode="graph")
     assert (out / GRAPH_FILE).exists()
     (spec_repo / "doc" / "tmr32_spec.txt").write_text("changed\f" + "x" * 500)
     run_ingest(spec_repo, out)
@@ -45,10 +45,10 @@ def test_graph_build_reused_with_zero_llm_calls(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
     first_llm = _llm()
-    first = run_build_graph(out, first_llm)
+    first = run_build_graph(out, first_llm, mode="graph")
     assert first["reused"] is False and first_llm.calls
     second_llm = _llm()
-    second = run_build_graph(out, second_llm)
+    second = run_build_graph(out, second_llm, mode="graph")
     assert second["reused"] is True and second_llm.calls == []
     assert second["nodes"] == first["nodes"]
 
@@ -56,24 +56,24 @@ def test_graph_build_reused_with_zero_llm_calls(spec_repo, tmp_path):
 def test_force_rebuilds_graph(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm())
+    run_build_graph(out, _llm(), mode="graph")
     forced_llm = _llm()
-    forced = run_build_graph(out, forced_llm, force=True)
+    forced = run_build_graph(out, forced_llm, force=True, mode="graph")
     assert forced["reused"] is False and not forced_llm.calls  # rebuild from durable batches
 
 
 def test_structural_build_is_not_reused_for_llm_build(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, None)
-    llm_build = run_build_graph(out, _llm())
+    run_build_graph(out, None, mode="graph")
+    llm_build = run_build_graph(out, _llm(), mode="graph")
     assert llm_build["reused"] is False and llm_build["mode"] == "llm:fake-llm"
 
 
 def test_test_plan_reused_unless_forced(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm())
+    run_build_graph(out, _llm(), mode="graph")
     req = _req_ids(out)[0]
     cfg = PlanConfig(retrieval=RetrievalConfig())
     first = run_test_plan(out, [req], _llm(), cfg)
@@ -90,7 +90,7 @@ def test_clear_run_removes_only_known_artifacts(spec_repo, tmp_path):
     run_ingest(spec_repo, out)
     llm = _llm()
     llm.cache_dir = out / "llm_cache"
-    run_build_graph(out, llm)
+    run_build_graph(out, llm, mode="graph")
     (out / "keep_me.txt").write_text("user file")
     removed = clear_run(out)
     assert "graph.json" in removed and "llm_cache" in removed and "trace.jsonl" in removed
@@ -119,7 +119,7 @@ def test_build_graph_fresh_deletes_llm_cache_and_calls_model_again(spec_repo, tm
     run_ingest(spec_repo, out)
     llm = _llm()
     llm.cache_dir = out / "llm_cache"
-    run_build_graph(out, llm)
+    run_build_graph(out, llm, mode="graph")
     assert (out / "llm_cache").is_dir() and clear_llm_cache(out)
     assert not (out / "llm_cache").exists()
     monkeypatch.setattr(cli, "_llm", lambda: _cache_llm(out))

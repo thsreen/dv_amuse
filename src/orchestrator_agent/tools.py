@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from dv_agent import pipeline as dv_pipeline
-from dv_agent.retrieval import RetrievalConfig
+from dv_agent.retrieval.retrieval import RetrievalConfig
 from rtl_agent import commands as rtl_commands
 from rtl_agent import graph_commands as rtl_graph_commands
 
@@ -60,7 +60,7 @@ def _dv_out(args: dict, ctx: StepContext) -> Path:
 
 
 def _pipeline_mode(args: dict) -> str:
-    return str(args.get("mode") or os.getenv("DV_AGENT_MODE") or "full").strip().lower()
+    return str(args.get("mode") or os.getenv("DV_AGENT_MODE") or "basic").strip().lower()
 
 
 def run_dv_ingest(args: dict, ctx: StepContext) -> dict:
@@ -243,7 +243,7 @@ def run_rtl_build_graph(args: dict, ctx: StepContext) -> dict:
 
 def run_rtl_build_spec(args: dict, ctx: StepContext) -> dict:
     try:
-        from dv_agent.trace import Tracer
+        from dv_agent.core.trace import Tracer
         from rtl_agent.specification import build_specification
         out = Path(args.get("out") or ctx.out_dir / "rtl_spec")
         template = _opt_str(args, "template")

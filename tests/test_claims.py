@@ -3,9 +3,9 @@ import json
 
 import pytest
 
-from dv_agent.claims import entry_claims
-from dv_agent.graph import load_graph
-from dv_agent.llm import LLMError
+from dv_agent.quality.claims import entry_claims
+from dv_agent.graph.graph import load_graph
+from dv_agent.core.llm import LLMError
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_testplan_doc
 from test_testplan_doc import _llm
 
@@ -14,7 +14,7 @@ from test_testplan_doc import _llm
 def run(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm())
+    run_build_graph(out, _llm(), mode="graph")
     return out
 
 
@@ -60,7 +60,7 @@ def _section(out, sid):
 
 def test_exact_quote_with_contradictory_claim_is_refused_and_repaired(run):
     llm = _llm(testplan_entries=clean_entries(), claims_check=judge_ffh)
-    run_testplan_doc(run, llm)
+    run_testplan_doc(run, llm, mode="graph")
     stim = _section(run, "stimulus")
     refusal = stim["repair"]["refusals"][0]["problems"]
     assert any("claims check" in p and "FFh" in p for p in refusal)
@@ -71,7 +71,7 @@ def test_exact_quote_with_contradictory_claim_is_refused_and_repaired(run):
 
 
 def test_claim_still_unsupported_after_repairs_is_downgraded(run):
-    run_testplan_doc(run, _llm(testplan_entries=clean_entries(always_wrong=True), claims_check=judge_ffh))
+    run_testplan_doc(run, _llm(testplan_entries=clean_entries(always_wrong=True), claims_check=judge_ffh), mode="graph")
     stim = _section(run, "stimulus")
     wrong = next(e for e in stim["entries"] if "FFh" in e["text"])
     assert wrong["provenance"] == "ASSUMED" and "claims check" in wrong["validation"][-1]
@@ -84,7 +84,7 @@ def test_claim_still_unsupported_after_repairs_is_downgraded(run):
 def test_failed_judge_does_not_block_the_section(run):
     def broken(payload):
         raise LLMError("transient", "simulated")
-    run_testplan_doc(run, _llm(testplan_entries=clean_entries(), claims_check=broken))
+    run_testplan_doc(run, _llm(testplan_entries=clean_entries(), claims_check=broken), mode="graph")
     stim = _section(run, "stimulus")
     assert stim["status"] == "PASS" and stim["claims_check"]["status"] == "BLOCKED"
     assert all(e["provenance"] != "ASSUMED" or "claims check" not in " ".join(e["validation"]) for e in stim["entries"])
@@ -92,7 +92,7 @@ def test_failed_judge_does_not_block_the_section(run):
 
 def test_judge_runs_only_after_deterministic_checks_and_not_where_disabled(run):
     llm = _llm()  # default fake entries fail deterministic checks in every section
-    run_testplan_doc(run, llm)
+    run_testplan_doc(run, llm, mode="graph")
     assert _section(run, "stimulus")["claims_check"]["status"] == "NOT_RUN"
     assert _section(run, "assumptions")["claims_check"]["status"] == "DISABLED"
     assert _section(run, "questions")["claims_check"]["status"] == "DISABLED"
@@ -108,7 +108,7 @@ def test_configuration_legal_values_are_judged(run):
              "constraints": [], "reserved_handling": "", "notes": "", "provenance": "INFERRED",
              "cited_req_ids": [], "cited_chunk_ids": []} for f in payload["configurable_fields"]]}
     run_testplan_doc(run, _llm(testplan_entries=clean_entries(), testplan_configurations=clean_configs,
-                               claims_check=judge_config))
+                               claims_check=judge_config), mode="graph")
     conf = _section(run, "configurations")
     assert any("claims check" in p for r in conf["repair"]["refusals"] for p in r["problems"])
     assert conf["claims_check"]["downgraded"] >= 1

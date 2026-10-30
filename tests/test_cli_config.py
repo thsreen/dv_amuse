@@ -7,7 +7,7 @@ import pytest
 
 from dv_agent import cli
 from dv_agent.cli import main
-from dv_agent.llm import MetaClient
+from dv_agent.core.llm import MetaClient
 from dv_agent.pipeline import run_build_graph, run_ingest
 
 COMMANDS = ["ingest", "build-graph", "interfaces", "registers", "strategy", "plan", "testplan", "pipeline", "query", "context", "deps", "features", "usage",
@@ -53,7 +53,7 @@ def test_llm_on_without_key_fails_clearly(spec_repo, tmp_path, capsys):
 def test_llm_auto_without_key_builds_structurally(spec_repo, tmp_path, capsys):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    assert main(["build-graph", "--out", str(out)]) == 0
+    assert main(["build-graph", "--out", str(out), "--mode", "graph"]) == 0
     assert json.loads(capsys.readouterr().out)["mode"] == "structural"
 
 
@@ -81,7 +81,7 @@ def test_meta_client_settings_are_validated(monkeypatch):
 def test_bad_or_missing_template_is_a_clear_error(spec_repo, tmp_path, monkeypatch, capsys):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, None)
+    run_build_graph(out, None, mode="graph")
     monkeypatch.setattr(cli, "_llm", lambda: type("L", (), {"model": "m", "cache_dir": None})())
     assert main(["testplan", "--out", str(out), "--template", str(tmp_path / "nope.json")]) == 2
     assert "template not found" in capsys.readouterr().err
@@ -97,18 +97,31 @@ def test_bad_or_missing_template_is_a_clear_error(spec_repo, tmp_path, monkeypat
 def test_invalid_mode_is_rejected(spec_repo, tmp_path, monkeypatch, capsys):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    monkeypatch.setenv("DV_AGENT_MODE", "turbo")
-    assert main(["build-graph", "--out", str(out)]) == 2
-    assert "mode must be one of" in capsys.readouterr().err
+    for bad in ("turbo", "fast", "full"):
+        monkeypatch.setenv("DV_AGENT_MODE", bad)
+        assert main(["build-graph", "--out", str(out)]) == 2
+        assert "mode must be one of" in capsys.readouterr().err
 
 
-def test_fast_build_graph_marks_mode(spec_repo, tmp_path, capsys):
+def test_basic_build_graph_marks_mode(spec_repo, tmp_path, capsys):
     import json
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    assert main(["build-graph", "--out", str(out), "--llm", "off", "--mode", "fast"]) == 0
+    assert main(["build-graph", "--out", str(out), "--llm", "off", "--mode", "basic"]) == 0
     stats = json.loads((out / "build_stats.json").read_text())
-    assert stats["mode"] == "fast" and stats["slim_index"]["status"] == "PASS"
+    assert stats["mode"] == "basic" and stats["slim_index"]["status"] == "PASS"
     assert (out / "slim_index.json").is_file()
-    assert "--mode fast" in capsys.readouterr().err
+    assert "--mode basic" in capsys.readouterr().err
+
+
+def test_default_mode_is_basic(spec_repo, tmp_path, monkeypatch, capsys):
+    import json
+
+    monkeypatch.delenv("DV_AGENT_MODE", raising=False)
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    assert main(["build-graph", "--out", str(out), "--llm", "off"]) == 0
+    stats = json.loads((out / "build_stats.json").read_text())
+    assert stats["mode"] == "basic" and stats["slim_index"]["status"] == "PASS"
+    assert "--mode basic" in capsys.readouterr().err

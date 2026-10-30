@@ -1,11 +1,11 @@
 import networkx as nx
 import pytest
 
-from dv_agent.combined_fetch import SOURCE_TYPES, adaptive_select, combined_fetch, step_targets, target_paths
-from dv_agent.graph import load_graph
+from dv_agent.retrieval.combined_fetch import SOURCE_TYPES, adaptive_select, combined_fetch, step_targets, target_paths
+from dv_agent.graph.graph import load_graph
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_testplan_doc
-from dv_agent.retrieval import layered_view
-from dv_agent.trace import read_trace
+from dv_agent.retrieval.retrieval import layered_view
+from dv_agent.core.trace import read_trace
 from test_testplan_doc import _llm
 
 
@@ -13,7 +13,7 @@ from test_testplan_doc import _llm
 def built(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm())
+    run_build_graph(out, _llm(), mode="graph")
     return out, load_graph(out / GRAPH_FILE)
 
 
@@ -60,7 +60,7 @@ def test_combined_fetch_merges_sources_deterministically(built):
 
 def test_testplan_sections_fetch_with_step_targets(built):
     out, _ = built
-    summary = run_testplan_doc(out, _llm())
+    summary = run_testplan_doc(out, _llm(), mode="graph")
     spans = [r for r in read_trace(out / "trace.jsonl", summary["trace_id"]) if r["name"] == "fetch_context"]
     assert any(s["input"]["targets"] > 0 for s in spans)
     assert any(any(s["input"]["selection"].get(t) for t in ("path", "coverage")) for s in spans)

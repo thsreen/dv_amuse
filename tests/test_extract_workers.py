@@ -4,13 +4,13 @@ import threading
 import pytest
 
 from conftest import dependency_handler, extraction_handler
-from dv_agent.extract import MAX_WORKERS_CAP, ExtractConfig, default_max_workers
-from dv_agent.llm import FakeLLM, LLMError
+from dv_agent.ingest.extract import MAX_WORKERS_CAP, ExtractConfig, default_max_workers
+from dv_agent.core.llm import FakeLLM, LLMError
 from dv_agent.pipeline import run_build_graph, run_ingest
 
 
 def _normalized_graph(out):
-    from dv_agent.graph import load_graph
+    from dv_agent.graph.graph import load_graph
     from dv_agent.pipeline import GRAPH_FILE
     G = load_graph(out / GRAPH_FILE)
     drop = {"span_id", "response_id", "trace_id"}
@@ -35,7 +35,7 @@ def test_parallel_build_matches_sequential(spec_repo, tmp_path):
         llm = FakeLLM({"spec_requirements": extraction_handler,
                        "requirement_dependencies": dependency_handler})
         run_ingest(spec_repo, out)
-        outs.append((out, run_build_graph(out, llm, ExtractConfig(max_workers=workers))))
+        outs.append((out, run_build_graph(out, llm, ExtractConfig(max_workers=workers), mode="graph")))
     _stats_equal(outs[0][1], outs[1][1])
     assert _normalized_graph(outs[0][0]) == _normalized_graph(outs[1][0])
 
@@ -52,13 +52,13 @@ def test_parallel_failure_ordering_matches_sequential(spec_repo, tmp_path):
         llm = FakeLLM({"spec_requirements": flaky,
                        "requirement_dependencies": dependency_handler})
         run_ingest(spec_repo, out)
-        outs.append((out, run_build_graph(out, llm, ExtractConfig(max_workers=workers))))
+        outs.append((out, run_build_graph(out, llm, ExtractConfig(max_workers=workers), mode="graph")))
     assert len(outs[0][1]["requirements"]["failed_chunks"]) == 1
     assert outs[0][1]["llm"]["status"] == outs[1][1]["llm"]["status"] == "BLOCKED"
     assert outs[0][1]["requirements"]["failed_chunks"] == outs[1][1]["requirements"]["failed_chunks"]
     for out, _ in outs:
         recovered = run_build_graph(out, FakeLLM({"spec_requirements": extraction_handler,
-                                                  "requirement_dependencies": dependency_handler}))
+                                                  "requirement_dependencies": dependency_handler}), mode="graph")
         assert recovered["llm"]["status"] == "PASS"
     assert _normalized_graph(outs[0][0]) == _normalized_graph(outs[1][0])
 
@@ -70,7 +70,7 @@ def test_parallel_config_errors_still_abort(spec_repo, tmp_path):
     out = tmp_path / "run"
     llm = FakeLLM({"spec_requirements": denied, "requirement_dependencies": dependency_handler})
     run_ingest(spec_repo, out)
-    result = run_build_graph(out, llm, ExtractConfig(max_workers=MAX_WORKERS_CAP))
+    result = run_build_graph(out, llm, ExtractConfig(max_workers=MAX_WORKERS_CAP), mode="graph")
     assert result["llm"]["status"] == "BLOCKED"
 
 
@@ -117,7 +117,7 @@ def test_fake_llm_ids_stay_unique_under_threads():
 
 
 def test_concurrent_spans_keep_parents_and_valid_jsonl(tmp_path):
-    from dv_agent.trace import Tracer, read_trace
+    from dv_agent.core.trace import Tracer, read_trace
     sink = tmp_path / "t.jsonl"
     with Tracer(sink, "run") as tracer:
         with tracer.span("stage") as stage:

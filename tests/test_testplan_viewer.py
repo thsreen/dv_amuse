@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import pytest
 
 from dv_agent.cli import main
-from dv_agent.html_report import _CONTROLS_SCRIPT, render_html
-from dv_agent.testplan_viewer import create_report_server
+from dv_agent.report.html_report import _CONTROLS_SCRIPT, render_html
+from dv_agent.report.testplan_viewer import create_report_server
 
 
 @pytest.fixture
@@ -20,13 +20,13 @@ def viewer(tmp_path, monkeypatch):
     (out / "testplan_doc.json").write_text('{"preserved": true}')
     def fail(*args, **kwargs):
         raise AssertionError("the viewer must not call a model")
-    monkeypatch.setattr("dv_agent.llm.MetaClient.structured", fail)
+    monkeypatch.setattr("dv_agent.core.llm.MetaClient.structured", fail)
     # Exercise real HTTP parsing/handling without opening sockets: some coding
     # environments prohibit even loopback sockets, and unit tests stay offline.
     def server(address, handler):
         assert address[0] == "127.0.0.1"
         return SimpleNamespace(server_port=8765, RequestHandlerClass=handler)
-    monkeypatch.setattr("dv_agent.testplan_viewer.HTTPServer", server)
+    monkeypatch.setattr("dv_agent.report.testplan_viewer.HTTPServer", server)
     server = create_report_server(out, port=0)
     return out, server
 
@@ -113,7 +113,7 @@ def test_selector_lists_sibling_and_new_plans_and_renders_only_selected(viewer):
 
 
 def test_runs_root_opens_first_plan_and_nested_plans(tmp_path, monkeypatch):
-    from dv_agent import testplan_viewer
+    from dv_agent.report import testplan_viewer
     root = tmp_path / "runs"
     nested = root / "design" / "feature"
     nested.mkdir(parents=True)
@@ -145,7 +145,7 @@ def test_viewer_rejects_report_symlinks_outside_the_selected_run(tmp_path):
 
 
 def test_cli_serve_prints_the_viewer_url_without_model_calls(tmp_path, monkeypatch, capsys):
-    from dv_agent import testplan_viewer
+    from dv_agent.report import testplan_viewer
     class Server:
         server_port = 9876
         def __enter__(self):
@@ -160,7 +160,8 @@ def test_cli_serve_prints_the_viewer_url_without_model_calls(tmp_path, monkeypat
 
 
 def test_cli_serve_defaults_to_repository_runs_directory(monkeypatch, capsys):
-    from dv_agent import cli, testplan_viewer
+    from dv_agent import cli
+    from dv_agent.report import testplan_viewer
     chosen = []
     class Server:
         server_port = 8765

@@ -5,10 +5,10 @@ import pytest
 
 from conftest import dependency_handler, extraction_handler
 from dv_agent.cli import main
-from dv_agent.llm import FakeLLM, usage_from_chat, usage_from_responses
+from dv_agent.core.llm import FakeLLM, usage_from_chat, usage_from_responses
 from dv_agent.pipeline import run_build_graph, run_ingest, run_testplan_doc
-from dv_agent.trace import Tracer
-from dv_agent.usage import estimate_usage, summarize
+from dv_agent.core.trace import Tracer
+from dv_agent.core.usage import estimate_usage, summarize
 
 
 def test_usage_includes_reasoning_and_cached_tokens():
@@ -64,9 +64,9 @@ def _llm(out):
 def test_command_output_reports_tokens(spec_repo, tmp_path, capsys):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    u = run_build_graph(out, _llm(out))["usage"]
+    u = run_build_graph(out, _llm(out), mode="graph")["usage"]
     assert u["api_calls"] > 0 and u["estimated_calls"] == u["calls"] and u["consumed"]["input"] > 0
-    again = run_build_graph(out, _llm(out), force=True)["usage"]
+    again = run_build_graph(out, _llm(out), force=True, mode="graph")["usage"]
     assert again["local_cache_hits"] == u["calls"] and again["consumed"]["total"] == 0
     assert again["from_scratch"]["total"] == u["consumed"]["total"]
     assert main(["usage", "--out", str(out), "--last", "1"]) == 0
@@ -78,8 +78,8 @@ def test_final_test_plan_carries_token_usage(spec_repo, tmp_path):
     from test_testplan_doc import _llm as full_llm
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, full_llm())
-    summary = run_testplan_doc(out, full_llm())
+    run_build_graph(out, full_llm(), mode="graph")
+    summary = run_testplan_doc(out, full_llm(), mode="graph")
     doc = json.loads((out / "testplan_doc.json").read_text())
     assert set(doc["token_usage"]) == {"Test-plan run", "Graph build"}
     plan_calls = doc["token_usage"]["Test-plan run"]["by_call"]
@@ -105,8 +105,8 @@ def test_repair_calls_are_counted(spec_repo, tmp_path):
     from test_testplan_doc import _llm as full_llm
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, full_llm())
-    summary = run_testplan_doc(out, full_llm())
+    run_build_graph(out, full_llm(), mode="graph")
+    summary = run_testplan_doc(out, full_llm(), mode="graph")
     plan = summary["token_usage"]["Test-plan run"]
     assert 0 < plan["repair_calls"] < plan["calls"]  # the flawed fake strategy is refused and repaired
     strategy = json.loads((out / "testplan_doc.json").read_text())["token_usage"]["Test-plan run"]["by_call"]["testplan_strategy"]

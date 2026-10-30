@@ -9,6 +9,7 @@ class {{AGENT}}_monitor extends uvm_component;
       logic current;
       bit parity;
       bit aborted;
+      logic [63:0] sampled_data;
       cg_item tr;
       prior=1;
       do begin
@@ -23,12 +24,12 @@ class {{AGENT}}_monitor extends uvm_component;
       if((transmit ? cfg.vif.tx : cfg.vif.rx) !== 1'b0) continue;
       tr=cg_item::type_id::create("frame"); tr.origin="{{AGENT}}"; tr.kind=transmit ? 4 : 3;
       tr.data_bits=cfg.data_bits; tr.parity_mode=cfg.parity_mode; tr.stop_bits=cfg.stop_bits;
-      tr.data=0; parity=0; aborted=0;
+      sampled_data=0; parity=0; aborted=0;
       for(int i=0;i<cfg.data_bits;i++) begin
         repeat(cfg.bit_cycles) @(posedge cfg.vif.clk);
         if(cfg.vif.reset == cfg.reset_active) aborted=1;
         if($isunknown(transmit ? cfg.vif.tx : cfg.vif.rx)) `uvm_error("MON_X", "unknown serial data bit")
-        tr.data[i]=transmit ? cfg.vif.tx : cfg.vif.rx; parity ^= tr.data[i];
+        sampled_data[i]=transmit ? cfg.vif.tx : cfg.vif.rx; parity ^= sampled_data[i];
       end
       if(cfg.parity_mode != 0) begin
         repeat(cfg.bit_cycles) @(posedge cfg.vif.clk);
@@ -41,6 +42,7 @@ class {{AGENT}}_monitor extends uvm_component;
         if((transmit ? cfg.vif.tx : cfg.vif.rx) !== 1'b1) tr.error=1;
         if(cfg.vif.reset == cfg.reset_active) aborted=1;
       end
+      tr.data=sampled_data;
       if(!aborted) ap.write(tr);
     end
   endtask

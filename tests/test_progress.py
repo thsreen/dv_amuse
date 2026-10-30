@@ -7,14 +7,14 @@ import httpx
 import openai
 import pytest
 
-from dv_agent import progress
+from dv_agent.core import progress
 from dv_agent.cli import main
-from dv_agent.extract import ExtractConfig, extract_requirements
-from dv_agent.graph import build_structure
-from dv_agent.ingest import load_chunks, load_manifest
-from dv_agent.llm import FakeLLM, LLMError, MetaClient
+from dv_agent.ingest.extract import ExtractConfig, extract_requirements
+from dv_agent.graph.graph import build_structure
+from dv_agent.ingest.ingest import load_chunks, load_manifest
+from dv_agent.core.llm import FakeLLM, LLMError, MetaClient
 from dv_agent.pipeline import run_build_graph, run_ingest
-from dv_agent.trace import Tracer
+from dv_agent.core.trace import Tracer
 
 
 @pytest.fixture(autouse=True)
@@ -58,7 +58,7 @@ def test_build_graph_reports_both_llm_stages(spec_repo, tmp_path, fake_llm):
     run_ingest(spec_repo, out)
     seen = []
     progress.set_sink(seen.append)
-    run_build_graph(out, fake_llm)
+    run_build_graph(out, fake_llm, mode="graph")
     text = "\n".join(seen)
     assert "extracting requirements from" in text
     assert "extracting dependencies for" in text
@@ -71,7 +71,7 @@ def test_pipeline_progress_goes_to_stderr_and_stdout_stays_json(spec_repo, tmp_p
     captured = capsys.readouterr()
     assert json.loads(captured.out)["build"]["llm"]["status"] == "NOT_RUN"
     assert "dv-agent: [1/2] ingest:" in captured.err
-    assert "dv-agent: [2/2] build-graph (--llm off, --mode full)" in captured.err
+    assert "dv-agent: [2/2] build-graph (--llm off, --mode basic)" in captured.err
     assert "dv-agent: pipeline done" in captured.err
 
 
@@ -169,5 +169,5 @@ def test_build_graph_emits_config_line(spec_repo, tmp_path, fake_llm):
     run_ingest(spec_repo, out)
     seen = []
     progress.set_sink(seen.append)
-    run_build_graph(out, fake_llm, ExtractConfig(max_workers=4))
+    run_build_graph(out, fake_llm, ExtractConfig(max_workers=4), mode="graph")
     assert "build config: model fake-llm, workers 4" in seen

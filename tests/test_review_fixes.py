@@ -5,14 +5,14 @@ import pytest
 
 from conftest import PAGES, dependency_handler, extraction_handler, plan_handler, rerank_handler
 from dv_agent.cli import main
-from dv_agent.dense import HashEmbedder, MetaEmbedder
-from dv_agent.evaluate import Case, evaluate
-from dv_agent.graph import load_graph
-from dv_agent.ingest import discover
-from dv_agent.llm import FakeLLM, LLMError
+from dv_agent.retrieval.dense import HashEmbedder, MetaEmbedder
+from dv_agent.retrieval.evaluate import Case, evaluate
+from dv_agent.graph.graph import load_graph
+from dv_agent.ingest.ingest import discover
+from dv_agent.core.llm import FakeLLM, LLMError
 from dv_agent.pipeline import GRAPH_FILE, clear_run, run_build_graph, run_ingest, run_query, run_test_plan
-from dv_agent.planning import PlanConfig
-from dv_agent.retrieval import RetrievalConfig, retrieve
+from dv_agent.plan.planning import PlanConfig
+from dv_agent.retrieval.retrieval import RetrievalConfig, retrieve
 
 
 def _llm(**overrides):
@@ -25,7 +25,7 @@ def _llm(**overrides):
 def _built(spec_repo, tmp_path, llm=None):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, llm or _llm())
+    run_build_graph(out, llm or _llm(), mode="graph")
     return out
 
 
@@ -39,7 +39,7 @@ def test_two_disconnected_documents_do_not_crash_retrieval(spec_repo, tmp_path):
     other.write_text("1 Overview\nThe GPIO block drives sixteen pins.\n\n2 Pins\nEach pin has a direction bit.\n")
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, None)
+    run_build_graph(out, None, mode="graph")
     G = load_graph(out / GRAPH_FILE)
     result = retrieve(G, "direction bit for each GPIO pin", RetrievalConfig(top_k=20))
     assert result["evidence"] and result["evidence"][0]["doc_path"].endswith("gpio_spec.txt")
@@ -59,24 +59,24 @@ def test_build_with_failed_chunks_is_not_reused(spec_repo, tmp_path):
         return extraction_handler(payload)
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    first = run_build_graph(out, _llm(spec_requirements=flaky))
+    first = run_build_graph(out, _llm(spec_requirements=flaky), mode="graph")
     assert first["requirements"]["failed_chunks"]
-    assert run_build_graph(out, _llm())["reused"] is False
+    assert run_build_graph(out, _llm(), mode="graph")["reused"] is False
 
 
 def test_model_change_invalidates_build(spec_repo, tmp_path):
     out = _built(spec_repo, tmp_path)
     other = _llm()
     other.model = "other-model"
-    assert run_build_graph(out, other)["reused"] is False
+    assert run_build_graph(out, other, mode="graph")["reused"] is False
 
 
 def test_embedder_change_invalidates_build_and_removes_stale_index(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm(), embedder=HashEmbedder(dim=128))
-    assert run_build_graph(out, _llm(), embedder=HashEmbedder(dim=64))["reused"] is False
-    run_build_graph(out, _llm(), force=True)
+    run_build_graph(out, _llm(), embedder=HashEmbedder(dim=128), mode="graph")
+    assert run_build_graph(out, _llm(), embedder=HashEmbedder(dim=64), mode="graph")["reused"] is False
+    run_build_graph(out, _llm(), force=True, mode="graph")
     assert not (out / "dense").exists()
 
 
@@ -144,12 +144,12 @@ def test_corrupt_cache_entry_is_refetched(spec_repo, tmp_path):
     run_ingest(spec_repo, out)
     llm = _llm()
     llm.cache_dir = out / "llm_cache"
-    run_build_graph(out, llm)
+    run_build_graph(out, llm, mode="graph")
     entry = next((out / "llm_cache").glob("*.json"))
     entry.write_text("{truncated")
     again = _llm()
     again.cache_dir = out / "llm_cache"
-    run_build_graph(out, again, force=True)
+    run_build_graph(out, again, force=True, mode="graph")
     assert again.calls and json.loads(entry.read_text())["data"]
 
 
@@ -180,5 +180,5 @@ def test_duplicate_quote_in_one_chunk_counted_once(spec_repo, tmp_path):
         return data
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    stats = run_build_graph(out, _llm(spec_requirements=dup))
+    stats = run_build_graph(out, _llm(spec_requirements=dup), mode="graph")
     assert stats["requirements"]["requirements"] == 4

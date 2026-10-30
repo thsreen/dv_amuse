@@ -5,7 +5,7 @@ import re
 import pytest
 
 from dv_agent.cli import main
-from dv_agent.llm import LLMResult
+from dv_agent.core.llm import LLMResult
 from dv_agent.uvm import build_uvm, load_agent_template, write_uvm
 
 

@@ -1,7 +1,9 @@
 from html.parser import HTMLParser
 
-from dv_agent.html_report import render_html
-from dv_agent.provenance_badge import badge
+import pytest
+
+from dv_agent.report.html_report import render_html
+from dv_agent.report.provenance_badge import badge
 
 
 class ReportText(HTMLParser):
@@ -109,7 +111,7 @@ def test_evidence_badges_link_to_reference_and_explain_inference():
 
 
 def test_source_tooltip_has_single_line_excerpt_and_reference_link():
-    from dv_agent.provenance_badge import source_summaries
+    from dv_agent.report.provenance_badge import source_summaries
     md = "- " + badge("DOCUMENTED", ["CH-signal"])
     md = source_summaries(md, {"CH-signal": {"excerpt": "RESET is active low.\n<script>bad</script>"}})
     report = render_html(md)
@@ -134,7 +136,7 @@ def test_register_details_are_inserted_as_hidden_subtable_rows():
 
 
 def test_rtl_observations_are_collapsed_under_the_section_heading():
-    from dv_agent.rtl_observations import render
+    from dv_agent.plan.rtl_observations import render
     result = dict(status="PASS", entries=[dict(id="OBS-1", kind="reset", text="Review reset handling.",
                   cited_rtl_excerpt_ids=["SRC-1"], inference_reason="RTL reset path needs review.",
                   suggested_verification="Exercise reset during traffic.", spec_relationship="Unconfirmed gap.",
@@ -150,7 +152,7 @@ def test_rtl_observations_are_collapsed_under_the_section_heading():
 
 
 def test_blocked_rtl_section_still_has_an_expandable_header():
-    from dv_agent.rtl_observations import render
+    from dv_agent.plan.rtl_observations import render
     report = render_html('\n'.join(render(dict(status="BLOCKED", error="No graph available."), "RTL Observations")))
     assert '<details class="rtl-observations">' in report
     assert '<strong>BLOCKED</strong>: No graph available.' in report
@@ -160,7 +162,7 @@ def test_register_accordion_clicks_and_exclusive_expansion():
     import shutil
     import subprocess
     import pytest
-    from dv_agent.html_report import _REGISTER_SCRIPT
+    from dv_agent.report.html_report import _REGISTER_SCRIPT
     node = shutil.which('node')
     if not node:
         pytest.skip('Node unavailable')
@@ -229,3 +231,77 @@ def test_long_rtl_source_lists_are_collapsed():
 def test_tooltips_use_a_viewport_popup_script():
     report = render_html("text")
     assert 'id="testplan-tooltips"' in report and "evidence-popup" in report and "beforeprint" in report
+
+
+def test_inference_notes_are_collapsible_in_bullets_and_cells():
+    md = ("- Claim ⚠️\n  - Inference: derived from the cited register list.\n\n"
+          "| # | Description | Details |\n| --- | --- | --- |\n"
+          "| 1 | Check x<br/>Where: monitor<br/>Inference: reason here | Sampling: CLK<br/>Inference: other |\n")
+    report = render_html(md)
+    assert report.count('<details class="inference">') == 3
+    assert "<summary><span aria-hidden=\"true\">⚠️</span> Inference</summary>" in report
+    assert report.index("Where:") < report.index("reason here")  # folded notes follow the visible ones
+
+
+def test_review_and_rtl_approval_terms_are_highlighted():
+    md = ("- NEEDS_REVIEW: RTL design engineer approval required.\n- Pending RTL designer review of the pulse.\n"
+          "- Owner RTL_DESIGN_ENGINEER decides.\n")
+    report = render_html(md)
+    assert report.count('<mark class="review">') == 4
+    assert '<mark class="review">NEEDS_REVIEW</mark>' in report
+    assert '<mark class="review">RTL design engineer approval required</mark>' in report
+
+
+def test_description_cell_leads_with_statement_and_coverage_status_is_a_pill():
+    md = ("| # | Description | Covergroup | Covered |\n| --- | --- | --- | --- |\n"
+          "| 1 | Cover x: y is covered.<br/>Sampled on ACK | cg_x | NOT_COVERED |\n")
+    report = render_html(md)
+    assert '<div class="desc">Cover x: y is covered.</div>' in report
+    assert 'status-not_covered' in report and "Not covered" in report
+    assert '<span class="k">Cover x:' not in report
+
+
+def test_indicator_tooltip_names_its_sources():
+    from dv_agent.report.provenance_badge import source_summaries
+    marked = source_summaries(badge("DOCUMENTED", ["CH-1"]) + " x", {"CH-1": {"path": "spec.pdf", "page": 6, "excerpt": "WB_CYC_I bus cycle"}})
+    report = render_html("- text " + marked + "\n")
+    assert "Sources: spec.pdf, p.6" in report and "Source excerpt: WB_CYC_I bus cycle" in report
+
+
+def test_citation_anchor_keeps_attributes_separated():
+    report = render_html("- x " + badge("DOCUMENTED", ["CH-1"]) + "\n\n## Reference evidence\n\n### Reference CH-1\n\nSource: s\n")
+    assert 'id="cite-1" tabindex="0"' in report
+
+
+def test_sources_tip_renders_excerpt_tooltip():
+    from dv_agent.report.provenance_badge import cite_marker, source_tip_summaries
+    md = "- entry text" + cite_marker(["CH-1", "REQ-9"]) + "\n"
+    assert "— sources:" not in md
+    enriched = source_tip_summaries(md, {"CH-1": {"path": "spec.pdf", "page": 6,
+                                                 "summary": "WB_CYC_I bus cycle"}})
+    assert enriched != md  # excerpts embedded
+    assert source_tip_summaries(enriched, {}) == enriched  # idempotent
+    report = render_html(enriched)
+    assert 'aria-label="Sources: CH-1, REQ-9"' in report
+    assert "WB_CYC_I bus cycle" in report
+    assert 'href="#reference-CH-1"' in report and 'href="#reference-REQ-9"' in report
+
+
+def test_sources_tip_without_index_links_ids_only():
+    from dv_agent.report.provenance_badge import cite_marker
+    report = render_html("- entry text" + cite_marker(["CH-2"]) + "\n")
+    assert 'aria-label="Sources: CH-2"' in report
+    assert 'href="#reference-CH-2"' in report
+
+
+def test_sources_tip_garbage_degrades_to_icon():
+    report = render_html("- entry text 📄<!--dv-sources:!!!not-valid!!! -->\n")
+    assert "📄" in report and '<span class="evidence-tooltip"' not in report
+
+
+def test_cite_marker_rejects_empty_and_bad_ids():
+    from dv_agent.report.provenance_badge import cite_marker, decode_sources
+    assert cite_marker([]) == ""
+    assert cite_marker(["CH-1", "bogus id!", "CH-1"]) == " 📄<!--dv-sources:CH-1-->"
+    with pytest.raises(ValueError):
+        decode_sources("bogus id!")

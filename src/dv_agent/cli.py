@@ -6,17 +6,17 @@ import os
 import sys
 from pathlib import Path
 
-from .dense import MetaEmbedder
-from .graph import lineage, load_graph
-from .llm import MetaClient
-from .fsutil import atomic_write_text
+from .retrieval.dense import MetaEmbedder
+from .graph.graph import lineage, load_graph
+from .core.llm import MetaClient
+from .core.fsutil import atomic_write_text
 from .pipeline import (GRAPH_FILE, clear_llm_cache, clear_run, run_build_graph, run_context, run_deps, run_features,
                        run_ingest, run_interfaces, run_query, run_registers, run_strategy, run_test_plan, run_usage,
                        run_testplan_doc, render_testplan)
-from .planning import PlanConfig
-from .progress import emit, set_global_sink, stderr_sink
-from .usage import run_totals
-from .retrieval import RetrievalConfig
+from .plan.planning import PlanConfig
+from .core.progress import emit, set_global_sink, stderr_sink
+from .core.usage import run_totals
+from .retrieval.retrieval import RetrievalConfig
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 
@@ -54,9 +54,9 @@ def _llm_mode(arg: str | None) -> str:
 
 
 def _mode(arg: str | None) -> str:
-    mode = (arg or os.getenv("DV_AGENT_MODE", "") or "full").strip().lower()
-    if mode not in ("full", "fast", "basic"):
-        raise UsageError(f"mode must be one of ('full', 'fast', 'basic'), got {mode!r}")
+    mode = (arg or os.getenv("DV_AGENT_MODE", "") or "basic").strip().lower()
+    if mode not in ("basic", "graph"):
+        raise UsageError(f"mode must be one of ('basic', 'graph'), got {mode!r}")
     return mode
 
 
@@ -78,7 +78,7 @@ def _extract_config(workers: int | None):
     """ExtractConfig from --workers (None keeps the DV_AGENT_MAX_WORKERS default)."""
     if workers is None:
         return None
-    from .extract import MAX_WORKERS_CAP, ExtractConfig
+    from .ingest.extract import MAX_WORKERS_CAP, ExtractConfig
     if workers < 1:
         raise UsageError(f"--workers must be at least 1, got {workers}")
     return ExtractConfig(max_workers=min(workers, MAX_WORKERS_CAP))
@@ -130,8 +130,8 @@ def _main(argv: list[str] | None) -> int:
     pb.add_argument("--fresh", action="store_true", help="delete the LLM cache and rebuild from scratch")
     pb.add_argument("--workers", type=int, default=None, metavar="N",
                     help="parallel extraction calls, 1-4 (default 1; env DV_AGENT_MAX_WORKERS)")
-    pb.add_argument("--mode", choices=("full", "fast", "basic"),
-                    help="full (default) or fast (slim index, lazy cited requirements); env DV_AGENT_MODE")
+    pb.add_argument("--mode", choices=("basic", "graph"),
+                    help="basic (default; lexical RAG, slim index) or graph (model-built knowledge graph); env DV_AGENT_MODE")
 
     pp = sub.add_parser("plan", help="build verification test-plan items for requirements")
     pp.add_argument("requirement_ids", nargs="+")
@@ -148,19 +148,21 @@ def _main(argv: list[str] | None) -> int:
         sp.add_argument("--scope", default="", help="block or feature to focus retrieval on (default: whole spec)")
         sp.add_argument("--force", action="store_true", help=f"regenerate even if {name}.json is current")
         sp.add_argument("--fresh", action="store_true", help="delete the LLM cache and regenerate")
-        sp.add_argument("--mode", choices=("full", "fast", "basic"),
-                        help="full (default) or fast (slim index retrieval); env DV_AGENT_MODE")
+        sp.add_argument("--mode", choices=("basic", "graph"),
+                        help="basic (default; lexical RAG, slim index) or graph (model-built knowledge graph); env DV_AGENT_MODE")
 
     pt = sub.add_parser("testplan", help="generate the template-driven test-plan document (JSON + Markdown + HTML)")
     pt.add_argument("--out", type=Path, required=True)
     pt.add_argument("--scope", default="", help="feature or block the plan covers (default: whole specification)")
     pt.add_argument("--template", type=Path, help="template JSON (default: built-in quick_reference_v0)")
+    pt.add_argument("--methodology-rules", type=Path,
+                    help="methodology rules JSON extending the shipped defaults")
     pt.add_argument("--force", action="store_true", help="regenerate even if the document is current")
     pt.add_argument("--fresh", action="store_true", help="delete the LLM cache and regenerate")
     pt.add_argument("--rtl-graph", type=Path, help="opt in to review-required implementation observations from this graph")
     pt.add_argument("--rtl-scope", default="", help="instance scope within --rtl-graph")
-    pt.add_argument("--mode", choices=("full", "fast", "basic"),
-                    help="full (default) or fast (slim index, lazy cited requirements); env DV_AGENT_MODE")
+    pt.add_argument("--mode", choices=("basic", "graph"),
+                    help="basic (default; lexical RAG, slim index) or graph (model-built knowledge graph); env DV_AGENT_MODE")
 
     pr = sub.add_parser("render-testplan", help="refresh HTML from editable testplan Markdown without model calls")
     pr.add_argument("--out", type=Path, help="run or runs directory (default with --serve: runs/)")
@@ -175,6 +177,8 @@ def _main(argv: list[str] | None) -> int:
     pa.add_argument("--testplan", action="store_true", help="also generate the template-driven test-plan document")
     pa.add_argument("--scope", default="", help="test-plan scope (with --testplan)")
     pa.add_argument("--template", type=Path, help="test-plan template JSON (with --testplan)")
+    pa.add_argument("--methodology-rules", type=Path,
+                    help="methodology rules JSON extending the shipped defaults (with --testplan)")
     pa.add_argument("--rtl-graph", type=Path, help="RTL observations graph (requires --testplan)")
     pa.add_argument("--rtl-scope", default="", help="instance scope within --rtl-graph")
     pa.add_argument("--force", action="store_true", help="rerun every stage regardless of existing outputs")
@@ -183,8 +187,16 @@ def _main(argv: list[str] | None) -> int:
     pa.add_argument("--llm", choices=LLM_MODES, help="auto (default), on, or off; env DV_AGENT_LLM_MODE")
     pa.add_argument("--workers", type=int, default=None, metavar="N",
                     help="parallel extraction calls, 1-4 (default 1; env DV_AGENT_MAX_WORKERS)")
-    pa.add_argument("--mode", choices=("full", "fast", "basic"),
-                    help="full (default) or fast (slim index, lazy cited requirements); env DV_AGENT_MODE")
+    pa.add_argument("--mode", choices=("basic", "graph"),
+                    help="basic (default; lexical RAG, slim index) or graph (model-built knowledge graph); env DV_AGENT_MODE")
+
+    pv = sub.add_parser("evaluate", help="recall@k and MRR of retrieval on a labelled question set (no LLM)")
+    pv.add_argument("--out", type=Path, required=True, help="run directory with a built graph")
+    pv.add_argument("--cases", type=Path, default=Path("eval/uart_cases.json"))
+    pv.add_argument("--k", type=int, nargs="+", default=[1, 3, 5], help="cut-offs to report")
+    pv.add_argument("--ablate", action="store_true",
+                    help="also report lexical only (no graph propagation) beside the full configuration")
+    pv.add_argument("--table", action="store_true", help="print a Markdown table instead of JSON")
 
     pq = sub.add_parser("query", help="retrieve ranked evidence with graph paths")
     pq.add_argument("text")
@@ -232,6 +244,15 @@ def _main(argv: list[str] | None) -> int:
     pcode.add_argument("--llm", choices=LLM_MODES, default="auto")
     pcode.add_argument("--no-compile", action="store_true", help="record compilation as NOT_RUN")
 
+    prun = sub.add_parser('run-code', help='compile and simulate saved functional verification code; no model calls')
+    prun.add_argument('--out',type=Path,required=True,help='run directory containing code_manifest.json')
+    prun.add_argument('--regress',action='store_true',help='run all built tests instead of the first test')
+    prun.add_argument('--timeout',type=int,default=180,help='wall-clock deadline per compilation/test, seconds (default 180)')
+
+    pwork = sub.add_parser('plan-code',help='write feature dependencies and pseudocode from a saved testplan; no SV generation')
+    pwork.add_argument('--out',type=Path,required=True,help='saved run containing dv/testplan_doc.json and rtl/interface_definition.json')
+    pwork.add_argument('--llm',choices=LLM_MODES,default='auto')
+
     puvm = sub.add_parser("build-uvm", help="build an extendable UVM scaffold from interface JSON")
     puvm.add_argument("interface", type=Path, help="interface_definition.json")
     puvm.add_argument("--out", type=Path, required=True, help="separate coding-flow output directory")
@@ -248,6 +269,33 @@ def _main(argv: list[str] | None) -> int:
     puvm.add_argument("--force", action="store_true", help="replace generated files in the output directory")
 
     args = p.parse_args(argv)
+    if args.cmd=='plan-code':
+        from .codegen.build import load_sources,project_lock
+        from .codegen.workplan import design as plan_work
+        from .core.llm import LLMError
+        llm,_=_models_for(args.llm)
+        if llm is None: raise UsageError('plan-code requires an enabled model')
+        set_global_sink(stderr_sink)
+        try:
+            plan=json.loads((args.out/'dv/testplan_doc.json').read_text())
+            definition=json.loads((args.out/'rtl/interface_definition.json').read_text())
+            with project_lock(args.out):
+                result=plan_work(llm,plan,definition,load_sources(plan,args.out/'dv/graph.json'),args.out,pseudocode_only=True)
+        except LLMError as exc:
+            raise UsageError('Code planning model call failed: '+exc.kind+'; rerun to reuse completed responses') from None
+        except OSError as exc:
+            raise UsageError(f'Code planning input unavailable: {exc}') from None
+        _print(result)
+        return 0
+    if args.cmd == 'run-code':
+        from .codegen.simulator import run_saved_project
+        if args.timeout<=0: raise UsageError('--timeout must be positive')
+        try:
+            result=run_saved_project(args.out,regress=args.regress,timeout=args.timeout)
+        except OSError as exc:
+            raise UsageError(f'Simulation input/tool unavailable: {exc}') from None
+        _print(result)
+        return 0 if result['status']=='PASS' else 1
     if args.cmd == "build-code":
         from .codegen import build_project
         set_global_sink(stderr_sink)
@@ -339,7 +387,7 @@ def _main(argv: list[str] | None) -> int:
         _print(result | {"cache_cleared": removed})
     elif args.cmd == "render-testplan":
         if args.serve:
-            from .testplan_viewer import create_report_server
+            from .report.testplan_viewer import create_report_server
             viewer_out = args.out or PACKAGE_ROOT / "runs"
             with create_report_server(viewer_out, args.port) as server:
                 _print({"url": f"http://127.0.0.1:{server.server_port}/", "out": str(viewer_out.resolve()),
@@ -364,7 +412,8 @@ def _main(argv: list[str] | None) -> int:
         result = run_testplan_doc(args.out, llm, scope=args.scope, template_path=args.template,
                                   embedder=_embedder(), force=args.force or args.fresh,
                                   rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope,
-                                  mode=_mode(args.mode))
+                                  mode=_mode(args.mode),
+                                  methodology_rules_path=args.methodology_rules)
         if result.get("reused"):
             emit("testplan done: reused cached document")
         else:
@@ -404,12 +453,28 @@ def _main(argv: list[str] | None) -> int:
             result["testplan"] = run_testplan_doc(out, llm, scope=args.scope, template_path=args.template,
                                                   embedder=embedder, force=force,
                                                   rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope,
-                                                  mode=_mode(args.mode))
+                                                  mode=_mode(args.mode),
+                                                  methodology_rules_path=args.methodology_rules)
         emit("pipeline done")
         ran = [r["trace_id"] for r in (result.get(k) for k in ("ingest", "build", "plan", "testplan"))
                if r and not r.get("reused") and r.get("trace_id")]
         result["usage"] = run_totals(out / "trace.jsonl", ran) if ran else None
         _print(result)
+    elif args.cmd == "evaluate":
+        from dataclasses import replace
+
+        from .retrieval.evaluate import compare, format_table, load_cases
+        _require(args.out, GRAPH_FILE)
+        if not args.cases.is_file():
+            raise UsageError(f"labelled cases not found: {args.cases}")
+        if any(k < 1 for k in args.k):
+            raise UsageError("--k values must be positive")
+        base = RetrievalConfig()
+        variants = {"graph retrieval (BM25 + PageRank)": base}
+        if args.ablate:
+            variants = {"lexical only (BM25)": replace(base, ppr_weight=0.0), **variants}
+        result = compare(load_graph(args.out / GRAPH_FILE), load_cases(args.cases), sorted(set(args.k)), variants)
+        print(format_table(result)) if args.table else _print(result)
     elif args.cmd == "query":
         _require(args.out, GRAPH_FILE)
         result = run_query(args.out, args.text, RetrievalConfig(top_k=args.top_k), embedder=_embedder())

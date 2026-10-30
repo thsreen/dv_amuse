@@ -37,10 +37,10 @@ The diagram shows the default specification path. The opt-in [RTL observations e
 | Principle | Where it is enforced |
 |---|---|
 | Specification-authoritative intended behavior; optional RTL implementation observations | Default ingestion still skips design sources. An explicit prebuilt RTL graph enables the dedicated review-required observations stage before strategy; see RTL_OBSERVATIONS.md |
-| Fixed step order chosen by the user; the model never picks the next step | `pipeline.py`, `testplan_doc.build_testplan_doc` |
+| Fixed step order chosen by the user; the model never picks the next step | `pipeline.py`, `plan.testplan_doc.build_testplan_doc` |
 | The model does the semantic work; code verifies it | Every model call goes through a schema and a check (below) |
-| Checks outside the model refuse its output and the model repairs it | `repair.structured_with_repair` |
-| Specification conflicts are reported, never resolved silently | `registers._merge`, designer questions |
+| Checks outside the model refuse its output and the model repairs it | `quality.repair.structured_with_repair` |
+| Specification conflicts are reported, never resolved silently | `plan.registers._merge`, designer questions |
 | Every statement traces to an exact specification location | Chunk offsets, verbatim quotes, citation filters, graph lineage |
 | Human review is authoritative | Everything is `NEEDS_REVIEW`; designer questions; sign-off command planned |
 
@@ -48,13 +48,13 @@ The diagram shows the default specification path. The opt-in [RTL observations e
 
 | # | Stage | Modules | Model calls | Checks | Outputs |
 |---|---|---|---|---|---|
-| 1 | Ingest | `ingest.py` | none | discovery rules (format preference, skipped folders, changelogs); every skip has a reason | `manifest.json`, `text/`, `chunks.jsonl` |
-| 2 | Graph build | `graph.py`, `extract.py`, `community.py`, `dense.py` | `spec_requirements` per chunk; `requirement_dependencies` per entity group; optional embeddings; fetches may run on 1-4 workers | quotes located verbatim (whitespace and typography tolerant); dependency evidence quote must be in an endpoint's quote; entity references resolved by owner | `graph.json`, `build_stats.json`, `dense/` |
-| 3 | Retrieval and fetch | `retrieval.py`, `graph_fetch.py`, `combined_fetch.py`, `testplan_context.py`, `planning.py` | `rerank_chunks`, `test_plan_items` (per-requirement `plan` command) | evidence is always an L1 chunk; every item records its sources and path; citations limited to retrieved IDs | `query`, `context`, `deps`, `features` output; `test_plan.json` |
-| 4a | Interfaces | `interfaces.py` | `testplan_interfaces` | names and defining quotes in the cited chunk; direction, width and active level marked when not stated; one group per signal; groups sharing functionality and module type flagged | `interfaces.json/.md` |
-| 4b | Register map | `registers.py` | `testplan_registers` per batch of chunks | names, quotes, addresses, widths, access, reset values and encodings must be written in the chunk; records merged across chunks; conflicts and overlaps reported; writable fields from access codes | `registers.json/.md` |
-| 4c | Verification strategy | `strategy.py` | `testplan_strategy` | every interface group covered once; agents drive only DUT inputs of their groups; passive agents never drive; registers, scoreboard inputs and sequence agents must exist | `strategy.json/.md` |
-| 5 | Test plan | `testplan_doc.py`, `templates/*.json` | `testplan_entries` per text section; `testplan_configurations` | citations within the supplied evidence; DOCUMENTED/INFERRED need citations; every writable field configured; legal values stated in the specification | `testplan_doc.json/.md/.html` |
+| 1 | Ingest | `ingest.ingest` | none | discovery rules (format preference, skipped folders, changelogs); every skip has a reason | `manifest.json`, `text/`, `chunks.jsonl` |
+| 2 | Graph build | `graph.graph`, `ingest.extract`, `graph.community`, `retrieval.dense` | `spec_requirements` per chunk; `requirement_dependencies` per entity group; optional embeddings; fetches may run on 1-4 workers | quotes located verbatim (whitespace and typography tolerant); dependency evidence quote must be in an endpoint's quote; entity references resolved by owner | `graph.json`, `build_stats.json`, `dense/` |
+| 3 | Retrieval and fetch | `retrieval.retrieval`, `retrieval.graph_fetch`, `retrieval.combined_fetch`, `plan.testplan_context`, `plan.planning` | `rerank_chunks`, `test_plan_items` (per-requirement `plan` command) | evidence is always an L1 chunk; every item records its sources and path; citations limited to retrieved IDs | `query`, `context`, `deps`, `features` output; `test_plan.json` |
+| 4a | Interfaces | `plan.interfaces` | `testplan_interfaces` | names and defining quotes in the cited chunk; direction, width and active level marked when not stated; one group per signal; groups sharing functionality and module type flagged | `interfaces.json/.md` |
+| 4b | Register map | `plan.registers` | `testplan_registers` per batch of chunks | names, quotes, addresses, widths, access, reset values and encodings must be written in the chunk; records merged across chunks; conflicts and overlaps reported; writable fields from access codes | `registers.json/.md` |
+| 4c | Verification strategy | `plan.strategy` | `testplan_strategy` | every interface group covered once; agents drive only DUT inputs of their groups; passive agents never drive; registers, scoreboard inputs and sequence agents must exist | `strategy.json/.md` |
+| 5 | Test plan | `plan.testplan_doc`, `templates/*.json` | `testplan_entries` per text section; `testplan_configurations` | citations within the supplied evidence; DOCUMENTED/INFERRED need citations; every writable field configured; legal values stated in the specification | `testplan_doc.json/.md/.html` |
 | 6 | Human review | (designer questions in section 11) | none | conflicts, gaps, undocumented signal properties and unresolved repairs raised as questions | sign-off command planned |
 
 Step 4c reads the saved outputs of 4a and 4b (regenerating them only when missing or stale) and records
@@ -93,7 +93,7 @@ only for a new output shape.
 
 ## Refuse and repair
 
-`repair.structured_with_repair(llm, tracer, name, instructions, payload, schema, check)`:
+`quality.repair.structured_with_repair(llm, tracer, name, instructions, payload, schema, check)`:
 
 1. The model answers in the step's JSON schema.
 2. `check(answer)` returns the problems the model can fix; an empty list accepts the answer.
@@ -110,7 +110,7 @@ specification causes (for example two chunks giving different reset values). Eac
 
 ## Model integration
 
-`llm.MetaClient`: OpenAI Python SDK against `https://api.meta.ai/v1`, model `muse-spark-1.3`, Responses
+`core.llm.MetaClient`: OpenAI Python SDK against `https://api.meta.ai/v1`, model `muse-spark-1.3`, Responses
 API with `text.format` `json_schema` (Chat Completions with `META_API_STYLE=chat`). Bounded retries for
 rate limits, timeouts and server errors; errors are classified without echoing request details.
 Responses are cached by a hash of model, call name, instructions, payload and schema, so reruns cost
@@ -130,9 +130,9 @@ specification file ─ chunk (offsets, page, SHA-256)
                   └─ section artifact (TPS-*), trace span with fact IDs
 ```
 
-`graph.attach_artifact` adds each generated section, the interface definitions and the register map as
+`graph.graph.attach_artifact` adds each generated section, the interface definitions and the register map as
 graph nodes with `DERIVED_FROM` edges; `dv-agent lineage <id>` walks back to every requirement and chunk
-behind it. `trace.py` writes one trace per run to `trace.jsonl` and mirrors it to Langfuse when keys are
+behind it. `core.trace` writes one trace per run to `trace.jsonl` and mirrors it to Langfuse when keys are
 set; a Langfuse failure disables the mirror without stopping the run.
 
 ## Around the pipeline

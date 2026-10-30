@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from dv_agent.graph import load_graph as load_spec_graph
-from dv_agent.llm import FakeLLM
+from dv_agent.graph.graph import load_graph as load_spec_graph
+from dv_agent.core.llm import FakeLLM
 from dv_agent.pipeline import run_build_graph, run_ingest
-from dv_agent.testplan_doc import enforce_source_authority, render_markdown
+from dv_agent.plan.testplan_doc import enforce_source_authority, render_markdown
 from orchestrator_agent.actions import build_code, documented_plan
 from orchestrator_agent.flow import load_flow
 from orchestrator_agent.guards import post_testplan_check
@@ -57,7 +57,7 @@ class _EnrichLLM:
         self.pick, self.calls = pick, []
 
     def structured(self, **kw):
-        from dv_agent.llm import LLMResult
+        from dv_agent.core.llm import LLMResult
         self.calls.append(kw["name"])
         ids = [e["id"] for e in kw["payload"]["evidence"]]
         claims = [dict(text="q follows d on clk.", inference_reason="sampled in clocked process", evidence_ids=ids[:1]),
@@ -88,7 +88,7 @@ def test_ingest_and_plan_preserve_inferred_authority(tmp_path):
                  if quote in payload["text"] else [])
         return dict(summary="", entities=[], requirements=items)
     run_build_graph(out, FakeLLM({"spec_requirements": requirements,
-                                  "requirement_dependencies": lambda payload: {"dependencies": []}}))
+                                  "requirement_dependencies": lambda payload: {"dependencies": []}}), mode="graph")
     graph = load_spec_graph(out / "graph.json")
     assert graph.graph["source_authority"] == "RTL_INFERRED"
     assert [n["status"] for _, n in graph.nodes(data=True) if n["type"] == "requirement"] == ["INFERRED"]

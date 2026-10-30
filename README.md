@@ -56,7 +56,7 @@ cp .env.example .env   # add MODEL_API_KEY and optional Langfuse keys
 
 ## Lineage for generated artifacts
 ```python
-from dv_agent.graph import attach_artifact
+from dv_agent.graph.graph import attach_artifact
 lin = attach_artifact(G, tracer, "SVA-0001", "assertion", parents=["REQ-..."], content=sva_text)
 ```
 Adds the artifact with `DERIVED_FROM` edges, walks back through dependencies to every fact and
@@ -68,7 +68,7 @@ source chunk, and logs that list on a `lineage:SVA-0001` span (Langfuse + `trace
 ## Retrieval and test plans
 - `query` fuses BM25 and dense scores (dense only when `META_EMBED_MODEL` and `MODEL_API_KEY` are set), then propagates with Personalized PageRank; each evidence item lists components, a graph path and an explanation.
 - `plan REQ-...` runs bounded multi-hop retrieval (rerank + sufficiency + dependency expansion), writes `test_plan.json`, and records each item in the graph with its requirement and chunk lineage. Items are always `NEEDS_REVIEW`.
-- `dv_agent/src/dv_agent/evaluate.py` computes recall@k and MRR for a labeled case file (`load_cases`); no CLI yet.
+- `dv_agent/src/dv_agent/retrieval/evaluate.py` computes recall@k and MRR for a labeled case file (`load_cases`); no CLI yet.
 
 ## Reuse and `--force`
 Each stage reuses its saved output when inputs are unchanged, so repeat runs do no work and spend no tokens:
@@ -82,7 +82,7 @@ Each stage reuses its saved output when inputs are unchanged, so repeat runs do 
 - `dv-agent pipeline <repo> --fresh` deletes every generated artifact in the run directory (manifest, chunks, text, graph, stats, test plan, dense index, LLM cache, trace) and reruns all stages. Nothing outside the fixed artifact list is touched, and it refuses a non-empty directory that has no run markers (manifest, build stats, graph or trace).
 - `dv-agent build-graph --fresh` and `dv-agent plan ... --fresh` delete only `llm_cache/` and rerun, so the model is called again.
 
-## Fetching test-plan knowledge (`testplan_context.py`)
+## Fetching test-plan knowledge (`plan/testplan_context.py`)
 No LLM calls; built only from specification-derived graph nodes. Bundle shape is versioned (`schema_version`) so a test-plan template can map onto it.
 - `dv-agent context "<feature or topic>" --out runs/<repo> [--save bundle.json]`
 - `dv-agent context --requirement REQ-... --out runs/<repo>` (adds `focus_requirement` and `lineage`)
@@ -91,7 +91,7 @@ No LLM calls; built only from specification-derived graph nodes. Bundle shape is
 Bundle fields: `requirements` (statement, verbatim quote, kind, review status, citation with document/page/section/chunk/offsets), `dependency_requirements` (preconditions outside the retrieved set), `dependencies` (inferred edges with rationale and evidence quote), `entities`, `evidence` (chunks with scores and explanations), `navigation` (section/community summaries, navigation only), `open_items` (conflicts, unreviewed dependencies and requirements), `retrieval`.
 The `plan` command now also passes dependency preconditions to the model and allows citing them.
 
-## Test-plan document (`testplan_doc.py`)
+## Test-plan document (`plan/testplan_doc.py`)
 `dv-agent testplan --out runs/<repo> [--scope "<feature>"] [--template my_template.json] [--force|--fresh]`
 or in one go: `dv-agent pipeline <repo> --fresh --testplan [--scope ...]`.
 
@@ -111,6 +111,11 @@ Each section has `generator` (`title` | `entries` | `register_map`), `queries` (
 `instructions`, optional `entry_kinds`, `include_kinds`, `collect_assumed`, `include_conflicts`.
 - Every entry is tagged `[DOCUMENTED]`, `[INFERRED]` or `[ASSUMED]` with source IDs. Citations outside the
   supplied evidence are dropped; DOCUMENTED/INFERRED without citations become ASSUMED.
+- Methodology rules (`src/dv_agent/templates/methodology_rules_v0.json`, extended via
+  `--methodology-rules my_rules.json`) are natural-language DV-agent recommendations that need no
+  specification source. Entries citing only a rule are DOCUMENTED with reason 'Recommended by DV agent'
+  and cite the rule ID (e.g. METH-XPROP-1); enforced rules are force-injected into their sections.
+  Same rule ID in your file replaces the shipped rule.
 - Register map: DOCUMENTED addresses and reset values must appear verbatim in cited text, otherwise INFERRED.
 - Explicit Name/Address/Width/Access specification tables supply the register inventory even if a model
   call fails. Model enrichment uses one source window per call, retaining the entire selected text.
@@ -125,7 +130,7 @@ Each section has `generator` (`title` | `entries` | `register_map`), `queries` (
 - Each section is a `test_plan_section` graph node (`dv-agent lineage TPS-...`) and a traced span with fact IDs.
 - Reused unless template, scope, model or graph build changed, or a section was BLOCKED.
 
-### Step 0: interface isolation (`interfaces.py`)
+### Step 0: interface isolation (`plan/interfaces.py`)
 Runs before any test-plan section (template `interfaces` block; `"enabled": false` turns it off).
 - Extracts every specification-defined signal: name, width, direction relative to the DUT, availability
   (build option or mode), defining quote. Names not found in the cited chunk are dropped; directions and
@@ -161,7 +166,7 @@ See [docs/RTL_OBSERVATIONS.md](docs/RTL_OBSERVATIONS.md). Without the flag the s
 ## Formats
 `.docx` (headings from Word heading styles or outline levels, tables as `cell | cell` rows, page numbers from page breaks) and `.html` (`h1`-`h6` headings, tables as rows; scripts and styles skipped) are parsed with the standard library. Legacy binary `.doc` is still reported SKIPPED.
 
-## Refuse and repair (`repair.py`)
+## Refuse and repair (`quality/repair.py`)
 The step order is fixed. Inside the interface, register, strategy, configurations and test-plan section
 steps, the checks review the model's answer; if they find problems the model can fix (a quote not in the
 source, a value the specification does not state, an unknown citation, a signal an agent cannot drive,
@@ -171,14 +176,14 @@ conflicts are never refused; they stay designer questions. Problems left after t
 cleaned up as before and raised as one designer question per step. Every refusal is a `refusal:<step>`
 trace span and is shown in the Markdown ("Refused (attempt N)", "Repaired after N refusal(s)").
 
-## Combined graph fetch (`graph_fetch.py`, `combined_fetch.py`)
+## Combined graph fetch (`retrieval/graph_fetch.py`, `retrieval/combined_fetch.py`)
 Every fetch combines seed retrieval + PageRank, entity-centred traversal (register→field and interface→signal
 owner edges), dependency closure and order, global community expansion, coverage of requirements not yet cited,
 and shortest paths from the topic to the verified signals and registers (a deliberately small take on the
 GRW-AS idea; no AssertionForge code). Adaptive selection keeps every source represented. See `docs/ARCHITECTURE.md`. Commands: `dv-agent context "<topic>" [--global N]`,
 `dv-agent deps REQ-...`.
 
-## Token usage (`usage.py`)
+## Token usage (`core/usage.py`)
 Every model call records the usage the Meta Model API reports: input, cached input (served from the provider's
 prompt cache, part of input), output and reasoning (part of output). Calls whose response reports no usage are
 estimated at about 4 characters per token and counted as estimated.
@@ -190,7 +195,7 @@ estimated at about 4 characters per token and counted as estimated.
   `replayed`, and `from_scratch` is what a fresh run would use.
 - `dv-agent usage --out runs/<repo> [--last N | --trace ID]`: totals per run and per model call.
 
-## Claims check (`claims.py`)
+## Claims check (`quality/claims.py`)
 A valid citation does not make a claim true. In free-text sections and Configurations, after the deterministic
 checks pass, a separate `claims_check` model call judges each DOCUMENTED or INFERRED claim against only the text it
 cites. Unsupported claims are refused back to the author call (refuse-and-repair); any still unsupported after the

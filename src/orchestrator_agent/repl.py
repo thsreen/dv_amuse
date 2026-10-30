@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
-from dv_agent.testplan_viewer import create_report_server
+from dv_agent.report.testplan_viewer import create_report_server
 
 from .actions import build_code, run_tests
 from .assist import explain_run, interpret, rerun_help, rerun_plan, show_text, status_text, validate_text
@@ -16,6 +16,8 @@ from .flow import load_flow
 from .repo_intake import find_repo, inspect_repo
 from .runner import ASK_FILE, REVIEW_FILE, run_flow, run_single_tool
 from .tui import Dashboard, testplan_substeps
+from .saved_runs import latest_successful, matches_current_run
+from .code_run import execute as execute_code, preview as code_preview
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 HELP = "Commands: /plan  /code  /run  /regress  /fresh  (Ctrl-D to leave)"
@@ -98,6 +100,7 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
     scan = None
     viewer = None
     viewer_thread = None
+    restore_saved = True
 
     def fresh_out() -> Path:
         """A run directory unused by this session and absent on disk."""
@@ -112,7 +115,7 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
         return candidate
     show("Describe the design and local repository. I will scan it and show the testplan steps.")
     show(HELP)
-    if os.getenv("DV_AGENT_MODE") == "basic":
+    if os.getenv("DV_AGENT_MODE", "basic") == "basic":
         show("Basic RAG demo: direct source retrieval, no model requirement/dependency graph; target 10–15 minutes.")
 
     def models():
@@ -184,12 +187,13 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
         return result["status"] == "PASS"
 
     def fresh():
-        nonlocal out, variables, requirement, scan, flow_path, flow
+        nonlocal out, variables, requirement, scan, flow_path, flow, restore_saved
         previous = out
         out = fresh_out()
         variables = {"include": [], "scope": ""}
         requirement = ""
         scan = None
+        restore_saved = False
         flow_path = _builtin_flow()
         flow = load_flow(flow_path)
         show(f"Fresh session in {out} — no cached state is reused. "
@@ -271,6 +275,8 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                                      rtl_files=[str(scan["top_file"])] if scan["top_file"] else [],
                                      rtl_graph_files=[str(p) for p in scan["rtl_files"]],
                                      rtl_top=scan["top"])
+                    if not matches_current_run(out, variables):
+                        out = fresh_out()
                 except (OSError, ValueError) as exc:
                     scan = None
                     show(f"Repository scan failed: {exc}")
@@ -282,6 +288,13 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
         if line == "/plan":
             plan()
         elif line == "/code":
+            if not (out / "dv" / "testplan_doc.json").is_file() and restore_saved:
+                saved = latest_successful(PACKAGE_ROOT / 'runs', variables)
+                if saved:
+                    out, saved_ask = saved
+                    variables = dict(saved_ask['variables'])
+                    requirement = saved_ask.get('requirement', requirement)
+                    show(f"Using saved successful testplan: {out / 'dv/testplan_doc.json'}")
             if not (out / "dv" / "testplan_doc.json").is_file():
                 show("No saved testplan; generating it first.")
                 plan()
@@ -289,19 +302,31 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                 show("Code blocked: no testplan was generated.")
                 continue
             try:
+                show(code_preview(out))
                 code_llm, _ = models()
-                result = build_code(out, variables, llm=code_llm)
+                result = execute_code(build_code, out, variables, llm=code_llm, show=show,
+                                      dashboard=use_dashboard, ansi=interactive)
                 policy = result["policy"]
-                show(f"Code: {result['code_dir']} ({policy['kept']} documented items retained as code input; "
-                     f"{policy['skipped']} unsupported or inferred items excluded).")
+                if result.get('contract'):
+                    show(f"Code: {result['code_dir']} ({policy['kept']} cited documented facts used for behavior; "
+                         "plan proposals guide implementation only).")
+                else:
+                    show(f"Code: {result['code_dir']} ({policy['kept']} documented items retained as code input; "
+                         f"{policy['skipped']} unsupported or inferred items excluded).")
                 show(f"Built tests: {', '.join(t['name'] for t in result['tests'])}.")
+                if result.get('work_documents'):
+                    show(f"Feature dependencies and pseudocode: {result['work_documents']}")
                 if result.get("contract"):
                     show(f"Functional compile: {result['compile']['status']}; generated expectations require review.")
                     if result['compile'].get('reason'): show(result['compile']['reason'])
                 else:
                     show("Legacy scaffold: compile/clock/reset smoke only; no functional behavior claimed.")
+            except KeyboardInterrupt:
+                show("Code interrupted; saved checkpoints are kept. Use /code to retry.")
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 show(f"Code blocked: {exc}")
+                if (out/'code_work_manifest.json').is_file():
+                    show(f"Partial feature documents: {out/'code_work_manifest.json'}")
         elif line in ("/run", "/regress"):
             try:
                 result = run_tests(out, regress=line == "/regress")

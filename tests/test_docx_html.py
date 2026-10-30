@@ -1,7 +1,7 @@
 import zipfile
 from pathlib import Path
 
-from dv_agent.ingest import discover, extract_document, ingest
+from dv_agent.ingest.ingest import discover, extract_document, ingest
 
 W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
 

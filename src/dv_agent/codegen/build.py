@@ -3,15 +3,16 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 
-from ..fsutil import atomic_write_text
-from ..graph import load_graph
-from ..llm import LLMError
-from ..progress import emit
+from ..core.fsutil import atomic_write_text
+from ..graph.graph import load_graph
+from ..core.llm import LLMError
+from ..core.progress import emit
 from .contracts import CodePlan, digest
 from .reasoning import design, eligible_items, implement, review
 from .render import render, template_hash
 from .simulator import compile_project
 from .validate import validate
+from .events import stage, skip, STEPS
 
 
 @contextmanager
@@ -53,9 +54,10 @@ def build_project(plan_path, interface_path, directory, *, llm=None, contract_pa
         try:
             result=_build(plan_path,interface_path,directory,llm=llm,contract_path=contract_path,
                           rtl_files=rtl_files,expected_top=expected_top,compile=compile)
-            atomic_write_text(directory/'code_generation_state.json',json.dumps(dict(status='BUILT_NEEDS_REVIEW',build_id=result['build_id']))+'\n')
+            status='BUILT_NEEDS_REVIEW' if result['compile']['status'] in ('PASS','NOT_RUN') else 'BLOCKED'
+            atomic_write_text(directory/'code_generation_state.json',json.dumps(dict(status=status,build_id=result['build_id']))+'\n')
             return result
-        except Exception as exc:
+        except (Exception, KeyboardInterrupt) as exc:
             # No credentials/provider exception bodies in the persistent issue artifact.
             reason=str(exc) if isinstance(exc,ValueError) else 'Model call failed: '+exc.kind if isinstance(exc,LLMError) else type(exc).__name__
             atomic_write_text(directory/'code_questions.json',json.dumps(dict(status='BLOCKED',questions=[reason]),indent=2)+'\n')
@@ -72,6 +74,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     sources=load_sources(specification,plan_path.parent/'graph.json')
     emit('code [1/5]: analyze documented source evidence and design implementation contract')
     if contract_path:
+        skip(*(sid for sid,label in STEPS[1:8]))
         plan=CodePlan.model_validate(json.loads(Path(contract_path).read_text()))
     elif llm:
         plan=design(llm,specification,definition,sources,directory)
@@ -84,8 +87,11 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     # remain in the shared client; explicit operator contracts are never rewritten.
     for attempt in range(2):
         try:
-            ports=validate(plan,specification,definition,sources)
-            if llm: review(llm,plan,directory)
+            with stage('code_validation'):
+                ports=validate(plan,specification,definition,sources)
+            if llm:
+                with stage('code_review'): review(llm,plan,directory)
+            else: skip('code_review')
             break
         except ValueError as exc:
             if contract_path or not llm or attempt==1: raise
@@ -104,13 +110,16 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     emit('code [3/5]: implement declared behavior hooks and render reusable templates')
     if plan.hooks and not llm:
         raise ValueError('Custom protocol hooks require model implementation and validation')
-    hook_code=implement(llm,plan,directory,compiler_feedback=compiler_feedback) if llm else {}
+    with stage('code_hooks') as outcome:
+        hook_code=implement(llm,plan,directory,compiler_feedback=compiler_feedback) if llm else {}
+        if not plan.hooks: outcome['status']='NOT_RUN'
     for agent in plan.agents:
         if agent.protocol=='custom':
             slots={h.slot for h in plan.hooks if h.target==agent.id and hook_code.get(h.id)}
             if not {'driver.body','monitor.body'} <= slots:
                 raise ValueError('Custom protocol requires implemented driver and monitor hooks')
-    artifacts,compile_files=render(plan,ports,hook_code)
+    with stage('code_render'):
+        artifacts,compile_files=render(plan,ports,hook_code)
     rtl=[Path(p).resolve() for p in rtl_files]
     if not rtl or any(not p.is_file() for p in rtl):
         raise ValueError('Explicit RTL files are required for compilation (not model inference)')
@@ -137,12 +146,15 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
                   coverage_collectors=[dict(id=a.id+'_coverage',source='monitor '+a.id,
                                             file=f'uvm/{a.id}_coverage.svh',sampling='completed observed transaction',
                                             fact_ids=a.fact_ids) for a in plan.agents]
+                                      + [dict(id=c.id,source='monitor '+c.agent,file=f'uvm/{c.id}_coverage.svh',
+                                              sampling='completed observed transaction',fact_ids=c.fact_ids) for c in plan.coverage]
                                       + ([dict(id='system_coverage',source='all interface monitors',
                                                file='uvm/cg_system_coverage.svh',sampling='observed route event',
                                                fact_ids=sorted({f for r in plan.routes for f in r.fact_ids}))] if plan.routes else []),
                   tests=[dict(name=t.id,kind='uvm_functional',top='verification_top',seed=t.seed,
                               minimum_comparisons=t.minimum_comparisons) for t in plan.tests],
                   policy=dict(source='documented expected behavior; template-owned infrastructure',
+                              guidance='Plan proposals guide implementation but are not expectation authority',
                               kept=len(plan.facts),skipped=max(0,len(eligible_items(specification,sources))-len({f.plan_pointer for f in plan.facts}))),
                   assertion_covers=[dict(check_id=c.id,assertion='a_'+c.id,cover='c_'+c.id,activation_cover='activation_'+c.id,
                       file=f'checks/{c.agent}_assertions.sv',
@@ -152,8 +164,10 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
                   uvm_status='NEEDS_REVIEW',expected_behavior_review='NEEDS_REVIEW',
                   operational_limits=dict(request_timeout_cycles=plan.request_timeout_cycles,
                                           note='testbench operational limits are not DUT timing requirements'))
+    if llm and not contract_path:
+        manifest['work_documents']=str(directory/'code_work_manifest.json')
     items=[]
-    for category in ('agents','registers','sequences','routes','checks','tests','hooks'):
+    for category in ('agents','registers','sequences','routes','checks','tests','hooks','coverage'):
         for item in getattr(plan,category):
             items.append(dict(id=item.id,kind=category,fact_ids=item.fact_ids,
                               plan_references=[next(f for f in plan.facts if f.id==fid).plan_pointer for fid in item.fact_ids],
@@ -162,7 +176,9 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
                        ('code_questions.json',dict(status='NEEDS_REVIEW' if plan.questions else 'PASS',questions=plan.questions))):
         atomic_write_text(code/path,json.dumps(value,indent=2)+'\n')
     emit('code [4/5]: compile generated UVM and preserve diagnostics')
-    manifest['compile']=compile_project(manifest) if compile else dict(status='NOT_RUN',reason='compile disabled explicitly')
+    with stage('code_compile') as outcome:
+        manifest['compile']=compile_project(manifest) if compile else dict(status='NOT_RUN',reason='compile disabled explicitly')
+        outcome['status']=manifest['compile']['status']
     if llm and plan.hooks and compiler_feedback is None and manifest['compile']['status']=='FAIL':
         # Repair only diagnostics naming a generated extension file. Framework,
         # missing-library and DUT errors cannot authorize model edits to those files.
@@ -180,14 +196,15 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
                           expected_top=expected_top,compile=compile,compiler_feedback=feedback)
     manifest['reused']=reused
     emit('code [5/5]: publish code manifest, source lineage and test inventory')
-    atomic_write_text(code/'tests.json',json.dumps(manifest,indent=2)+'\n')
-    atomic_write_text(directory/'code_manifest.json',json.dumps(manifest,indent=2)+'\n')
-    atomic_write_text(directory/'traceability.json',json.dumps(dict(items=items),indent=2)+'\n')
-    questions=list(plan.questions)
-    compile_status=manifest['compile']['status']
-    if compile_status not in ('PASS','NOT_RUN'):
-        questions.append('Compilation '+compile_status+': '+manifest['compile'].get('reason',manifest['compile'].get('log','see compile_result.json')))
-    question_status='BLOCKED' if compile_status not in ('PASS','NOT_RUN') else 'NEEDS_REVIEW' if questions else 'PASS'
-    for target in (directory/'code_questions.json',code/'code_questions.json'):
-        atomic_write_text(target,json.dumps(dict(status=question_status,questions=questions),indent=2)+'\n')
+    with stage('code_publish'):
+        atomic_write_text(code/'tests.json',json.dumps(manifest,indent=2)+'\n')
+        atomic_write_text(directory/'code_manifest.json',json.dumps(manifest,indent=2)+'\n')
+        atomic_write_text(directory/'traceability.json',json.dumps(dict(items=items),indent=2)+'\n')
+        questions=list(plan.questions)
+        compile_status=manifest['compile']['status']
+        if compile_status not in ('PASS','NOT_RUN'):
+            questions.append('Compilation '+compile_status+': '+manifest['compile'].get('reason',manifest['compile'].get('log','see compile_result.json')))
+        question_status='BLOCKED' if compile_status not in ('PASS','NOT_RUN') else 'NEEDS_REVIEW' if questions else 'PASS'
+        for target in (directory/'code_questions.json',code/'code_questions.json'):
+            atomic_write_text(target,json.dumps(dict(status=question_status,questions=questions),indent=2)+'\n')
     return manifest

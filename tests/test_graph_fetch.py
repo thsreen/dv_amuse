@@ -4,12 +4,12 @@ import pytest
 
 from conftest import dependency_handler, extraction_handler
 from dv_agent.cli import main
-from dv_agent.graph import load_graph
-from dv_agent.graph_fetch import (dependency_closure, dependency_order, entity_context, global_fetch,
+from dv_agent.graph.graph import load_graph
+from dv_agent.retrieval.graph_fetch import (dependency_closure, dependency_order, entity_context, global_fetch,
                                   requirement_coverage, resolve_entities)
-from dv_agent.llm import FakeLLM
+from dv_agent.core.llm import FakeLLM
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_testplan_doc
-from dv_agent.testplan_context import BUNDLE_SCHEMA_VERSION, fetch_context
+from dv_agent.plan.testplan_context import BUNDLE_SCHEMA_VERSION, fetch_context
 from test_entity_ownership import owned_fields
 from test_testplan_doc import _llm, entries_handler
 
@@ -17,7 +17,7 @@ from test_testplan_doc import _llm, entries_handler
 def _build(spec_repo, tmp_path, llm):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    stats = run_build_graph(out, llm)
+    stats = run_build_graph(out, llm, mode="graph")
     return out, stats, load_graph(out / GRAPH_FILE)
 
 
@@ -91,7 +91,7 @@ def test_cycles_are_detected_and_raised_to_designers(spec_repo, tmp_path):
     out, _, G = _build(spec_repo, tmp_path, _llm(requirement_dependencies=cyclic_dependencies))
     order = dependency_order(G, [_req(G, "On reaching zero")])
     assert order["cycles"] == [sorted([_req(G, "On reaching zero"), _req(G, "When CTRL.Enable")])]
-    run_testplan_doc(out, _llm())
+    run_testplan_doc(out, _llm(), mode="graph")
     doc = json.loads((out / "testplan_doc.json").read_text())
     questions = next(s for s in doc["sections"] if s["id"] == "questions")["entries"]
     assert any(q["text"].startswith("These requirements depend on each other in a cycle") for q in questions)
@@ -128,7 +128,7 @@ def test_testplan_uses_ordering_and_coverage(built, monkeypatch):
     def capture(payload):
         seen[payload["section"]["id"]] = payload
         return entries_handler(payload)
-    run_testplan_doc(out, _llm(testplan_entries=capture))
+    run_testplan_doc(out, _llm(testplan_entries=capture), mode="graph")
     assert seen["stimulus"]["dependency_order"]["order"]
     reload_id, enable_id = _req(G, "On reaching zero"), _req(G, "When CTRL.Enable")
     order = [o["req_id"] for o in seen["stimulus"]["dependency_order"]["order"]]
@@ -153,7 +153,7 @@ def test_coverage_repair_closes_the_gap(built):
                                 "provenance": "INFERRED", "cited_req_ids": [r["req_id"]], "cited_chunk_ids": [chunk],
                                 "details": []} for r in payload["uncovered_requirements"]]
         return data
-    summary = run_testplan_doc(out, _llm(testplan_entries=cite_targets))
+    summary = run_testplan_doc(out, _llm(testplan_entries=cite_targets), mode="graph")
     doc = json.loads((out / "testplan_doc.json").read_text())
     checks = next(s for s in doc["sections"] if s["id"] == "checks")
     assert checks["repair"]["unresolved"] == []

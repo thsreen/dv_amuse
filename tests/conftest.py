@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from dv_agent.llm import FakeLLM
+from dv_agent.core.llm import FakeLLM
 
 PAGES = [
     """ACME TMR32 datasheet
@@ -182,6 +182,6 @@ def no_langfuse(monkeypatch):
 @pytest.fixture(autouse=True)
 def _clear_progress_sinks():
     yield
-    from dv_agent.progress import set_global_sink, set_sink
+    from dv_agent.core.progress import set_global_sink, set_sink
     set_sink(None)
     set_global_sink(None)

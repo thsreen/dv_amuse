@@ -1,0 +1,22 @@
+class {{GOAL}}_coverage extends uvm_subscriber #(cg_item);
+  `uvm_component_utils({{GOAL}}_coverage)
+  cg_item observed;
+  int unsigned samples;
+{{VARIABLES}}
+  covergroup transactions;
+    option.per_instance=1;
+{{POINTS}}
+{{CROSSES}}
+  endgroup
+  function new(string name,uvm_component parent); super.new(name,parent); transactions=new(); endfunction
+  function void write(cg_item tr);
+    if(!$cast(observed,tr.clone())) `uvm_fatal("COV_COPY", "transaction copy failed")
+    if({{FILTER}}) begin
+{{SAMPLING}}
+      samples++; transactions.sample();
+    end
+  endfunction
+  function void report_phase(uvm_phase phase);
+    `uvm_info("PLAN_COVERAGE", $sformatf("{{GOAL}} samples=%0d coverage=%0.2f", samples,transactions.get_inst_coverage()), UVM_LOW)
+  endfunction
+endclass

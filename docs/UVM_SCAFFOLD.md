@@ -71,6 +71,16 @@ them in a separate package and apply factory overrides. `drive_item`,
 and `item_count` are virtual. `apply_configuration` runs before each sequence's
 traffic and is the hook for reviewed register setup.
 
+## Forced X-propagation errors (METH-XPROP-1)
+
+Every generated monitor fails fast on unknown values: `sample_item` throws
+`` `uvm_error("XPROP", ...) `` for any X/Z sampled on a signal. Testbench-driven
+inputs are checked unconditionally; DUT outputs are checked only while reset is
+inactive (skipped while reset is asserted or unknown, when X outputs are expected),
+or unconditionally when the agent has no reset. There is no opt-out: the DV agent
+always emits these checks. The matching test-plan entry is DOCUMENTED with reason
+'Recommended by DV agent', citing rule METH-XPROP-1.
+
 ## Agent template and arguments
 
 The [agent template catalog](../src/dv_agent/templates/uvm_agent/template.json)

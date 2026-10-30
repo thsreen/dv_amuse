@@ -1,6 +1,8 @@
 # Testplan to verification code
 
-The functional builder lives in `src/dv_agent/codegen/`. Its reusable templates live in
+The functional builder lives in `src/dv_agent/codegen/`. [Feature work packages](CODE_WORK_PACKAGES.md)
+now provide dependency documents and collated pseudocode before component generation.
+Its reusable templates live in
 `src/dv_agent/templates/codegen/`; `catalog.json` describes their inputs, dependencies,
 outputs and extension slots. Design-specific names and behavior belong in a typed
 implementation contract, never in protocol templates. The legacy `build-uvm` scaffold
@@ -8,9 +10,11 @@ remains available independently.
 
 ```mermaid
 flowchart LR
-    P[Saved testplan + cited specification] --> D[Model designs typed contract]
+    P[Saved testplan + cited specification] --> D[Group features and dependencies]
     I[Explicit interface JSON] --> D
-    D --> V[Evidence / ownership / width validation]
+    D --> U[Scoped excerpts and feature understanding]
+    U --> S[Collated pseudocode]
+    S --> V[Typed components and deterministic validation]
     V --> R[Independent contract review]
     R --> H[Declared behavior hooks]
     H --> T[Deterministic reusable templates]
@@ -50,6 +54,20 @@ to design the contract from saved documented evidence. `--no-compile` records `N
 it does not produce compilation or simulation evidence. In the interactive terminal,
 model-disabled `/code` retains the explicitly labeled legacy clock/reset smoke path.
 
+Replay an existing functional build without model calls:
+
+```sh
+.venv/bin/python -m dv_agent.cli run-code --out runs/example
+.venv/bin/python -m dv_agent.cli run-code --out runs/example --regress --timeout 180
+```
+
+The first command runs the first saved test; `--regress` runs every saved test.
+`--timeout` bounds each compiler/test process in wall-clock seconds, independently
+of the model API timeout. These commands load `.env`, validate saved input/source
+hashes and latest-build state, then preserve per-test logs and coverage. Results
+include actual scoreboard comparison counts and UVM severity counts. They return
+a nonzero exit code for any failure or missing required evidence.
+
 Set `XEZIM_BIN` to a local executable if it is not on PATH. Set `XEZIM_UVM_DIR` to an
 actual UVM source release containing `uvm_pkg.sv` and `uvm_macros.svh` (either at its
 root or under `src/`). Missing UVM sources produce `BLOCKED`. The adapter probes the
@@ -76,6 +94,15 @@ It records exact quoted facts and JSON pointers into documented plan items; name
 agents with canonical protocol roles bound to physical ports; explicit tie-offs;
 simple register mirrors; typed operations and sequences; observed-event routes;
 source-supported protocol checks; ordered/concurrent test stages; and extension hooks.
+
+Implementation context is retrieved per feature. Compact documented records retain
+original pointers, source IDs, semantic fields and property classifications; exact
+relevant excerpts are supplied rather than the full design. All original sources remain
+available locally for quote/authority validation. Dependency notes, feature pseudocode,
+collated implementation pseudocode and component mappings are saved before rendering.
+This replaces the former whole-plan 160k input and its compaction workaround; see
+[CODE_WORK_PACKAGES.md](CODE_WORK_PACKAGES.md) for artifacts, limits and pseudocode-only use.
+`code_context.json` now records per-request sizes/cache state instead of one global size.
 
 Built-in capabilities are WISHBONE transfers/polling and serial frames with configured
 word length, parity, stop bits and bit timing. Sequences support directed and masked
@@ -110,6 +137,9 @@ slot context and cited facts. Deterministic checks refuse declarations, external
 observation-side interface writes and time-consuming function hooks. These checks and
 compilation are guardrails, not a complete SystemVerilog security sandbox or proof of
 semantic correctness. Generated behavior always needs review.
+
+Typed coverage goals also generate dedicated monitor subscribers with source-linked
+bins/crosses and event/address filters, alongside the baseline per-agent collectors.
 
 ## Recovery, output and limits
 
@@ -154,6 +184,40 @@ The UART fixture builds initialization, directed transmit/receive, status pollin
 configuration reads and randomized transmit with readiness polling. It generates both
 per-interface and environment coverage, register checks and qualified TX/RX scoreboards.
 It is acceptance test data, not a model-generated or engineer-approved production plan.
-Local Xezim syntax parsing uses explicitly minimal test macros, not a UVM implementation.
-Real UVM elaboration and functional simulation require an installed UVM release and
-remain unvalidated in this environment. No live model-generation result is claimed.
+Syntax-only tests use explicitly minimal macros; the opt-in integration test uses the
+actual installed Accellera UVM 2020.3.1 release and Xezim 0.11.3, git `058f2bb`.
+Real compilation and simulation now pass for the acceptance fixture's 8-bit bus,
+32-clock-cycle serial bit timing and 8N1 configuration:
+
+| Test | Seed | Scoreboard comparisons | UVM errors/fatals | Property / activation hits |
+| --- | --- | --- | --- | --- |
+| `basic_functional` | 1 | 3 | 0 / 0 | 30 / 30 |
+| `random_transmit` | 7 | 4 | 0 / 0 | 681 / 681 |
+
+All three coverage subscribers sampled real observed traffic. Forty-five UVM warnings
+per test (principally library queue-delete warnings) and simulator warnings remain;
+these runs do not establish complete UART verification or other configurations.
+The initial real run caught monitor payload mismatches and missing assertion samples;
+neither was accepted as a pass. Fixes declare physical wires before use, assemble serial
+samples in a local variable before assigning the transaction payload, and explicitly
+clock/disable each assertion and activation cover. The adapter uses Xezim's documented
+`+seed` argument, not an unverified simulator-specific spelling. DUT RTL is unchanged.
+
+Saved evidence and replay command:
+
+```sh
+.venv/bin/python -m dv_agent.cli run-code \
+  --out runs/codegen-acceptance-20261030T164553714633Z --regress
+```
+
+The code project is `code/0f231192803d1ef2` under that run. Results are in its
+`simulation/regress.json`, with unique per-test/seed attempt directories. To run the
+real simulator regression test explicitly (no model API calls):
+
+```sh
+DV_AGENT_TEST_SIMULATION=1 .venv/bin/python -m pytest \
+  tests/test_codegen.py::test_real_uart_simulation_opt_in -q
+```
+
+Live model-generated code from the latest production plan is still unvalidated;
+these results apply to the explicit acceptance contract.

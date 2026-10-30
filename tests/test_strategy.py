@@ -3,7 +3,7 @@ import json
 import pytest
 
 from dv_agent.cli import main
-from dv_agent.llm import LLMError
+from dv_agent.core.llm import LLMError
 from dv_agent.pipeline import run_build_graph, run_ingest, run_strategy, run_testplan_doc
 from test_testplan_doc import _llm
 
@@ -12,12 +12,12 @@ from test_testplan_doc import _llm
 def run(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm())
+    run_build_graph(out, _llm(), mode="graph")
     return out
 
 
 def _strategy(out):
-    run_testplan_doc(out, _llm())
+    run_testplan_doc(out, _llm(), mode="graph")
     doc = json.loads((out / "testplan_doc.json").read_text())
     return doc, next(s for s in doc["sections"] if s["id"] == "strategy")["strategy"]
 
@@ -55,7 +55,7 @@ def test_source_supported_strategy_item_keeps_its_own_status(run):
             description=source["text"], support=dict(provenance="DOCUMENTED", quote=source["text"],
                                                     chunk_id=source["chunk_id"], inference_reason=""))
         return data
-    run_testplan_doc(run, _llm(testplan_strategy=supported))
+    run_testplan_doc(run, _llm(testplan_strategy=supported), mode="graph")
     doc = json.loads((run / "testplan_doc.json").read_text())
     st = next(s for s in doc["sections"] if s["id"] == "strategy")["strategy"]
     assert st["agents"][0]["provenance"] == "INFERRED"
@@ -65,7 +65,7 @@ def test_source_supported_strategy_item_keeps_its_own_status(run):
 
 def test_overview_rendering_keeps_details_for_downstream_plan(run):
     from test_testplan_doc import strategy_handler
-    from dv_agent.strategy import render, strategy_summary
+    from dv_agent.plan.strategy import render, strategy_summary
     def overview(payload):
         data = strategy_handler(payload)
         source = payload["chunks"][0]
@@ -74,7 +74,7 @@ def test_overview_rendering_keeps_details_for_downstream_plan(run):
                                               chunk_id=source["chunk_id"],
                                               inference_reason="Bring-up establishes a known starting state."))]
         return data
-    run_testplan_doc(run, _llm(testplan_strategy=overview))
+    run_testplan_doc(run, _llm(testplan_strategy=overview), mode="graph")
     doc = json.loads((run / "testplan_doc.json").read_text())
     st = next(s for s in doc["sections"] if s["id"] == "strategy")["strategy"]
     md = "\n".join(render(st, "High Level Verification Strategy"))
@@ -97,8 +97,8 @@ def test_uncovered_interface_group_is_a_gap_and_a_question(run):
 
 def test_every_strategy_bullet_has_its_own_evidence_status(run):
     import re
-    from dv_agent.strategy import render
-    from dv_agent.provenance_badge import decode
+    from dv_agent.plan.strategy import render
+    from dv_agent.report.provenance_badge import decode
     _, st = _strategy(run)
     lines = render(st, "Verification Strategy")
     assert not any(line.startswith("|") for line in lines)
@@ -116,15 +116,15 @@ def test_every_strategy_bullet_has_its_own_evidence_status(run):
 
 
 def test_standalone_strategy_uses_documented_steps_and_reuses(run):
-    first = run_strategy(run, _llm())
+    first = run_strategy(run, _llm(), mode="graph")
     assert first["reused"] is False and first["inputs"] == {"interfaces": False, "registers": False}
     assert (run / "interfaces.json").exists() and (run / "registers.json").exists() and (run / "strategy.md").exists()
     llm = _llm()
-    second = run_strategy(run, llm)
+    second = run_strategy(run, llm, mode="graph")
     assert second["reused"] is True and second["inputs"] == {"interfaces": True, "registers": True}
     assert llm.calls == []
     (run / "registers.json").unlink()
-    third = run_strategy(run, _llm())
+    third = run_strategy(run, _llm(), mode="graph")
     assert third["inputs"]["registers"] is False and third["reused"] is False
     saved = json.loads((run / "strategy.json").read_text())
     assert saved["registers_trace_id"] == json.loads((run / "registers.json").read_text())["trace_id"]
@@ -133,7 +133,7 @@ def test_standalone_strategy_uses_documented_steps_and_reuses(run):
 def test_strategy_not_run_without_interface_groups(run):
     def failing(payload):
         raise LLMError("transient", "simulated")
-    result = run_strategy(run, _llm(testplan_interfaces=failing))
+    result = run_strategy(run, _llm(testplan_interfaces=failing), mode="graph")
     assert result["status"] == "NOT_RUN" and "interface" in result["error"]
 
 

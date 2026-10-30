@@ -1,7 +1,7 @@
 """Same-named entities with different owners (checklist item: model-provided ownership must be kept)."""
 from conftest import dependency_handler, extraction_handler
-from dv_agent.graph import load_graph
-from dv_agent.llm import FakeLLM
+from dv_agent.graph.graph import load_graph
+from dv_agent.core.llm import FakeLLM
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest
 
 
@@ -31,7 +31,7 @@ def _build(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
     stats = run_build_graph(out, FakeLLM({"spec_requirements": owned_fields,
-                                          "requirement_dependencies": dependency_handler}))
+                                          "requirement_dependencies": dependency_handler}), mode="graph")
     return stats, load_graph(out / GRAPH_FILE)
 
 

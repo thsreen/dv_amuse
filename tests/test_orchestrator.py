@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from dv_agent.llm import FakeLLM
+from dv_agent.core.llm import FakeLLM
 from orchestrator_agent import runner
 from orchestrator_agent.cli import main as cli_main
 from orchestrator_agent.flow import FlowError, load_flow, resolve_args, validate_flow
@@ -97,7 +97,8 @@ def test_recommended_order_executes_without_llm(tmp_path):
     assert not (tmp_path / "run" / "orchestrator_review.json").exists()
 
 
-def test_llm_revisit_runs_target_with_extra_prompt(tmp_path):
+def test_llm_revisit_runs_target_with_extra_prompt(tmp_path, monkeypatch):
+    monkeypatch.setenv("DV_AGENT_MODE", "graph")
     calls = []
     script = [{"action": "revisit", "target_step": "first",
                "extra_prompt": "Which reset value did the spec state?",
@@ -114,7 +115,8 @@ def test_llm_revisit_runs_target_with_extra_prompt(tmp_path):
     assert result["overrides_used"] == 1
 
 
-def test_nagging_decider_hits_budget_and_asks_owner(tmp_path):
+def test_nagging_decider_hits_budget_and_asks_owner(tmp_path, monkeypatch):
+    monkeypatch.setenv("DV_AGENT_MODE", "graph")
     calls = []
     llm = FakeLLM({"orchestrator_next": lambda payload:
                    {"action": "revisit", "target_step": "first",
@@ -169,7 +171,7 @@ def test_basic_mode_uses_150_second_model_timeout(monkeypatch):
 
 
 def test_model_interruption_records_final_result_and_progress_without_dashboard(tmp_path):
-    from dv_agent.progress import emit
+    from dv_agent.core.progress import emit
     def interrupted(args,ctx):
         emit('request diagnostic persisted without dashboard')
         raise KeyboardInterrupt()
@@ -287,7 +289,8 @@ def test_post_testplan_check_requires_unapproved_observations(tmp_path):
     assert post_testplan_check(doc_path=doc, rtl_used=False) == []
 
 
-def test_invalid_decider_proposal_is_ignored(tmp_path):
+def test_invalid_decider_proposal_is_ignored(tmp_path, monkeypatch):
+    monkeypatch.setenv("DV_AGENT_MODE", "graph")
     calls = []
     llm = FakeLLM({"orchestrator_next": lambda payload:
                    {"action": "revisit", "target_step": "nope",
@@ -300,7 +303,8 @@ def test_invalid_decider_proposal_is_ignored(tmp_path):
     assert result["overrides_used"] == 0
 
 
-def test_decider_stop_reverts_to_owner(tmp_path):
+def test_decider_stop_reverts_to_owner(tmp_path, monkeypatch):
+    monkeypatch.setenv("DV_AGENT_MODE", "graph")
     llm = FakeLLM({"orchestrator_next": lambda payload:
                    {"action": "stop", "target_step": "", "extra_prompt": "",
                     "reason": "something smells"}})
@@ -510,7 +514,7 @@ def test_runner_event_sink_receives_lifecycle(tmp_path):
 
 
 def test_runner_forwards_dv_progress_and_substep_events(tmp_path):
-    from dv_agent.progress import emit, emit_event
+    from dv_agent.core.progress import emit, emit_event
     calls, events = [], []
     registry = stub_registry(calls)
     def stage(args, ctx):
@@ -700,7 +704,7 @@ def test_repl_rerun_executes_guarded_tool(tmp_path, monkeypatch):
     out = tmp_path / "run"
     monkeypatch.setattr(terminal, "_default_out", lambda: out)
     calls = []
-    def run_registers(args, ctx):
+    def run_registers(args, ctx, mode="graph"):
         calls.append(dict(args))
         return dict(status="PASS", summary="registers ok", files=[])
     registry = {"dv_registers": ToolSpec("dv", SPEC, True, run_registers)}

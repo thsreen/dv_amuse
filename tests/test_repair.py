@@ -2,12 +2,12 @@ import json
 
 import pytest
 
-from dv_agent.graph import load_graph
-from dv_agent.llm import FakeLLM, LLMError
+from dv_agent.graph.graph import load_graph
+from dv_agent.core.llm import FakeLLM, LLMError
 from dv_agent.pipeline import run_build_graph, run_ingest, run_registers, run_testplan_doc
-from dv_agent.registers import record_problems
-from dv_agent.repair import default_max_repairs, structured_with_repair
-from dv_agent.trace import Tracer, read_trace
+from dv_agent.plan.registers import record_problems
+from dv_agent.quality.repair import default_max_repairs, structured_with_repair
+from dv_agent.core.trace import Tracer, read_trace
 from test_registers import SPEC, handler as register_handler
 from test_testplan_doc import _llm, configurations_handler, strategy_handler
 
@@ -68,7 +68,7 @@ def reg_run(tmp_path):
     (repo / "doc" / "spec.md").write_text(SPEC)
     out = tmp_path / "run"
     run_ingest(repo, out)
-    run_build_graph(out, None)
+    run_build_graph(out, None, mode="graph")
     return out
 
 
@@ -89,7 +89,7 @@ def test_register_step_refuses_invented_values_and_keeps_spec_conflicts(reg_run)
                     if f["name"] == "Mode select":
                         f["values"] = []
         return data
-    run_registers(reg_run, FakeLLM({"testplan_registers": invent_then_fix}))
+    run_registers(reg_run, FakeLLM({"testplan_registers": invent_then_fix}), mode="graph")
     res = json.loads((reg_run / "registers.json").read_text())
     refusals = res["repair"]["refusals"]
     assert refusals and any("'1111' is not written" in p for r in refusals for p in r["problems"])
@@ -117,7 +117,7 @@ def test_record_problems_only_lists_model_fixable_issues(reg_run):
 def doc_run(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm())
+    run_build_graph(out, _llm(), mode="graph")
     return out
 
 
@@ -140,7 +140,7 @@ def fixed_strategy(payload):
 
 
 def test_strategy_is_repaired_after_refusal(doc_run):
-    run_testplan_doc(doc_run, _llm(testplan_strategy=fixed_strategy))
+    run_testplan_doc(doc_run, _llm(testplan_strategy=fixed_strategy), mode="graph")
     doc = json.loads((doc_run / "testplan_doc.json").read_text())
     st = next(s for s in doc["sections"] if s["id"] == "strategy")["strategy"]
     assert st["validation"] == [] and st["gaps"] == []
@@ -153,7 +153,7 @@ def test_strategy_is_repaired_after_refusal(doc_run):
 
 
 def test_unrepaired_strategy_problems_become_one_designer_question(doc_run):
-    run_testplan_doc(doc_run, _llm())
+    run_testplan_doc(doc_run, _llm(), mode="graph")
     doc = json.loads((doc_run / "testplan_doc.json").read_text())
     st = next(s for s in doc["sections"] if s["id"] == "strategy")["strategy"]
     assert len(st["repair"]["refusals"]) == 2 and st["repair"]["unresolved"]
@@ -171,7 +171,7 @@ def test_configurations_missing_field_is_refused_then_supplied(doc_run):
             data["configurations"] = [data["configurations"][0], dict(
                 data["configurations"][0], field_id=second, legal_values=["0", "1"], randomize=True)]
         return data
-    run_testplan_doc(doc_run, _llm(testplan_configurations=complete_on_refusal))
+    run_testplan_doc(doc_run, _llm(testplan_configurations=complete_on_refusal), mode="graph")
     doc = json.loads((doc_run / "testplan_doc.json").read_text())
     conf = next(s for s in doc["sections"] if s["id"] == "configurations")
     assert all(e["provenance"] != "ASSUMED" for e in conf["configurations"])

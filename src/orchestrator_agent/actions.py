@@ -8,7 +8,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from dv_agent.fsutil import atomic_write_text
+from dv_agent.core.fsutil import atomic_write_text
 from dv_agent.uvm import build_uvm, write_uvm
 
 CODE_MANIFEST = "code_manifest.json"

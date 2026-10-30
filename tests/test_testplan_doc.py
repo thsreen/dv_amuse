@@ -4,11 +4,11 @@ import pytest
 
 from conftest import dependency_handler, extraction_handler, interfaces_handler, plan_handler, rerank_handler
 from dv_agent.cli import main
-from dv_agent.graph import lineage, load_graph
-from dv_agent.llm import FakeLLM, LLMError
+from dv_agent.graph.graph import lineage, load_graph
+from dv_agent.core.llm import FakeLLM, LLMError
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_testplan_doc
-from dv_agent.testplan_doc import load_template
-from dv_agent.trace import read_trace
+from dv_agent.plan.testplan_doc import load_template
+from dv_agent.core.trace import read_trace
 
 HEADINGS = ["1. Document Overview", "2. Feature Description", "3. Register Map", "4. Observations from RTL", "5. High Level Verification Strategy",
             "6. Verification Plan", "7. Configurations", "8. Sequences and Stimulus", "9. Checks and Scoreboards", "10. Functional Coverage", "11. Integration and Reuse",
@@ -116,7 +116,7 @@ def _llm(**overrides):
 def run(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm())
+    run_build_graph(out, _llm(), mode="graph")
     return out
 
 
@@ -134,13 +134,14 @@ def test_template_loads_and_validates(tmp_path):
 
 
 def test_document_has_all_sections_in_template_order(run):
-    summary = run_testplan_doc(run, _llm())
+    summary = run_testplan_doc(run, _llm(), mode="graph")
     assert [s["status"] for s in summary["sections"]] == ["PASS"] * 3 + ["NOT_RUN"] + ["PASS"] * 9
     md = (run / "testplan_doc.md").read_text()
     positions = [0 if h == HEADINGS[0] else md.index(f"## {h}") for h in HEADINGS]
     assert positions == sorted(positions)
     assert md.startswith("# Verification Test Plan: tmr32_spec")
-    assert "⚠️<!--dv-evidence:" in md and "stimulus entry backed by evidence — sources:" in md
+    # Stimulus: the indicator comes last and carries the sources instead of trailing "sources:" text.
+    assert "stimulus entry backed by evidence ⚠️<!--dv-evidence:" in md and "stimulus entry backed by evidence — sources:" not in md
     assert "### Directed Test" in md and "(directed_test)" not in md
     assert "Inference: The cited behavior motivates this proposed verification action." in md
     doc = _doc(run)
@@ -153,7 +154,7 @@ def test_document_has_all_sections_in_template_order(run):
 
 
 def test_feature_description_has_one_documented_heading_and_subtle_note(run):
-    run_testplan_doc(run, _llm())
+    run_testplan_doc(run, _llm(), mode="graph")
     md = (run / "testplan_doc.md").read_text()
     section = md.split("## 2. Feature Description", 1)[1].split("## 3. Register Map", 1)[0]
     assert section.count("✅<!--dv-evidence:") == 1
@@ -163,8 +164,8 @@ def test_feature_description_has_one_documented_heading_and_subtle_note(run):
 
 
 def test_saved_json_controls_subsection_titles_and_entry_grouping(run):
-    from dv_agent.testplan_doc import render_markdown
-    run_testplan_doc(run, _llm())
+    from dv_agent.plan.testplan_doc import render_markdown
+    run_testplan_doc(run, _llm(), mode="graph")
     doc = _doc(run)
     assert doc["presentation"]["subsection_heading_level"] == 3
     assert doc["presentation"]["subsection_emphasis"] == "bold"
@@ -185,23 +186,23 @@ def test_saved_json_controls_subsection_titles_and_entry_grouping(run):
 
 
 def test_feature_description_never_promotes_an_inferred_claim(run):
-    from dv_agent.testplan_doc import DocConfig
+    from dv_agent.plan.testplan_doc import DocConfig
     def inferred(payload):
         result = entries_handler(payload)
         if payload["section"]["id"] == "feature_description":
             result["entries"][0]["provenance"] = "INFERRED"
         return result
-    run_testplan_doc(run, _llm(testplan_entries=inferred), cfg=DocConfig(max_repairs=0))
+    run_testplan_doc(run, _llm(testplan_entries=inferred), cfg=DocConfig(max_repairs=0), mode="graph")
     section = next(s for s in _doc(run)["sections"] if s["id"] == "feature_description")
     assert section["status"] == "BLOCKED" and section["entries"] == []
 
 
 def test_document_emits_named_substeps(run):
-    from dv_agent.progress import set_event_sink
+    from dv_agent.core.progress import set_event_sink
     events = []
     set_event_sink(events.append)
     try:
-        run_testplan_doc(run, _llm())
+        run_testplan_doc(run, _llm(), mode="graph")
     finally:
         set_event_sink(None)
     names = [e["id"] for e in events if e["kind"] == "substep_start"]
@@ -213,7 +214,7 @@ def test_document_emits_named_substeps(run):
     events.clear()
     set_event_sink(events.append)
     try:
-        reused = run_testplan_doc(run, _llm())
+        reused = run_testplan_doc(run, _llm(), mode="graph")
     finally:
         set_event_sink(None)
     assert reused["reused"] is True
@@ -222,7 +223,7 @@ def test_document_emits_named_substeps(run):
 
 
 def test_citations_are_enforced_and_provenance_downgraded(run):
-    run_testplan_doc(run, _llm())
+    run_testplan_doc(run, _llm(), mode="graph")
     checks = next(s for s in _doc(run)["sections"] if s["id"] == "checks")
     by_text = {e["text"]: e for e in checks["entries"]}
     assert by_text["checks entry backed by evidence"]["provenance"] == "INFERRED"
@@ -235,7 +236,7 @@ def test_citations_are_enforced_and_provenance_downgraded(run):
 
 def test_register_map_section_is_rendered_from_the_register_step(run):
     llm = _llm()
-    run_testplan_doc(run, llm)
+    run_testplan_doc(run, llm, mode="graph")
     assert not any(name == "testplan_register_map" for name, _ in llm.calls)
     doc = _doc(run)
     assert [r["abbreviation"] for r in doc["registers"]["registers"]] == ["CTRL"]
@@ -245,7 +246,7 @@ def test_register_map_section_is_rendered_from_the_register_step(run):
 
 
 def test_configurations_cover_every_writable_field(run):
-    run_testplan_doc(run, _llm())
+    run_testplan_doc(run, _llm(), mode="graph")
     doc = _doc(run)
     conf = next(s for s in doc["sections"] if s["id"] == "configurations")
     by_field = {e["field"]: e for e in conf["configurations"]}
@@ -263,7 +264,7 @@ def test_configurations_cover_every_writable_field(run):
 
 
 def test_later_sections_see_earlier_ones_and_assumptions_are_collected(run):
-    run_testplan_doc(run, _llm())
+    run_testplan_doc(run, _llm(), mode="graph")
     secs = {s["id"]: s for s in _doc(run)["sections"]}
     assert "strategy agents seen: 3" in secs["stimulus"]["entries"][0]["details"]
     collected = [e for e in secs["assumptions"]["entries"] if e["details"][:1] and e["details"][0].startswith("Collected from")]
@@ -280,15 +281,15 @@ def test_conflicts_become_designer_questions(spec_repo, tmp_path):
         return data
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm(requirement_dependencies=conflicting))
-    run_testplan_doc(out, _llm(), scope="counter reload")
+    run_build_graph(out, _llm(requirement_dependencies=conflicting), mode="graph")
+    run_testplan_doc(out, _llm(), scope="counter reload", mode="graph")
     questions = next(s for s in _doc(out)["sections"] if s["id"] == "questions")["entries"]
     assert any(e["text"].startswith("The specification appears contradictory") and len(e["cited_req_ids"]) == 2
                for e in questions)
 
 
 def test_sections_recorded_with_lineage_and_trace(run):
-    summary = run_testplan_doc(run, _llm())
+    summary = run_testplan_doc(run, _llm(), mode="graph")
     G = load_graph(run / GRAPH_FILE)
     checks = next(s for s in _doc(run)["sections"] if s["id"] == "checks")
     node = G.nodes[checks["artifact_id"]]
@@ -301,11 +302,11 @@ def test_sections_recorded_with_lineage_and_trace(run):
 
 
 def test_reuse_force_and_no_artifact_accumulation(run):
-    assert run_testplan_doc(run, _llm())["reused"] is False
+    assert run_testplan_doc(run, _llm(), mode="graph")["reused"] is False
     llm = _llm()
-    assert run_testplan_doc(run, llm)["reused"] is True and llm.calls == []
-    assert run_testplan_doc(run, _llm(), scope="interrupts")["reused"] is False
-    run_testplan_doc(run, _llm(), scope="interrupts", force=True)
+    assert run_testplan_doc(run, llm, mode="graph")["reused"] is True and llm.calls == []
+    assert run_testplan_doc(run, _llm(), scope="interrupts", mode="graph")["reused"] is False
+    run_testplan_doc(run, _llm(), scope="interrupts", force=True, mode="graph")
     G = load_graph(run / GRAPH_FILE)
     tps = [n for n, d in G.nodes(data=True) if d.get("type") == "test_plan_section"]
     assert len(tps) == 22  # 11 generated sections x 2 scopes, no duplicates from the forced rerun
@@ -316,16 +317,16 @@ def test_blocked_section_is_reported_and_not_reused(run):
         if payload["section"]["id"] == "coverage":
             raise LLMError("transient", "simulated")
         return entries_handler(payload)
-    summary = run_testplan_doc(run, _llm(testplan_entries=failing))
+    summary = run_testplan_doc(run, _llm(testplan_entries=failing), mode="graph")
     status = {s["id"]: s["status"] for s in summary["sections"]}
     assert status["coverage"] == "BLOCKED" and status["checks"] == "PASS"
     assert "**BLOCKED**" in (run / "testplan_doc.md").read_text()
-    assert run_testplan_doc(run, _llm())["reused"] is False
+    assert run_testplan_doc(run, _llm(), mode="graph")["reused"] is False
 
 
 def test_interrupted_generation_saves_partial_json_markdown_html_and_can_resume(run):
     def interrupted(payload): raise KeyboardInterrupt()
-    with pytest.raises(KeyboardInterrupt): run_testplan_doc(run,_llm(testplan_entries=interrupted))
+    with pytest.raises(KeyboardInterrupt): run_testplan_doc(run,_llm(testplan_entries=interrupted), mode="graph")
     partial=json.loads((run/'testplan_doc.json').read_text())
     assert partial['generation_status']=='INTERRUPTED' and partial['interruption_type']=='KeyboardInterrupt'
     assert partial['completed_sections']==['title']
@@ -334,7 +335,7 @@ def test_interrupted_generation_saves_partial_json_markdown_html_and_can_resume(
     assert 'Generation interrupted' in (run/'testplan_doc.md').read_text()
     assert 'Generation interrupted' in (run/'testplan_doc.html').read_text()
     assert partial['interfaces'] and partial['registers']
-    resumed=run_testplan_doc(run,_llm())
+    resumed=run_testplan_doc(run,_llm(), mode="graph")
     assert resumed['reused'] is False
     complete=json.loads((run/'testplan_doc.json').read_text())
     assert complete['generation_status']=='COMPLETE'
@@ -361,7 +362,7 @@ def test_pipeline_testplan_flag(spec_repo, tmp_path, capsys, monkeypatch):
 
 
 def test_coverage_observation_entries_render_as_subsection():
-    from dv_agent.testplan_doc import render_markdown
+    from dv_agent.plan.testplan_doc import render_markdown
 
     def entry(text, obs):
         return {"text": text, "kind": "covergroup", "provenance": "INFERRED",
@@ -379,38 +380,52 @@ def test_coverage_observation_entries_render_as_subsection():
     assert "NEEDS_REVIEW: RTL design engineer approval required." in md
 
 
-def test_checks_and_coverage_render_as_tables_with_trailing_status():
-    from dv_agent.testplan_doc import render_markdown
+def test_checks_and_coverage_render_as_tables_with_indicators_beside_descriptions():
+    from dv_agent.plan.testplan_doc import render_markdown
 
-    def entry(text, kind="assertion", obs=(), status="NOT_RUN"):
+    def entry(text, kind="assertion", obs=(), status="NOT_RUN", **extra):
         return {"text": text, "kind": kind, "provenance": "INFERRED",
                 "cited_req_ids": ["REQ-1"], "cited_chunk_ids": ["CH-1"],
                 "cited_rtl_observation_ids": list(obs), "details": ["detail a"],
-                "validation": [], "status": status}
+                "validation": [], "status": status} | extra
 
-    plain = entry("plain cover", "covergroup")
-    obs_entry = entry("obs cover", "cover_property", obs=["RTLOBS-1"])
+    plain = entry("plain cover cg_x", "covergroup", covergroup="cg_x",
+                  coverpoints=[dict(name="cp_a", bins=["low", "high"]), dict(name="cp_b", bins=["on"])])
+    cover = entry("cover property c_ack for a_ack", "cover_property")
+    obs_entry = entry("obs cover", "covergroup", obs=["RTLOBS-1"])
     check_sec = {"id": "checks", "heading": "8. Checks", "generator": "entries",
-                 "status": "PASS",
-                 "entries": [entry("ack follows req", "assertion")]}
+                 "status": "PASS", "entries": [entry("ack follows req", "assertion")]}
     cov_sec = {"id": "coverage", "heading": "9. Coverage", "generator": "entries",
-               "status": "PASS", "entries": [plain, obs_entry]}
-    doc = {"sections": [check_sec, cov_sec],
-           "coverage": None, "token_usage": None}
-    md = render_markdown(doc)
-    assert md.count("| # | Description | Kind | Details | Sources / provenance | Status |") == 3
-    assert "| 1 | ack follows req | assertion | detail a<br/>Inference: Reason not supplied; designer review required. | ⚠️<!--dv-evidence:" in md
-    assert "| NOT_RUN |" in md
-    head = md.index("### Coverage from RTL observations")
-    obs_row = md.index("| 2 | obs cover | cover_property |")
-    assert head < obs_row
-    assert obs_row < md.index("| NOT_RUN |", obs_row) < md.index("\n", obs_row)
+               "status": "PASS", "entries": [plain, cover, obs_entry]}
+    md = render_markdown({"sections": [check_sec, cov_sec], "coverage": None, "token_usage": None})
+    # Checks: no source or status column; the indicator follows the description.
+    assert "| # | Description | Kind | Details |" in md and "NOT_RUN" not in md
+    assert "| 1 | ack follows req ⚠️<!--dv-evidence:" in md
+    # Coverage: assertion table and covergroup table are separate, RTL-derived coverage stays apart.
+    assert md.index("### Assertion Coverage") < md.index("### Covergroups") < md.index("### Coverage from RTL observations")
+    assert "| # | Description | Assertion | Cover property | Covered |" in md
+    assert "| # | Description | Covergroup | Coverpoint | Coverbin | Covered |" in md
+    assert "| c_ack" in md and "| a_ack" in md
+    rows = [l for l in md.splitlines() if l.startswith("| 1 | plain cover") or l.startswith("|  |  | cg_x")]
+    assert len(rows) == 2 and "| cg_x | cp_a | low<br/>high | NOT_COVERED |" in rows[0] and rows[1].endswith("| cg_x | cp_b | on | NOT_COVERED |")
+    assert md.count("NOT_COVERED") == 4
+
+
+def test_coverage_without_cover_properties_flags_every_assertion_for_review():
+    from dv_agent.plan.testplan_doc import render_markdown
+    e = {"text": "ack follows req", "kind": "assertion", "provenance": "DOCUMENTED", "cited_req_ids": [],
+         "cited_chunk_ids": ["CH-1"], "cited_rtl_observation_ids": [], "details": [], "validation": []}
+    cov = dict(e, text="cg", kind="covergroup")
+    md = render_markdown({"sections": [{"id": "checks", "heading": "8", "generator": "entries", "status": "PASS", "entries": [e]},
+                                       {"id": "coverage", "heading": "9", "generator": "entries", "status": "PASS", "entries": [cov]}],
+                          "coverage": None, "token_usage": None})
+    assert "No cover properties were generated for the 1 assertion(s)" in md and "NEEDS_REVIEW" in md
 
 
 def test_html_is_rendered_from_the_exact_markdown_and_recovered_without_model_calls(run, monkeypatch, capsys):
-    from dv_agent.html_report import render_html
+    from dv_agent.report.html_report import render_html
     llm = _llm()
-    result = run_testplan_doc(run, llm)
+    result = run_testplan_doc(run, llm, mode="graph")
     md = (run / "testplan_doc.md").read_text()
     assert (run / "testplan_doc.html").read_text() == render_html(md)
     assert result["html"] == str(run / "testplan_doc.html")
@@ -425,7 +440,7 @@ def test_html_is_rendered_from_the_exact_markdown_and_recovered_without_model_ca
     assert (run / "testplan_doc.html").read_text() == render_html(edited)
     assert (run / "testplan_doc.md").read_text() == edited
     cached_llm = _llm()
-    assert run_testplan_doc(run, cached_llm)["reused"] is True
+    assert run_testplan_doc(run, cached_llm, mode="graph")["reused"] is True
     assert cached_llm.calls == []
     assert (run / "testplan_doc.md").read_text() == edited
 
@@ -433,7 +448,7 @@ def test_html_is_rendered_from_the_exact_markdown_and_recovered_without_model_ca
 def test_configurations_are_blocked_when_register_extraction_failed(run):
     def fail(payload):
         raise LLMError("incomplete", "limited")
-    run_testplan_doc(run, _llm(testplan_registers=fail))
+    run_testplan_doc(run, _llm(testplan_registers=fail), mode="graph")
     doc = _doc(run)
     assert doc["registers"]["status"] == "BLOCKED"
     section = next(s for s in doc["sections"] if s["id"] == "configurations")
@@ -441,11 +456,11 @@ def test_configurations_are_blocked_when_register_extraction_failed(run):
 
 
 def test_old_register_extraction_invalidates_dependent_testplan_cache(run):
-    run_testplan_doc(run, _llm())
+    run_testplan_doc(run, _llm(), mode="graph")
     doc = _doc(run)
     doc["registers"].pop("extraction_signature")
     (run / "testplan_doc.json").write_text(json.dumps(doc))
-    assert run_testplan_doc(run, _llm())["reused"] is False
+    assert run_testplan_doc(run, _llm(), mode="graph")["reused"] is False
 
 
 def test_llm_configuration_identification_feeds_strategy_and_configuration_sections(run):
@@ -472,16 +487,16 @@ def test_llm_configuration_identification_feeds_strategy_and_configuration_secti
         seen.add("configurations")
         return configurations_handler(payload)
     run_testplan_doc(run, _llm(testplan_registers=identified, testplan_strategy=strategy,
-                               testplan_configurations=configurations))
+                               testplan_configurations=configurations), mode="graph")
     assert seen == {"strategy", "configurations"}
 
 
 def test_section_context_slim_returns_chunk_only_context(spec_repo, tmp_path):
-    from dv_agent.graph import build_structure
-    from dv_agent.ingest import load_chunks, load_manifest
-    from dv_agent.retrieval import layered_view
-    from dv_agent.slim_index import build_index
-    from dv_agent.testplan_doc import DocConfig, section_context
+    from dv_agent.graph.graph import build_structure
+    from dv_agent.ingest.ingest import load_chunks, load_manifest
+    from dv_agent.retrieval.retrieval import layered_view
+    from dv_agent.retrieval.slim_index import build_index
+    from dv_agent.plan.testplan_doc import DocConfig, section_context
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
@@ -494,7 +509,7 @@ def test_section_context_slim_returns_chunk_only_context(spec_repo, tmp_path):
 
 
 def test_slim_entries_schema_requires_quote():
-    from dv_agent.testplan_doc import _entries_schema
+    from dv_agent.plan.testplan_doc import _entries_schema
 
     slim = _entries_schema(None, [], ["CH-1"], slim=True)
     item = slim["properties"]["entries"]["items"]
@@ -504,10 +519,10 @@ def test_slim_entries_schema_requires_quote():
 
 
 def test_validate_entries_verifies_slim_quotes(spec_repo, tmp_path):
-    from dv_agent.graph import build_structure
-    from dv_agent.ingest import load_chunks, load_manifest
+    from dv_agent.graph.graph import build_structure
+    from dv_agent.ingest.ingest import load_chunks, load_manifest
     from dv_agent.pipeline import run_ingest
-    from dv_agent.testplan_doc import _validate_entries
+    from dv_agent.plan.testplan_doc import _validate_entries
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
@@ -551,28 +566,28 @@ def slim_entries_handler(payload):
 
 
 @pytest.fixture
-def fast_run(spec_repo, tmp_path):
+def extracted_run(spec_repo, tmp_path):
     from dv_agent.pipeline import run_build_graph, run_ingest
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm(), mode="fast")
+    run_build_graph(out, _llm(), mode="graph")
     return out
 
 
-def test_fast_testplan_reuses_prebuilt_requirements(fast_run):
-    from dv_agent.graph import load_graph
+def test_basic_testplan_reuses_prebuilt_requirements(extracted_run):
+    from dv_agent.graph.graph import load_graph
     from dv_agent.pipeline import GRAPH_FILE, run_testplan_doc
 
-    before = {n for n, d in load_graph(fast_run / GRAPH_FILE).nodes(data=True) if d.get("type") == "requirement"}
+    before = {n for n, d in load_graph(extracted_run / GRAPH_FILE).nodes(data=True) if d.get("type") == "requirement"}
     llm = _llm(testplan_entries=slim_entries_handler)
-    result = run_testplan_doc(fast_run, llm, mode="fast")
+    result = run_testplan_doc(extracted_run, llm, mode="basic")
     assert not any(name == "requirement_dependencies" for name, _ in llm.calls)
     assert result["reused"] is False
-    doc = _doc(fast_run)
-    assert doc["mode"] == "fast"
+    doc = _doc(extracted_run)
+    assert doc["mode"] == "basic"
     assert [s["status"] for s in doc["sections"]] == ["PASS"] * 3 + ["NOT_RUN"] + ["PASS"] * 9
-    G = load_graph(fast_run / GRAPH_FILE)
+    G = load_graph(extracted_run / GRAPH_FILE)
     reqs = [n for n, d in G.nodes(data=True) if d.get("type") == "requirement"]
     assert reqs
     assert set(reqs) == before
@@ -580,14 +595,17 @@ def test_fast_testplan_reuses_prebuilt_requirements(fast_run):
     assert cited and cited <= set(reqs)
 
 
-def test_testplan_reuse_respects_mode(run):
-    from dv_agent.pipeline import run_testplan_doc
+def test_testplan_reuse_respects_mode(spec_repo, tmp_path):
+    from dv_agent.pipeline import run_build_graph, run_ingest, run_testplan_doc
 
-    run_testplan_doc(run, _llm())
-    assert _doc(run)["mode"] == "full"
-    fast = run_testplan_doc(run, _llm(testplan_entries=slim_entries_handler), mode="fast")
-    assert fast["reused"] is False and _doc(run)["mode"] == "fast"
-    again = run_testplan_doc(run, _llm(testplan_entries=slim_entries_handler), mode="fast")
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    run_build_graph(out, _llm(), mode="graph")
+    run_testplan_doc(out, _llm(), mode="graph")
+    assert _doc(out)["mode"] == "graph"
+    basic = run_testplan_doc(out, _llm(testplan_entries=slim_entries_handler), mode="basic")
+    assert basic["reused"] is False and _doc(out)["mode"] == "basic"
+    again = run_testplan_doc(out, _llm(testplan_entries=slim_entries_handler), mode="basic")
     assert again["reused"] is True
 
 

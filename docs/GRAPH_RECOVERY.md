@@ -1,6 +1,6 @@
 # Automatic graph extraction and API recovery
 
-`spec_graph` now extracts requirements and dependencies before testplan generation in both full and fast modes. Fast retains lexical retrieval; it no longer skips upfront extraction. A completed graph supplies existing requirements/dependencies to planning without on-demand dependency model calls. This supersedes the graph-free behaviour described in D-052.
+`spec_graph` extracts requirements and dependencies before testplan generation in graph mode. Basic mode skips upfront extraction and retrieves lexically from the deterministic slim index instead. A completed graph supplies existing requirements/dependencies to planning without on-demand dependency model calls. This supersedes the graph-free behaviour described in D-052.
 
 Successful batch responses are saved atomically under the run's `llm_cache` (including responses containing no requirements or edges). A normal rerun or `/plan` in the same interactive session reconstructs the graph from completed responses and requests only missing batches. Model, instructions, schema and source payload form the cache key, so changed input is re-extracted. `--force` rebuilds graph artifacts while retaining response checkpoints; `--fresh` deliberately deletes them.
 
@@ -21,7 +21,7 @@ interrupted step and final review/result instead of silently losing its ending.
 
 Model requests default to **150 seconds per attempt**, including basic mode. Set
 `META_REQUEST_TIMEOUT_SECONDS` to override it; explicit constructor timeouts take
-precedence. Basic mode retains two attempts, full/fast five. Longer request timeouts
+precedence. Basic mode retains two attempts, graph mode five. Longer request timeouts
 improve tolerance for slow responses but cannot guarantee the 10–15 minute demo target.
 
 For diagnosis, each traced stage writes `llm_requests.jsonl` beside `trace.jsonl`.

@@ -1,7 +1,7 @@
 import pytest
 
-from dv_agent.graph_checkpoint import CheckpointLLM
-from dv_agent.llm import FakeLLM, LLMError
+from dv_agent.graph.graph_checkpoint import CheckpointLLM
+from dv_agent.core.llm import FakeLLM, LLMError
 
 
 def test_graph_resume_reuses_success_including_empty_results(tmp_path):
@@ -45,8 +45,8 @@ def test_embedding_retry_is_bounded_and_uses_no_temperature(monkeypatch):
     from types import SimpleNamespace
     import httpx
     import openai
-    from dv_agent.dense import MetaEmbedder
-    from dv_agent import dense
+    from dv_agent.retrieval.dense import MetaEmbedder
+    from dv_agent.retrieval import dense
     calls, sleeps = [], []
     def create(**kwargs):
         calls.append(kwargs)

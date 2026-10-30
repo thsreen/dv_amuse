@@ -1,7 +1,7 @@
 """Deterministic evidence, topology, width and hook checks before SV rendering."""
 import re
 
-from ..extract import locate_quote
+from ..ingest.extract import locate_quote
 from .contracts import identifier, pointer
 
 
@@ -37,29 +37,13 @@ def validate(plan, specification, definition, sources):
     for name in (plan.clock, plan.reset):
         if name not in ports or ports[name]["direction"] != "input" or ports[name]["width"] != 1:
             raise ValueError("Clock/reset binding must be an explicit scalar DUT input")
-    for category in (plan.facts, plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.routes, plan.checks, plan.tests, plan.hooks):
+    for category in (plan.facts, plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.routes, plan.checks, plan.tests, plan.hooks,plan.coverage):
         ids = [identifier(item.id) for item in category]
         if len(ids) != len(set(ids)):
             raise ValueError("Duplicate code-plan IDs")
     facts = {f.id: f for f in plan.facts}
-    for fact in plan.facts:
-        try:
-            origin = pointer(specification, fact.plan_pointer)
-        except (KeyError, IndexError, ValueError, TypeError):
-            raise ValueError(f"Fact {fact.id} points outside the testplan") from None
-        if not isinstance(origin, dict) or origin.get("provenance") != "DOCUMENTED":
-            raise ValueError(f"Fact {fact.id} is not a documented plan item")
-        if origin.get("cited_rtl_observation_ids") or origin.get("review_owner") == "RTL_DESIGN_ENGINEER":
-            raise ValueError("RTL observations cannot supply executable expectations")
-        allowed = set(origin.get("cited_chunk_ids", [])) | set(origin.get("cited_req_ids", []))
-        if origin.get("chunk_id"):
-            allowed.add(origin["chunk_id"])
-        allowed.update(s["chunk_id"] for s in origin.get("sources", []) if isinstance(s, dict) and s.get("chunk_id"))
-        if fact.source_id not in allowed or fact.source_id not in sources:
-            raise ValueError(f"Fact {fact.id} lacks an eligible source")
-        if locate_quote(sources[fact.source_id], fact.quote) is None:
-            raise ValueError(f"Fact {fact.id} quote does not match its source")
-    for category in (plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.routes, plan.checks, plan.tests, plan.hooks):
+    validate_facts(plan.facts,specification,sources)
+    for category in (plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.routes, plan.checks, plan.tests, plan.hooks,plan.coverage):
         for item in category:
             if not set(item.fact_ids) <= facts.keys():
                 raise ValueError(f"Unknown evidence for {item.id}")
@@ -70,6 +54,7 @@ def validate(plan, specification, definition, sources):
     symbols += [s.id for s in plan.sequences] + [t.id for t in plan.tests]
     symbols += [t.id+'_vseq' for t in plan.tests]
     symbols += [t.id+'_'+a.id+'_drain' for t in plan.tests for a in plan.agents if a.active]
+    symbols += [c.id+'_coverage' for c in plan.coverage]
     if len(symbols)!=len(set(symbols)):
         raise ValueError('Generated class names collide; choose distinct component/sequence/test IDs')
     if any(a.id in {'sb','system_cov','build_phase','connect_phase','new'} or a.id.endswith('_control') for a in plan.agents):
@@ -177,6 +162,31 @@ def validate(plan, specification, definition, sources):
     for check in plan.checks:
         if check.agent not in agents or agents[check.agent].protocol != "wishbone":
             raise ValueError("Built-in protocol checks require a bus agent")
+    for goal in plan.coverage:
+        if goal.agent not in agents: raise ValueError('Coverage goal references an unknown monitor agent')
+        agent=agents[goal.agent]
+        names=[identifier(p.name) for p in goal.points]+[identifier(c.name) for c in goal.crosses]
+        if len(names)!=len(set(names)): raise ValueError('Duplicate coverage point/cross names')
+        for point in goal.points:
+            if point.field=='address' and agent.protocol!='wishbone': raise ValueError('Address coverage requires a bus monitor')
+            if point.field in ('parity_mode','stop_bits') and agent.protocol!='serial': raise ValueError('Frame coverage requires a serial monitor')
+            bins=[identifier(b.name) for b in point.bins]
+            if len(bins)!=len(set(bins)): raise ValueError('Duplicate coverage bins')
+            width=(ports[agent.bindings['addr']]['width'] if point.field=='address' else
+                   ports[agent.bindings['wdata']]['width'] if point.field=='data' and agent.protocol=='wishbone' else
+                   agent.data_bits if point.field=='data' and agent.protocol=='serial' else
+                   1 if point.field=='error' else 3 if point.field=='kind' else 64)
+            selected_mask=(point.mask & ((1<<width)-1))>>point.shift
+            for b in point.bins:
+                if any(v<0 or v & ~selected_mask for v in b.values): raise ValueError('Coverage bin exceeds its selected field/mask width')
+        point_names={p.name for p in goal.points}
+        for cross in goal.crosses:
+            if len(set(cross.points))!=len(cross.points) or not set(cross.points)<=point_names:
+                raise ValueError('Coverage cross references unknown/duplicate points')
+        allowed_kinds={'wishbone':{1,2},'serial':{3,4},'custom':{5}}[agent.protocol]
+        if not set(goal.sample_kinds)<=allowed_kinds: raise ValueError('Coverage filter incompatible with monitored events')
+        if goal.sample_address is not None and (agent.protocol!='wishbone' or goal.sample_address>=1<<ports[agent.bindings['addr']]['width']):
+            raise ValueError('Coverage address filter requires a valid bus address')
     for hook in plan.hooks:
         if hook.slot=='scoreboard.compare':
             if hook.target not in {r.id for r in plan.routes}: raise ValueError('Scoreboard hook requires a route target')
@@ -185,3 +195,23 @@ def validate(plan, specification, definition, sources):
         elif hook.slot in ('driver.body','monitor.body') and agents[hook.target].protocol!='custom':
             raise ValueError('Protocol body hooks require the custom protocol; builtin behavior is template-owned')
     return ports
+
+
+def validate_facts(facts,specification,sources):
+    if specification.get('source_authority')=='RTL_INFERRED':
+        raise ValueError('Unvalidated RTL-derived expectations are not executable')
+    ids=[identifier(f.id) for f in facts]
+    if len(ids)!=len(set(ids)): raise ValueError('Duplicate fact IDs')
+    for fact in facts:
+        try: origin=pointer(specification,fact.plan_pointer)
+        except (KeyError,IndexError,ValueError,TypeError):
+            raise ValueError(f'Fact {fact.id} points outside the testplan') from None
+        if not isinstance(origin,dict) or origin.get('provenance')!='DOCUMENTED':
+            raise ValueError(f'Fact {fact.id} is not a documented plan item')
+        if origin.get('cited_rtl_observation_ids') or origin.get('review_owner')=='RTL_DESIGN_ENGINEER':
+            raise ValueError('RTL observations cannot supply executable expectations')
+        allowed=set(origin.get('cited_chunk_ids',[]))|set(origin.get('cited_req_ids',[]))
+        if origin.get('chunk_id'): allowed.add(origin['chunk_id'])
+        allowed.update(s['chunk_id'] for s in origin.get('sources',[]) if isinstance(s,dict) and s.get('chunk_id'))
+        if fact.source_id not in allowed or fact.source_id not in sources: raise ValueError(f'Fact {fact.id} lacks an eligible source')
+        if locate_quote(sources[fact.source_id],fact.quote) is None: raise ValueError(f'Fact {fact.id} quote does not match its source')

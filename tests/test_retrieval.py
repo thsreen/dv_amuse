@@ -1,15 +1,15 @@
 import pytest
 
-from dv_agent.graph import load_graph
+from dv_agent.graph.graph import load_graph
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_query
-from dv_agent.retrieval import RetrievalConfig, retrieve
+from dv_agent.retrieval.retrieval import RetrievalConfig, retrieve
 
 
 @pytest.fixture
 def graph(spec_repo, tmp_path, fake_llm):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, fake_llm)
+    run_build_graph(out, fake_llm, mode="graph")
     return out, load_graph(out / GRAPH_FILE)
 
 

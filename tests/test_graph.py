@@ -1,16 +1,16 @@
 import pytest
 
-from dv_agent.extract import locate_quote
-from dv_agent.graph import attach_artifact, lineage, load_graph, save_graph
+from dv_agent.ingest.extract import locate_quote
+from dv_agent.graph.graph import attach_artifact, lineage, load_graph, save_graph
 from dv_agent.pipeline import GRAPH_FILE, TRACE_FILE, run_build_graph, run_ingest
-from dv_agent.trace import Tracer, read_trace
+from dv_agent.core.trace import Tracer, read_trace
 
 
 @pytest.fixture
 def built(spec_repo, tmp_path, fake_llm):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    stats = run_build_graph(out, fake_llm)
+    stats = run_build_graph(out, fake_llm, mode="graph")
     return out, stats, load_graph(out / GRAPH_FILE)
 
 
@@ -89,6 +89,6 @@ def test_graph_roundtrip_and_structural_build_without_llm(built, spec_repo, tmp_
     assert H.number_of_nodes() == G.number_of_nodes() and H.number_of_edges() == G.number_of_edges()
     out2 = tmp_path / "structural"
     run_ingest(spec_repo, out2)
-    stats = run_build_graph(out2, None)
+    stats = run_build_graph(out2, None, mode="graph")
     assert stats["llm"]["status"] == "NOT_RUN"
     assert "requirement" not in stats["nodes"] and stats["nodes"]["chunk"] > 0

@@ -1,19 +1,19 @@
 import json
 
 from conftest import interfaces_handler
-from dv_agent.graph import lineage, load_graph
-from dv_agent.interfaces import UNGROUPED, compact, extract_interfaces
-from dv_agent.llm import LLMError
+from dv_agent.graph.graph import lineage, load_graph
+from dv_agent.plan.interfaces import UNGROUPED, compact, extract_interfaces
+from dv_agent.core.llm import LLMError
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_testplan_doc
-from dv_agent.retrieval import layered_view
-from dv_agent.trace import Tracer
+from dv_agent.retrieval.retrieval import layered_view
+from dv_agent.core.trace import Tracer
 from test_testplan_doc import _llm, entries_handler
 
 
 def _graph(spec_repo, tmp_path):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm())
+    run_build_graph(out, _llm(), mode="graph")
     return out, load_graph(out / GRAPH_FILE)
 
 
@@ -34,8 +34,8 @@ def test_signals_are_verified_against_the_spec(spec_repo, tmp_path):
 
 
 def test_interface_metadata_is_bulleted_with_collapsed_quotes(spec_repo, tmp_path):
-    from dv_agent.interfaces import render
-    from dv_agent.html_report import render_html
+    from dv_agent.plan.interfaces import render
+    from dv_agent.report.html_report import render_html
     _, G = _graph(spec_repo, tmp_path)
     result = _extract(G, tmp_path)
     md = "\n".join(render(result, "Interfaces"))
@@ -94,7 +94,7 @@ def test_interfaces_come_first_and_feed_every_section(spec_repo, tmp_path):
     def capture(payload):
         seen[payload["section"]["id"]] = payload["interfaces"]
         return entries_handler(payload)
-    summary = run_testplan_doc(out, _llm(testplan_entries=capture))
+    summary = run_testplan_doc(out, _llm(testplan_entries=capture), mode="graph")
     assert summary["interfaces"]["status"] == "PASS"
     assert {g["group"] for g in seen["stimulus"]} >= {"Register bus", "Interrupt"}
     assert all(seen[s] == seen["stimulus"] for s in seen)
@@ -115,25 +115,25 @@ def test_blocked_interface_step_does_not_stop_the_plan(spec_repo, tmp_path):
 
     def failing(payload):
         raise LLMError("transient", "simulated")
-    summary = run_testplan_doc(out, _llm(testplan_interfaces=failing))
+    summary = run_testplan_doc(out, _llm(testplan_interfaces=failing), mode="graph")
     assert summary["interfaces"]["status"] == "BLOCKED"
     status = {s["id"]: s["status"] for s in summary["sections"]}
     assert status.pop("strategy") == "NOT_RUN"  # the strategy is built from verified interface groups
     assert status.pop("rtl_observations") == "NOT_RUN"  # opt-in; no RTL graph provided
     assert set(status.values()) == {"PASS"}
     assert "**BLOCKED**" in (out / "testplan_doc.md").read_text()
-    assert run_testplan_doc(out, _llm())["reused"] is False
+    assert run_testplan_doc(out, _llm(), mode="graph")["reused"] is False
 
 
 def test_interface_step_can_be_disabled_in_template(spec_repo, tmp_path):
-    from dv_agent.testplan_doc import DEFAULT_TEMPLATE
+    from dv_agent.plan.testplan_doc import DEFAULT_TEMPLATE
     out, _ = _graph(spec_repo, tmp_path)
     t = json.loads(DEFAULT_TEMPLATE.read_text())
     t["interfaces"] = {"enabled": False}
     path = tmp_path / "no_iface.json"
     path.write_text(json.dumps(t))
     llm = _llm()
-    summary = run_testplan_doc(out, llm, template_path=path)
+    summary = run_testplan_doc(out, llm, template_path=path, mode="graph")
     assert summary["interfaces"] is None and not any(name == "testplan_interfaces" for name, _ in llm.calls)
 
 
@@ -163,7 +163,7 @@ def test_groups_sharing_functionality_and_module_type_are_flagged(spec_repo, tmp
 
 def test_markdown_shows_connected_module_type(spec_repo, tmp_path):
     out, _ = _graph(spec_repo, tmp_path)
-    run_testplan_doc(out, _llm())
+    run_testplan_doc(out, _llm(), mode="graph")
     md = (out / "testplan_doc.md").read_text()
     assert "Connected module type: interrupt_controller" in md
     assert "Connected to: interrupt controller" in md
@@ -175,7 +175,7 @@ def test_active_level_is_checked_against_the_quote(spec_repo, tmp_path):
     sigs = {s["name"]: s for s in res["signals"]}
     assert sigs["RST_N"]["active_level"] == "low" and sigs["RST_N"]["active_level_documented"]
     assert sigs["IRQ"]["active_level"] == "high" and not sigs["IRQ"]["active_level_documented"]
-    from dv_agent.interfaces import interface_questions
+    from dv_agent.plan.interfaces import interface_questions
     qs = [q["text"] for q in interface_questions(res)]
     assert any("active level of IRQ" in q for q in qs) and not any("active level of RST_N" in q for q in qs)
     bus = next(c for c in compact(res) if c["group"] == "Reset")
@@ -183,11 +183,11 @@ def test_active_level_is_checked_against_the_quote(spec_repo, tmp_path):
 
 
 def test_interface_chunks_slim_returns_cited_chunks(spec_repo, tmp_path):
-    from dv_agent.graph import build_structure
-    from dv_agent.ingest import load_chunks, load_manifest
-    from dv_agent.interfaces import InterfaceConfig, interface_chunks
+    from dv_agent.graph.graph import build_structure
+    from dv_agent.ingest.ingest import load_chunks, load_manifest
+    from dv_agent.plan.interfaces import InterfaceConfig, interface_chunks
     from dv_agent.pipeline import run_ingest
-    from dv_agent.slim_index import build_index
+    from dv_agent.retrieval.slim_index import build_index
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
@@ -197,7 +197,7 @@ def test_interface_chunks_slim_returns_cited_chunks(spec_repo, tmp_path):
     assert all({"chunk_id", "text", "score", "doc_path", "pages"} <= set(c) for c in chunks)
 
 
-def test_interfaces_fast_mode_marks_and_reuses(spec_repo, tmp_path):
+def test_interfaces_basic_mode_marks_and_reuses(spec_repo, tmp_path):
     import json
 
     from dv_agent.pipeline import run_build_graph, run_ingest, run_interfaces
@@ -205,9 +205,9 @@ def test_interfaces_fast_mode_marks_and_reuses(spec_repo, tmp_path):
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm(), mode="fast")
-    first = run_interfaces(out, _llm(), mode="fast")
+    run_build_graph(out, _llm(), mode="basic")
+    first = run_interfaces(out, _llm(), mode="basic")
     assert first["status"] == "PASS" and first["reused"] is False
-    assert json.loads((out / "interfaces.json").read_text())["mode"] == "fast"
-    assert run_interfaces(out, _llm(), mode="fast")["reused"] is True
-    assert run_interfaces(out, _llm(), mode="full")["reused"] is False
+    assert json.loads((out / "interfaces.json").read_text())["mode"] == "basic"
+    assert run_interfaces(out, _llm(), mode="basic")["reused"] is True
+    assert run_interfaces(out, _llm(), mode="graph")["reused"] is False

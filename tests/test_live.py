@@ -3,9 +3,9 @@ import os
 
 import pytest
 
-from dv_agent.extract import EXTRACT_INSTRUCTIONS, EXTRACT_SCHEMA, locate_quote
-from dv_agent.llm import MetaClient
-from dv_agent.trace import Tracer, langfuse_configured, read_trace
+from dv_agent.ingest.extract import EXTRACT_INSTRUCTIONS, EXTRACT_SCHEMA, locate_quote
+from dv_agent.core.llm import MetaClient
+from dv_agent.core.trace import Tracer, langfuse_configured, read_trace
 
 pytestmark = pytest.mark.live
 

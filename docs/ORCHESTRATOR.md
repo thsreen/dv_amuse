@@ -10,15 +10,38 @@ resume command.
 
 ## Interactive testplan flow
 
-For a live demo using basic RAG, start:
+Basic lexical RAG is the default. Start:
 
 ```sh
-.venv/bin/python -m orchestrator_agent --mode basic
+.venv/bin/python -m orchestrator_agent
 ```
 
 Then enter `Generate verification collateral for ../baseline_repos/uart16550` and `/plan`.
-The same four commands remain available. Advanced `run` also accepts `--mode basic`.
-`DV_AGENT_MODE=basic` is the equivalent environment setting.
+Afterward type `/code`. It automatically groups related features, retrieves relevant specification
+excerpts, records dependencies and per-feature pseudocode, collates the implementation approach,
+generates the reusable UVM foundation and components, validates/reviews them, renders source files,
+and compiles with Xezim/UVM. No separate intermediate command is needed. The terminal shows an
+English preview and the same progress dashboard as `/plan`, including each feature's understanding
+and implementation tasks, the current task, start time and elapsed time at completion checkpoints.
+Noninteractive terminals receive plain progress lines; there are no timer-only redraws.
+
+In a restarted session, `/code` automatically selects the latest successful compatible documented
+testplan and restores its saved RTL interface/source list. Naming a repository first restricts this
+selection to that design. Incomplete plans, inferred RTL specifications, failed workflows and missing
+source files are excluded. With no matching saved plan, `/code` runs `/plan` first for the selected
+repository. `/fresh` disables automatic saved-plan restoration for that session.
+
+Code remains under the selected run's `code/`; dependency/pseudocode documents are indexed by
+`code_work_manifest.json`. `code_trace.jsonl` records progress and `code_result.json` records the
+outcome/duration separately from the planning result. Interrupted builds retain successful checkpoints;
+retry `/code` to resume matching work. Compilation failures are reported as blocked. Generated
+expectations still require review. `/run` and `/regress` execute the generated tests separately.
+Without an enabled model or explicit implementation contract, the existing limited smoke scaffold
+remains available and is labeled accordingly.
+
+The same four commands remain available. Advanced `run` also accepts `--mode graph`
+for the model-built knowledge-graph analysis. `DV_AGENT_MODE=graph` is the
+equivalent environment setting.
 
 Basic mode targets a 10–15 minute UART-sized demo: it builds a local lexical chunk index without model
 requirement/dependency extraction or embeddings, follows the fixed flow without model decider calls,
@@ -27,17 +50,18 @@ window and the deterministic register-table inventory, using two workers with de
 Planning uses smaller retrieval/entry limits and no validation repair rounds or separate model claim
 judges for ordinary sections. Citation, quote, register validation and inferred RTL review rules remain.
 RTL observations retain their claim judge. The interactive/advanced orchestrator model client uses a
-150-second request timeout and two API attempts in basic mode. Full/fast also default
-to 150 seconds per request, retaining their five-attempt recovery. Set
+150-second request timeout and two API attempts in basic mode. Graph mode also defaults
+to 150 seconds per request, retaining its five-attempt recovery. Set
 `META_REQUEST_TIMEOUT_SECONDS` to override the request timeout.
 
 The report explicitly identifies the reduced analysis scope. Requirement graph coverage is unavailable;
-this is a review-required demo draft, not equivalent to the full analysis. Successful responses still
+this is a review-required demo draft, not equivalent to the graph analysis. Successful responses still
 checkpoint for same-directory recovery. API service latency and failures can exceed the target;
 10–15 minutes is a target, not an enforced whole-run deadline. Live timing requires an unrestricted
-terminal with API connectivity. Existing `fast` mode still builds the evidence graph; `basic` skips it.
+terminal with API connectivity. Graph mode (`--mode graph`) builds the evidence graph first;
+`basic` skips it.
 
-Graph extraction saves and resumes completed batches automatically; generation API calls recover with at most five attempts. See [graph and API recovery](GRAPH_RECOVERY.md). Fast mode now changes retrieval, while requirement/dependency extraction occurs in `spec_graph` before planning.
+Graph extraction saves and resumes completed batches automatically; generation API calls recover with at most five attempts. See [graph and API recovery](GRAPH_RECOVERY.md). Basic mode uses chunk-only lexical retrieval, while requirement/dependency extraction occurs in `spec_graph` before planning in graph mode.
 
 Completed testplan sections immediately update partial JSON, Markdown and HTML
 reports. Pending sections are labeled; interruptions preserve the latest output.
@@ -127,6 +151,11 @@ or plan reports BLOCKED; it never reports a simulated PASS. Functional generatio
 also requires `XEZIM_UVM_DIR` pointing to a UVM source release. The legacy smoke
 test does not claim functional correctness. See [CODE_GENERATION.md](CODE_GENERATION.md)
 for contracts, templates, supported behaviors, recovery and current validation limits.
+Saved functional projects can also be replayed without a model using
+`dv-agent run-code --out <run>` or `dv-agent run-code --out <run> --regress`.
+`/code` writes feature dependency/understanding notes and collated pseudocode before
+translation. These are indexed by `<run>/code_work_manifest.json`; standalone
+`dv-agent plan-code --out <run>` stops at pseudocode. See [work packages](CODE_WORK_PACKAGES.md).
 Ctrl-D leaves the terminal. The
 advanced non-interactive CLI below remains available for custom flow files.
 

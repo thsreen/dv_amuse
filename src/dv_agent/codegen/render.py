@@ -92,10 +92,11 @@ def render(plan, ports, hooks=None):
                 trigger = "bus.cyc && bus.stb && !bus.ack" if c.kind == 'stable_until_ack' else "bus.cyc && bus.stb"
                 consequent = "$stable({bus.addr,bus.wdata,bus.sel,bus.we})" if c.kind == 'stable_until_ack' else "!$isunknown({bus.addr,bus.sel,bus.we,bus.ack})"
                 delay = '|=>' if c.kind == 'stable_until_ack' else '|->'
-                properties += [f"  property p_{c.id}; ({trigger}) {delay} ({consequent}); endproperty",
+                clock=f'@(posedge bus.clk) disable iff (bus.reset == {int(plan.reset_active=="high")})'
+                properties += [f"  property p_{c.id}; {clock} ({trigger}) {delay} ({consequent}); endproperty",
                                f'  a_{c.id}: assert property(p_{c.id}) else $error("{c.id}");',
                                f"  c_{c.id}: cover property(p_{c.id});",
-                               f"  activation_{c.id}: cover property({trigger});"]
+                               f"  activation_{c.id}: cover property({clock} {trigger});"]
             artifacts[f"checks/{a.id}_assertions.sv"] = template('assertions.sv', PROPERTIES='\n'.join(properties), **values)
             checker_instances.append(f"  {a.id}_assertions {a.id}_checks({a.id}_bus);")
     declarations,reset,updates,predicates=qualifiers(plan,'tr')
@@ -138,6 +139,22 @@ def render(plan, ports, hooks=None):
         add('uvm/cg_system_coverage.svh',template('system_coverage.svh',ROUTE_BINS='\n'.join(route_bins),
             DECLARATIONS='\n'.join(cov_declarations), RESET_STATE='\n'.join(cov_resets), ROUTE_SAMPLING='\n'.join(cov_updates+route_sampling)))
     env_members, env_build, env_connect = [], [], []
+    for goal in plan.coverage:
+        points=[]
+        for point in goal.points:
+            bins=' '.join(f"bins {b.name}={{{', '.join(sv(v) for v in b.values)}}};" for b in point.bins)
+            points.append(f'    {point.name}: coverpoint sampled_{point.name} {{ {bins} }}')
+        filters=[]
+        if goal.sample_kinds: filters.append('('+' || '.join(f'observed.kind=={k}' for k in goal.sample_kinds)+')')
+        if goal.sample_address is not None: filters.append(f'observed.address=={sv(goal.sample_address)}')
+        add(f'uvm/{goal.id}_coverage.svh',template('plan_coverage.svh',GOAL=goal.id,
+            VARIABLES='\n'.join(f'  longint unsigned sampled_{p.name};' for p in goal.points),
+            POINTS='\n'.join(points),CROSSES='\n'.join(f"    {c.name}: cross {', '.join(c.points)};" for c in goal.crosses),
+            FILTER=' && '.join(filters) or '1',SAMPLING='\n'.join(
+                f'      sampled_{p.name}=(observed.{p.field} & {sv(p.mask)}) >> {p.shift};' for p in goal.points)))
+        env_members.append(f'  {goal.id}_coverage plan_cov_{goal.id};')
+        env_build.append(f'    plan_cov_{goal.id}={goal.id}_coverage::type_id::create("plan_cov_{goal.id}",this);')
+        env_connect.append(f'    {goal.agent}.mon.ap.connect(plan_cov_{goal.id}.analysis_export);')
     if plan.routes:
         env_members.append('  cg_system_coverage system_cov;')
         env_build.append('    system_cov=cg_system_coverage::type_id::create("system_cov",this);')

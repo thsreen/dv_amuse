@@ -3,15 +3,15 @@ import json
 import pytest
 
 from dv_agent.cli import main
-from dv_agent.graph import load_graph
-from dv_agent.llm import FakeLLM, LLMError
+from dv_agent.graph.graph import load_graph
+from dv_agent.core.llm import FakeLLM, LLMError
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_registers
-from dv_agent.registers import (RegisterConfig, access_class, configurable_fields, extract_registers, parse_bits,
+from dv_agent.plan.registers import (RegisterConfig, access_class, configurable_fields, extract_registers, parse_bits,
                                 parse_number, register_questions)
-from dv_agent.retrieval import layered_view
-from dv_agent.trace import Tracer
-from dv_agent.register_tables import table_records
-from dv_agent.source_windows import extraction_windows
+from dv_agent.retrieval.retrieval import layered_view
+from dv_agent.core.trace import Tracer
+from dv_agent.plan.register_tables import table_records
+from dv_agent.ingest.source_windows import extraction_windows
 
 SPEC = """# 1 Register list
 Name | Address | Access | Reset value
@@ -57,7 +57,7 @@ def graph(tmp_path):
     (repo / "doc" / "spec.md").write_text(SPEC)
     out = tmp_path / "run"
     run_ingest(repo, out)
-    run_build_graph(out, None)
+    run_build_graph(out, None, mode="graph")
     return out, load_graph(out / GRAPH_FILE)
 
 
@@ -145,7 +145,7 @@ def test_cli_registers_writes_outputs_and_reuses(graph, capsys, monkeypatch):
     assert json.loads(capsys.readouterr().out)["reused"] is True
     other = FakeLLM({"testplan_registers": handler})
     other.model = "other"
-    assert run_registers(out, other)["reused"] is False
+    assert run_registers(out, other, mode="graph")["reused"] is False
 
 
 TABLE = """# Register map
@@ -164,7 +164,7 @@ def _table_graph(tmp_path):
     (repo / "doc" / "spec.md").write_text(TABLE)
     out = tmp_path / "table-run"
     run_ingest(repo, out)
-    run_build_graph(out, None)
+    run_build_graph(out, None, mode="graph")
     return load_graph(out / GRAPH_FILE)
 
 
@@ -238,7 +238,7 @@ Bit # Access Description
 
 
 def test_configuration_identification_requires_source_quote(graph, tmp_path):
-    from dv_agent.registers import record_problems
+    from dv_agent.plan.registers import record_problems
     _, G = graph
     cid = next(n for n, d in G.nodes(data=True) if d["type"] == "chunk" and "Register list" in d["text"])
     raw = handler({"chunks": [{"chunk_id": cid, "text": G.nodes[cid]["text"]}]})["registers"][0]
@@ -249,20 +249,20 @@ def test_configuration_identification_requires_source_quote(graph, tmp_path):
 def test_register_cache_from_before_configuration_identification_is_not_reused(graph):
     out, _ = graph
     llm = FakeLLM({"testplan_registers": handler})
-    run_registers(out, llm)
+    run_registers(out, llm, mode="graph")
     path = out / "registers.json"
     result = json.loads(path.read_text())
     result.pop("extraction_signature")
     path.write_text(json.dumps(result))
-    assert run_registers(out, llm)["reused"] is False
+    assert run_registers(out, llm, mode="graph")["reused"] is False
 
 
 def test_register_chunks_slim_returns_cited_chunks(spec_repo, tmp_path):
-    from dv_agent.graph import build_structure
-    from dv_agent.ingest import load_chunks, load_manifest
+    from dv_agent.graph.graph import build_structure
+    from dv_agent.ingest.ingest import load_chunks, load_manifest
     from dv_agent.pipeline import run_ingest
-    from dv_agent.registers import register_chunks
-    from dv_agent.slim_index import build_index
+    from dv_agent.plan.registers import register_chunks
+    from dv_agent.retrieval.slim_index import build_index
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
@@ -272,7 +272,7 @@ def test_register_chunks_slim_returns_cited_chunks(spec_repo, tmp_path):
     assert all({"chunk_id", "text", "score", "doc_path", "pages"} <= set(c) for c in chunks)
 
 
-def test_registers_fast_mode_marks_and_reuses(spec_repo, tmp_path):
+def test_registers_basic_mode_marks_and_reuses(spec_repo, tmp_path):
     import json
 
     from dv_agent.pipeline import run_build_graph, run_ingest, run_registers
@@ -280,9 +280,9 @@ def test_registers_fast_mode_marks_and_reuses(spec_repo, tmp_path):
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, _llm(), mode="fast")
-    first = run_registers(out, _llm(), mode="fast")
+    run_build_graph(out, _llm(), mode="basic")
+    first = run_registers(out, _llm(), mode="basic")
     assert first["status"] == "PASS" and first["reused"] is False
-    assert json.loads((out / "registers.json").read_text())["mode"] == "fast"
-    assert run_registers(out, _llm(), mode="fast")["reused"] is True
-    assert run_registers(out, _llm(), mode="full")["reused"] is False
+    assert json.loads((out / "registers.json").read_text())["mode"] == "basic"
+    assert run_registers(out, _llm(), mode="basic")["reused"] is True
+    assert run_registers(out, _llm(), mode="graph")["reused"] is False

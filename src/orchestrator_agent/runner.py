@@ -340,7 +340,7 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
             def invoke():
                 if spec.agent != "dv":
                     return spec.run(args, context)
-                from dv_agent import progress
+                from dv_agent.core import progress
                 progress.set_sink(lambda message: emit("task_progress", step=step_id, message=message))
                 progress.set_event_sink(lambda detail: emit(
                     detail["kind"], step=step_id,
@@ -406,7 +406,7 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
                 index += 1
             else:
                 pending_revisit = None
-            if llm is None or dry_run or os.getenv("DV_AGENT_MODE") == "basic":
+            if llm is None or dry_run or os.getenv("DV_AGENT_MODE", "basic") == "basic":
                 continue
             next_step = order[index] if index < len(order) else None
             decision, decider_error = decider_mod.decide(

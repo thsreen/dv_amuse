@@ -4,8 +4,8 @@ import httpx
 import openai
 import pytest
 
-from dv_agent.llm import LLMError, MetaClient
-from dv_agent.trace import Tracer, read_trace
+from dv_agent.core.llm import LLMError, MetaClient
+from dv_agent.core.trace import Tracer, read_trace
 
 SCHEMA = {"type": "object", "properties": {"x": {"type": "string"}}, "required": ["x"],
           "additionalProperties": False}
@@ -180,7 +180,7 @@ class SequenceResponses:
 
 
 def test_token_exhaustion_grows_budget_and_accounts_for_failed_attempt(tmp_path):
-    from dv_agent.usage import run_totals
+    from dv_agent.core.usage import run_totals
     fake = SequenceResponses(_response("incomplete", reason="max_output_tokens"), _response("completed"))
     client = MetaClient(api_key="k", model="m", client=SimpleNamespace(responses=fake),
                         max_output_tokens=64, max_output_tokens_ceiling=128)
@@ -224,7 +224,7 @@ def test_partial_extraction_does_not_report_a_passing_graph(spec_repo, tmp_path,
     fake_llm.handlers["spec_requirements"] = fail
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    result = run_build_graph(out, fake_llm)
+    result = run_build_graph(out, fake_llm, mode="graph")
     assert result["requirements"]["failed_chunks"]
     assert result["llm"]["status"] == "BLOCKED"
 
@@ -242,7 +242,7 @@ def test_default_and_configurable_request_timeout(monkeypatch):
 
 def test_attempt_logging_is_immediate_detailed_and_sanitized(tmp_path):
     import json
-    from dv_agent.graph_checkpoint import CheckpointLLM
+    from dv_agent.graph.graph_checkpoint import CheckpointLLM
     path=tmp_path/'llm_requests.jsonl'
     request=httpx.Request('POST','https://example.invalid')
     secret='private-provider-body'

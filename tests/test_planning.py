@@ -3,15 +3,15 @@ import json
 import pytest
 
 from conftest import dependency_handler, extraction_handler, plan_handler, rerank_handler
-from dv_agent.community import build_communities  # noqa: F401  (import check)
-from dv_agent.dense import HashEmbedder, load_index
-from dv_agent.evaluate import Case, evaluate
-from dv_agent.graph import lineage, load_graph
-from dv_agent.llm import FakeLLM
+from dv_agent.graph.community import build_communities  # noqa: F401  (import check)
+from dv_agent.retrieval.dense import HashEmbedder, load_index
+from dv_agent.retrieval.evaluate import Case, evaluate
+from dv_agent.graph.graph import lineage, load_graph
+from dv_agent.core.llm import FakeLLM
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_query, run_test_plan
-from dv_agent.planning import PlanConfig, iterative_retrieve
-from dv_agent.retrieval import RetrievalConfig, layered_view
-from dv_agent.trace import Tracer, read_trace
+from dv_agent.plan.planning import PlanConfig, iterative_retrieve
+from dv_agent.retrieval.retrieval import RetrievalConfig, layered_view
+from dv_agent.core.trace import Tracer, read_trace
 
 
 def _full_llm():
@@ -22,7 +22,7 @@ def _full_llm():
 def _graph(spec_repo, tmp_path, llm, embedder=None):
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    run_build_graph(out, llm, embedder=embedder)
+    run_build_graph(out, llm, embedder=embedder, mode="graph")
     return out
 
 

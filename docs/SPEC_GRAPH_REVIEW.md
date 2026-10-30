@@ -2,6 +2,8 @@
 
 Subsequent implementation: see [automatic recovery](GRAPH_RECOVERY.md). Both modes now extract in spec_graph with durable batch checkpoints; the graph tool no longer uses its former whole-stage background timeout. Findings below describe the earlier code.
 
+Note (2026-10-30): `fast` mode was later removed and `full` renamed to `graph`; `basic` is now the default. Map `full`->`graph` when reading this review; `fast`-specific findings no longer apply.
+
 No pipeline, model calls or tests were executed for this review, as requested.
 
 - Fixed: repository discovery stripped leading dots from `../...`, breaking parent-relative paths. It now preserves them and accepts quoted paths containing spaces. The terminal accepts a bare existing absolute directory as a repository prompt. An unresolved new prompt clears the previous repository selection.

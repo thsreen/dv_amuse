@@ -1,6 +1,6 @@
 import hashlib
 
-from dv_agent.ingest import ChunkConfig, _split_section, discover, find_headings, ingest
+from dv_agent.ingest.ingest import ChunkConfig, _split_section, discover, find_headings, ingest
 
 
 def test_discover_selects_spec_and_explains_skips(spec_repo):

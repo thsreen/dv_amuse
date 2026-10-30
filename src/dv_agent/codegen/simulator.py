@@ -7,8 +7,21 @@ import subprocess
 import time
 from pathlib import Path
 
-from ..fsutil import atomic_write_text
+from ..core.fsutil import atomic_write_text
 from .contracts import digest
+
+
+def run_saved_project(directory, *, regress=False, timeout=180):
+    directory=Path(directory)
+    state=directory/'code_generation_state.json'
+    if state.is_file() and json.loads(state.read_text()).get('status') in ('BLOCKED','BUILDING'):
+        return dict(status='BLOCKED',reason='Latest code generation is incomplete; rebuild before execution',tests=[])
+    path=directory/'code_manifest.json'
+    if not path.is_file(): raise ValueError('No code manifest; run /code or build-code first')
+    manifest=json.loads(path.read_text())
+    if manifest.get('contract')!='verification_codegen_v1':
+        raise ValueError('run-code requires a functional verification manifest; use orchestrator /run for legacy smoke')
+    return run_project(manifest,regress=regress,timeout=timeout)
 
 
 def discover():
@@ -48,7 +61,7 @@ def command(manifest, capabilities, *, simulate=False, test=None):
     if capabilities.get('error_exit'): cmd+=['--error-exit']
     cmd+=[str(library)]+rtl+[str(code/p) for p in manifest['compile_files']]
     if test:
-        cmd += ['+UVM_TESTNAME='+test['name'], '+ntb_random_seed='+str(test['seed'])]
+        cmd += ['+UVM_TESTNAME='+test['name'], '+seed='+str(test['seed'])]
     return cmd
 
 
@@ -97,6 +110,8 @@ def run_project(manifest, *, regress=False, timeout=180):
         directory=code/'simulation'/test['name']/str(test['seed'])/str(time.time_ns())
         directory.mkdir(parents=True,exist_ok=True)
         env=dict(os.environ,XEZIM_COV_DB=str(directory/'coverage.json'))
+        comparisons=[]
+        uvm_counts={}
         try:
             completed=subprocess.run(command(manifest,compile_result,simulate=True,test=test),cwd=directory,env=env,
                                      text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=timeout,check=False)
@@ -104,7 +119,13 @@ def run_project(manifest, *, regress=False, timeout=180):
             marker='FUNCTIONAL_TEST_PASS '+test['name']
             errors=bool(re.search(r'UVM_(?:ERROR|FATAL)\s+(?!: *0\b)|\b(?:DATA_MISMATCH|REGISTER_MISMATCH|UNDRAINED|NO_COMPARISON|MON_X)\b',log))
             status='PASS' if completed.returncode==0 and marker in log and not errors else 'FAIL'
-            reason=f'Xezim exit {completed.returncode}'
+            reason=(f'Xezim exit {completed.returncode}' if completed.returncode else
+                    'UVM or scoreboard/monitor errors reported' if errors else
+                    'Functional completion marker missing' if marker not in log else 'Functional checks completed')
+            comparisons=[int(n) for n in re.findall(r'\[SCOREBOARD_SUMMARY\]\s+comparisons=(\d+)',log)]
+            uvm_counts={kind:int(count) for kind,count in re.findall(r'^UVM_(INFO|WARNING|ERROR|FATAL)\s*:\s*(\d+)',log,re.M)}
+            if status=='PASS' and (not comparisons or sum(comparisons)<test['minimum_comparisons']):
+                status,reason='BLOCKED','Scoreboard comparison evidence missing or below required minimum'
         except subprocess.TimeoutExpired as exc:
             log=exc.stdout or ''; log=log.decode(errors='replace') if isinstance(log,bytes) else log
             status,reason='TIMEOUT','Simulation deadline exceeded'
@@ -135,6 +156,7 @@ def run_project(manifest, *, regress=False, timeout=180):
                 group.get('samples',0)>0 for group in coverage.get('data',{}).get('covergroups',[]))):
             status,reason='BLOCKED','No sampled functional coverage evidence was produced'
         results.append(dict(name=test['name'],status=status,reason=reason,seed=test['seed'],
+                            scoreboard_comparisons=sum(comparisons),uvm_counts=uvm_counts,
                             log=str(directory/'simulation.log'),coverage=coverage,assertion_results=assertion_results))
     report=dict(status='PASS' if results and all(r['status']=='PASS' for r in results) else
                 'FAIL' if any(r['status'] in ('FAIL','TIMEOUT') for r in results) else 'BLOCKED',

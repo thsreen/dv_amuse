@@ -2,7 +2,7 @@
 import json
 
 from dv_agent.pipeline import run_ingest
-from dv_agent.slim_index import INDEX_FILE, SlimIndex, build_index, extract_mentions, load_index, requirement_id
+from dv_agent.retrieval.slim_index import INDEX_FILE, SlimIndex, build_index, extract_mentions, load_index, requirement_id
 
 
 def test_extract_mentions_finds_signals_and_terms():
@@ -58,11 +58,11 @@ def test_mentions_boost_relevant_chunks():
 
 
 def test_materialize_creates_stable_requirements(spec_repo, tmp_path):
-    from dv_agent.graph import build_structure
-    from dv_agent.ingest import load_chunks, load_manifest
+    from dv_agent.graph.graph import build_structure
+    from dv_agent.ingest.ingest import load_chunks, load_manifest
     from dv_agent.pipeline import run_ingest
-    from dv_agent.slim_index import materialize_requirements, requirement_id
-    from dv_agent.testplan_context import requirement_record
+    from dv_agent.retrieval.slim_index import materialize_requirements, requirement_id
+    from dv_agent.plan.testplan_context import requirement_record
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
@@ -83,12 +83,12 @@ def test_materialize_creates_stable_requirements(spec_repo, tmp_path):
 
 
 def test_query_dependencies_caches_edges_on_graph(spec_repo, tmp_path):
-    from dv_agent.graph import build_structure
-    from dv_agent.ingest import load_chunks, load_manifest
-    from dv_agent.llm import FakeLLM
+    from dv_agent.graph.graph import build_structure
+    from dv_agent.ingest.ingest import load_chunks, load_manifest
+    from dv_agent.core.llm import FakeLLM
     from dv_agent.pipeline import run_ingest
-    from dv_agent.slim_index import materialize_requirements, query_dependencies
-    from dv_agent.trace import Tracer
+    from dv_agent.retrieval.slim_index import materialize_requirements, query_dependencies
+    from dv_agent.core.trace import Tracer
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
@@ -116,19 +116,19 @@ def test_query_dependencies_caches_edges_on_graph(spec_repo, tmp_path):
         assert again["pairs"] == 0 and len(calls) == 1
 
 
-def test_fast_build_skips_extraction_and_writes_index(spec_repo, tmp_path):
-    from dv_agent.graph import load_graph
+def test_basic_build_skips_extraction_and_writes_index(spec_repo, tmp_path):
+    from dv_agent.graph.graph import load_graph
     from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest
-    from dv_agent.slim_index import INDEX_FILE
+    from dv_agent.retrieval.slim_index import INDEX_FILE
 
     out = tmp_path / "run"
     run_ingest(spec_repo, out)
-    stats = run_build_graph(out, None, mode="fast")
-    assert stats["mode"] == "fast" and stats["slim_index"]["status"] == "PASS"
+    stats = run_build_graph(out, None, mode="basic")
+    assert stats["mode"] == "basic" and stats["slim_index"]["status"] == "PASS"
     assert (out / INDEX_FILE).is_file()
     G = load_graph(out / GRAPH_FILE)
     assert not any(d.get("type") == "requirement" for _, d in G.nodes(data=True))
-    assert run_build_graph(out, None, mode="fast")["reused"] is True
+    assert run_build_graph(out, None, mode="basic")["reused"] is True
 
 
 def test_unknown_mode_is_rejected(spec_repo, tmp_path):
@@ -143,7 +143,7 @@ def test_unknown_mode_is_rejected(spec_repo, tmp_path):
 
 
 def test_basic_build_never_calls_model_or_embedder(spec_repo, tmp_path):
-    from dv_agent.llm import FakeLLM
+    from dv_agent.core.llm import FakeLLM
     from dv_agent.pipeline import run_build_graph
     class ForbiddenEmbedder:
         def embed(self, texts):

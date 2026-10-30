@@ -1,0 +1,17 @@
+{
+  "rules": [
+    {
+      "check_text": "Expected: every UVM monitor throws a uvm_error immediately upon sampling X or Z on any sampled control or data signal, and DUT outputs reach known (non-X/Z) values after reset deassertion; dedicated simulator X-propagation runs complement but never replace these monitor checks.",
+      "enforced": true,
+      "id": "METH-XPROP-1",
+      "kinds": [
+        "protocol_check"
+      ],
+      "applies_to": [
+        "checks"
+      ],
+      "rationale": "Unknown-value propagation hides reset, connectivity, and uninitialized-register bugs; failing fast in the monitor catches them at the sampling source instead of debugging downstream mismatches.",
+      "statement": "UVM monitors must throw a uvm_error immediately upon sampling X or Z on any sampled control or data signal, and DUT outputs must reach known (non-X/Z) values after reset deassertion. Dedicated simulator X-propagation runs complement but never replace these monitor checks."
+    }
+  ]
+}
