@@ -19,7 +19,7 @@ from ..quality.repair import default_max_repairs, render_repairs, structured_wit
 from ..retrieval.retrieval import RetrievalConfig
 from .testplan_context import chunk_record, fetch_context, fetch_context_slim
 from ..core.trace import Tracer
-from ..report.provenance_badge import badge
+from ..report.provenance_badge import badge, cite_marker
 from ..quality.evidence_policy import PROVENANCE_RULES, assessment_schema, assessment
 
 GROUP_PROPERTIES = ("name", "function", "category", "protocol", "connected_to", "peer_type", "dut_role", "is_sideband")
@@ -303,8 +303,9 @@ def render(interfaces: dict, heading: str) -> list[str]:
         g_ids = [s["chunk_id"] for s in g["signals"] if s.get("chunk_id")]
         def status(key):
             e = g.get("property_evidence", {}).get(key, {})
-            return badge(e.get("provenance", g["provenance"]), e.get("cited_chunk_ids", g_ids),
-                         e.get("inference_reason", g.get("rationale", "")), e.get("quote", ""))
+            ids = e.get("cited_chunk_ids", g_ids)
+            return badge(e.get("provenance", g["provenance"]), ids,
+                         e.get("inference_reason", g.get("rationale", "")), e.get("quote", "")) + cite_marker(ids)
         lines += [f"### {g['name']} " + status("name"), "",
                   "<details>", "<summary>ⓘ Interface info</summary>", ""]
         for key, label in (("function", "Function"), ("category", "Category"),
@@ -314,7 +315,8 @@ def render(interfaces: dict, heading: str) -> list[str]:
         directions_documented = all(s["direction_documented"] for s in g["signals"])
         lines += [f"- Signal directions: {g['direction_summary']} "
                   + badge("DOCUMENTED" if directions_documented else "INFERRED", g_ids,
-                          "Direction summary includes signal directions not explicitly stated in source."), "",
+                          "Direction summary includes signal directions not explicitly stated in source.")
+                  + cite_marker(g_ids), "",
                   "</details>", "",
                   "| Signal | Width | Direction (DUT) | Active level / edge (if applicable) | Availability condition | Description |",
                   "|---|---|---|---|---|---|"]
@@ -327,14 +329,14 @@ def render(interfaces: dict, heading: str) -> list[str]:
             if s["active_level"] == "not_applicable":
                 level = "—"
             lines.append(f"| {s['name']} | {width} | {direction} | {level} | {s['availability'] or 'not specified'} | "
-                         f"{s['description'].replace('|', '/')} |")
+                         f"{s['description'].replace('|', '/')}{cite_marker([s['chunk_id']]) if s.get('chunk_id') else ''} |")
         lines.append("")
         quotes = [(s['name'], s['chunk_id'], s['pages'][0], s.get('quote', ''))
                   for s in g['signals'] if s.get('quote')]
         if quotes:
             lines += ["<details>", "<summary>Specification evidence</summary>", ""]
             for name, cid, page, quote in quotes:
-                lines += [f"Source: `{name}`, {cid}, p.{page}", ""]
+                lines += [f"Source: `{name}`, p.{page}{cite_marker([cid])}", ""]
                 lines += ["> " + line for line in quote.splitlines()] + [""]
             lines += ["</details>", ""]
     lines += [f"> Validation: {v}" for v in interfaces["validation"]]

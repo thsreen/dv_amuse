@@ -17,6 +17,7 @@ from typing import Callable
 import networkx as nx
 
 from ..ingest.extract import locate_quote, normalize_name
+from ..core import cancel
 from ..core.llm import LLM, LLMError
 from ..core.progress import emit
 from .register_tables import table_records
@@ -25,7 +26,7 @@ from ..quality.repair import default_max_repairs, render_repairs, structured_wit
 from ..retrieval.retrieval import RetrievalConfig
 from .testplan_context import chunk_record, fetch_context, fetch_context_slim
 from ..core.trace import Tracer
-from ..report.provenance_badge import badge
+from ..report.provenance_badge import badge, cite_marker
 from ..quality.evidence_policy import PROVENANCE_RULES
 
 REGISTER_INSTRUCTIONS = """You extract the register map of ONE hardware design from specification chunks.
@@ -407,7 +408,7 @@ def extract_registers(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer,
     workers = max(1, min(cfg.max_workers, 2))
     with ThreadPoolExecutor(max_workers=workers) if workers > 1 else nullcontext() as executor:
         items = enumerate(range(0, len(windows), cfg.batch_size), 1)
-        outcomes = executor.map(fetch, items) if executor else map(fetch, items)
+        outcomes = executor.map(cancel.bind(fetch), items) if executor else map(fetch, items)
         for completed, (batch_ids, out, failure) in enumerate(outcomes, 1):
             emit(f"registers completed [{completed}/{batches}]: {', '.join(batch_ids)}")
             if failure:
@@ -458,7 +459,8 @@ def render(registers: dict, heading: str) -> list[str]:
     if registers["status"] == "BLOCKED":
         lines += [f"**BLOCKED** for {len(registers['failed_batches'])} chunk batch(es); results below are partial.", ""]
         for failure in registers["failed_batches"]:
-            lines += [f"> Extraction failed: {', '.join(failure['chunk_ids'])}: {failure.get('detail', failure['error'])}", ""]
+            lines += [f"> Extraction failed: {', '.join(failure['chunk_ids'])}: {failure.get('detail', failure['error'])}"
+                          f"{cite_marker(failure['chunk_ids'])}", ""]
     if not registers["registers"]:
         lines += ["_No registers found in the retrieved specification text._", ""]
     else:
@@ -472,7 +474,8 @@ def render(registers: dict, heading: str) -> list[str]:
                      r["availability"] or "not stated",
                      badge(r['provenance'], [s['chunk_id'] for s in r['sources']],
                            "Register properties are interpreted from the cited specification.",
-                           " ".join(s.get('quote', '') for s in r['sources']))]
+                           " ".join(s.get('quote', '') for s in r['sources']))
+                     + cite_marker([s['chunk_id'] for s in r['sources']])]
             lines.append("| " + " | ".join(c.replace("|", "\\|").replace("\n", " ") for c in cells) + " |")
         lines.append("")
 
@@ -483,14 +486,16 @@ def render(registers: dict, heading: str) -> list[str]:
         r_ids = [s["chunk_id"] for s in r["sources"]]
         lines += [f"<!--dv-register-detail:{row_key(index, r)}-->",
                   f"### {r['name'] or r['abbreviation']} ({r['abbreviation'] or '-'}) "
-                  + badge(r['provenance'], r_ids, "Register identity is interpreted from the cited source text."),
+                  + badge(r['provenance'], r_ids, "Register identity is interpreted from the cited source text.")
+                  + cite_marker(r_ids),
                   f"Address: {shown(r, 'address')} | Width: {shown(r, 'width')} | Access: {shown(r, 'access')} | "
                   f"Reset: {shown(r, 'reset_value')}" + (f" | Availability: {r['availability']}" if r["availability"] else ""),
                   ""]
         lines += ["#### Description", "", r["description"] or "Not stated in the supplied specification.", ""]
         classification = r.get("configuration", {})
         if classification.get("configurable") is not None:
-            lines += [f"Configuration identification {badge(classification.get('provenance', 'INFERRED'), r_ids, classification['reason'])} NEEDS_REVIEW: {classification['reason']}",
+            lines += [f"Configuration identification {badge(classification.get('provenance', 'INFERRED'), r_ids, classification['reason'])}"
+                      f"{cite_marker(r_ids)} NEEDS_REVIEW: {classification['reason']}",
                       f"> Specification evidence: {classification['quote']}", ""]
         lines += ["#### Fields", ""]
         if r["fields"]:
@@ -502,14 +507,16 @@ def render(registers: dict, heading: str) -> list[str]:
                 lines.append(f"| {f['bits']} | {f['name']} | {f['access'] or '-'} | {f['reset_value'] or '-'} | "
                              f"{f['description'].replace('|', '/')} | {vals.replace('|', '/')} | "
                              + badge(f['provenance'], f.get('sources', []),
-                                     "Field interpretation is derived from the cited register text.") + " |")
+                                     "Field interpretation is derived from the cited register text.")
+                             + cite_marker(f.get('sources', [])) + " |")
             lines.append("")
         else:
             lines += ["_No field definitions were recovered from the supplied specification._", ""]
         lines += ["<!--dv-register-detail-end-->", ""]
     for c in registers["conflicts"]:
         target = c["register"] + (f".{c['field']}" if c.get("field") else "")
-        lines.append(f"> Conflict: {target} {c['attribute']}: {' vs '.join(c['values'])} (chunks {', '.join(c['chunks'])})")
+        lines.append(f"> Conflict: {target} {c['attribute']}: {' vs '.join(c['values'])} (chunks {', '.join(c['chunks'])})"
+                         f"{cite_marker(c['chunks'])}")
     lines += [f"> Validation: {v}" for v in registers["validation"]]
     lines += render_repairs(registers.get("repair"))
     return lines + [""]

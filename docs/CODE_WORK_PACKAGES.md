@@ -27,7 +27,8 @@ Artifacts are under `<run>/code_work/<fingerprint>/`, indexed by
 | --- | --- |
 | `DEPENDENCIES.md`, `dependencies.json` | Dependent features, reasons, independent features and generation waves |
 | `<feature>.context.json` | Selected plan intentions, documented records, exact excerpt text and offsets |
-| `<feature>.md`, `<feature>.pseudocode.json` | Understanding, preconditions, stimulus/check/coverage pseudocode, completion and questions |
+| `<feature>.md`, `<feature>.pseudocode.json` | Understanding, preconditions, stimulus/check/coverage pseudocode, completion, questions and essential blockers |
+| `<feature>.recovery.context.json` | Focused evidence fetch and feedback used for one incomplete-feature repair |
 | `COLLATED_PSEUDOCODE.md`, `.json` | Overall implementation approach, shared setup and ordered feature composition, written before code |
 | `foundation.json` | Shared bindings, configuration, agent contracts and supported register mirrors |
 | `<feature>.fragment.json` | Typed feature components and mappings from pseudocode steps to components/questions |
@@ -45,9 +46,25 @@ To create dependency/pseudocode documents without generating SystemVerilog:
   --out runs/orch-20261030T181215Z --llm on
 ```
 
-This stops after collated pseudocode, with `PSEUDOCODE_READY_NEEDS_REVIEW`. It does not
-require a fully resolved executable foundation, so missing reset/configuration facts
-can remain questions. A later `/code` or `build-code` in the same run reuses matching
+This stops after validated collated pseudocode, with `PSEUDOCODE_READY_NEEDS_REVIEW`.
+Each feature needs source-backed actionable steps for its assigned intention categories and
+explicit bounded completion criteria. Questions alone cannot satisfy a feature. Questions
+about nonessential details or final bindings may remain alongside supported symbolic algorithms;
+`blockers` records essential gaps that prevent supported work. A missing final executable
+foundation does not justify discarding otherwise supported planning steps.
+
+An incomplete feature triggers one focused BM25 fetch using its blockers/questions and one
+validation repair. Recovery ranks relevant windows ahead of original source-ID preference,
+with the same record/excerpt bounds and exact-quote checks. If it remains incomplete, the
+manifest is `BLOCKED`, diagnostics and rejected output are saved in `code_planning_issue.json`,
+and foundation/code generation does not begin. Recovered issues are labeled `RECOVERED`.
+
+Collation receives full steps, preconditions, completion criteria and questions, without
+duplicating fact quotations. Larger inputs are collated in bounded hierarchical batches.
+Shared setup, stimulus, checks/scoreboard and coverage approaches must all contain text;
+an inapplicable area needs an explicit explanation. Empty sections receive one repair and
+then block readiness. Feature inclusion and dependency ordering are checked at every level.
+A later `/code` or `build-code` in the same run reuses matching
 planning responses and continues into the foundation and feature implementations.
 The orchestrator commands remain `/plan`, `/code`, `/run`, `/regress` (plus existing
 session controls). No new terminal command is needed to get the intermediate documents.

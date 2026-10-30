@@ -9,6 +9,7 @@ from typing import Callable
 import networkx as nx
 
 from ..graph.graph import DEPENDENCY_EDGES, _h, add_edge, edges_of_type, page_of
+from ..core import cancel
 from ..core.llm import LLM, LLMError
 from ..core.progress import emit, thread_tag
 from ..core.trace import Tracer
@@ -227,13 +228,14 @@ def _record_chunk(G, index, cid, result, exc, span, tracer, cfg, stats):
 def _bounded_batches(fetch, batches, workers):
     """Keep only workers batches in flight; stop dispatch after exhausted recovery."""
     remaining = iter(batches)
+    bound = cancel.bind(fetch)
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers, thread_name_prefix="dv_extract") as executor:
         pending = {}
         def submit():
             item = next(remaining, None)
             if item is not None:
                 key, args = item
-                pending[executor.submit(fetch, *args)] = key
+                pending[executor.submit(bound, *args)] = key
         for _ in range(workers):
             submit()
         while pending:

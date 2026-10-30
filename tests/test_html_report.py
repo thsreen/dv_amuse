@@ -305,3 +305,13 @@ def test_cite_marker_rejects_empty_and_bad_ids():
     assert cite_marker(["CH-1", "bogus id!", "CH-1"]) == " 📄<!--dv-sources:CH-1-->"
     with pytest.raises(ValueError):
         decode_sources("bogus id!")
+
+
+def test_document_marker_renders_tooltip_inside_table_cells():
+    from dv_agent.report.html_report import render_html
+    from dv_agent.report.provenance_badge import cite_marker, source_tip_summaries
+    md = "| Name | Sources |\n|---|---|\n| CTRL |" + cite_marker(["CH-1"]) + " |\n"
+    md = source_tip_summaries(md, {"CH-1": dict(path="doc.txt", excerpt="Control register.")})
+    report = render_html(md)
+    assert '<span class="evidence-badge sources"' in report
+    assert "Control register." in report

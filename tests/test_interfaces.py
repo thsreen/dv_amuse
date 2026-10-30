@@ -211,3 +211,14 @@ def test_interfaces_basic_mode_marks_and_reuses(spec_repo, tmp_path):
     assert json.loads((out / "interfaces.json").read_text())["mode"] == "basic"
     assert run_interfaces(out, _llm(), mode="basic")["reused"] is True
     assert run_interfaces(out, _llm(), mode="graph")["reused"] is False
+
+
+def test_interface_sources_use_document_markers(spec_repo, tmp_path):
+    import re
+    from dv_agent.plan.interfaces import render
+    _, G = _graph(spec_repo, tmp_path)
+    md = "\n".join(render(_extract(G, tmp_path), "Interfaces"))
+    assert "📄<!--dv-sources:" in md
+    assert re.search(r"Source: `[^`]+`, CH-", md) is None
+    signal_row = next(line for line in md.splitlines() if line.startswith("| CLK |"))
+    assert "📄<!--dv-sources:" in signal_row

@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
+from . import cancel
 from .fsutil import atomic_write_text
 from .progress import emit, thread_tag
 from .trace import Tracer
@@ -301,6 +302,11 @@ class MetaClient(_Base):
         total_usage: dict[str, int] = {}
         sampling_supported = True
         for attempt in range(1, self.max_attempts + 1):
+            if cancel.is_cancelled():
+                _request_event('cancelled', **request_fields, attempt=attempt)
+                error = LLMError("cancelled", "the tool timed out; no further model calls are made")
+                error.attempts = attempts
+                raise error
             if attempt > 1:
                 token_budget = min((token_budget * 5 + 3) // 4, self.max_output_tokens_ceiling)
                 emit(f"model call {name!r} attempt {attempt}/{self.max_attempts}: output budget {token_budget}")

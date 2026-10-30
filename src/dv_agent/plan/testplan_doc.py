@@ -38,7 +38,7 @@ from ..core.usage import render as render_usage
 from .strategy import render as render_strategy
 from .testplan_context import chunk_record, fetch_context, fetch_context_slim, requirement_record
 from ..core.trace import Tracer
-from ..report.provenance_badge import badge, decode
+from ..report.provenance_badge import badge, cite_marker, decode, decode_sources
 from ..quality.evidence_policy import PROVENANCE_RULES
 from .document_layout import organize_document, entry_subsections
 
@@ -480,6 +480,7 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 model=llm.model, generated_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"))
     meth_rules = load_methodology_rules(cfg.methodology_rules_path or None)
     meta["methodology_fingerprint"] = rules_fingerprint(meth_rules)
+    meta["methodology_rules"] = [dict(id=r["id"], statement=r["statement"]) for r in meth_rules]
     sections: list[dict] = []
     conflicts: dict[tuple, dict] = {}
     def record_section(section: dict) -> None:
@@ -909,7 +910,6 @@ def _repair_questions(interfaces: dict | None, registers: dict | None, sections:
 
 
 def _cite(e: dict) -> str:
-    from ..report.provenance_badge import cite_marker
     ids = e["cited_req_ids"] + e["cited_chunk_ids"] + e.get("cited_rtl_observation_ids", []) + e.get("cited_methodology_ids", [])
     return cite_marker(ids)
 
@@ -960,8 +960,9 @@ _SUBSECTION_TITLES = {"rtl_observation_coverage": "Coverage from RTL observation
 
 def _render_entry(e: dict, show_kind=True, indicator_last=False) -> list[str]:
     kind = f"({e['kind']}) " if show_kind else ""
-    # Indicator-last entries carry their sources inside the indicator, not as trailing text.
-    lines = [f"- {kind}{e['text']} {_badge(e)}" if indicator_last else f"- {_badge(e)} {kind}{e['text']}{_cite(e)}"]
+    # Every entry keeps a document marker: badges may consolidate to the section
+    # heading, but the marker stays with the item it sources.
+    lines = [f"- {kind}{e['text']} {_badge(e)}{_cite(e)}" if indicator_last else f"- {_badge(e)} {kind}{e['text']}{_cite(e)}"]
     if e["provenance"] == "INFERRED":
         lines.append(f"  - Inference: {e.get('inference_reason') or 'Reason not supplied; designer review required.'}")
     if e.get("cited_rtl_observation_ids"):
@@ -990,14 +991,14 @@ def _row(*cells: str) -> str:
 
 def _described(e: dict, notes: list[str]) -> str:
     """Description cell: the statement with its indicator last, then supporting notes."""
-    return _cell(e["text"]) + " " + _badge(e) + "".join("<br/>" + _cell(n) for n in notes)
+    return _cell(e["text"]) + " " + _badge(e) + _cite(e) + "".join("<br/>" + _cell(n) for n in notes)
 
 
 def _render_table(entries: list[dict], start: int = 1) -> list[str]:
-    """Checks: the indicator (with its sources) sits beside the description; no status or source column."""
+    """Checks: the indicator and document marker sit beside the description; no status or source column."""
     lines = [_row("#", "Description", "Kind", "Details"), _row(*["---"] * 4)]
     for i, e in enumerate(entries, start):
-        lines.append(_row(str(i), _cell(e["text"]) + " " + _badge(e), _cell(e["kind"]), _cell("<br/>".join(_entry_notes(e))) or "-"))
+        lines.append(_row(str(i), _cell(e["text"]) + " " + _badge(e) + _cite(e), _cell(e["kind"]), _cell("<br/>".join(_entry_notes(e))) or "-"))
     return lines + [""]
 
 
@@ -1092,12 +1093,21 @@ def build_evidence_index(G: nx.MultiDiGraph, doc: dict) -> dict:
                           page=n.get("page", n.get("page_start")),
                           excerpt=(n.get("quote") or n.get("text") or "")[:1200])
         index[cid]["summary"] = " ".join(index[cid]["excerpt"].split())[:240]
+    rtl_evidence: list[dict] = []
     for section in doc.get("sections", []):
-        for c in section.get("evidence", []):
-            if isinstance(c, dict) and c.get("id"):
-                index[c["id"]] = dict(path=c.get("path", ""), section="RTL excerpt",
-                                      page=None, line_start=c.get("line_start"), line_end=c.get("line_end"),
-                                      excerpt=c.get("text", "")[:1200])
+        rtl_evidence += [c for c in section.get("evidence", []) if isinstance(c, dict) and c.get("id")]
+    rtl_evidence += [c for c in (doc.get("rtl_observations") or {}).get("evidence", [])
+                     if isinstance(c, dict) and c.get("id")]
+    for c in rtl_evidence:
+        index[c["id"]] = dict(path=c.get("path", ""), section="RTL excerpt",
+                              page=None, line_start=c.get("line_start"), line_end=c.get("line_end"),
+                              excerpt=c.get("text", "")[:1200])
+        index[c["id"]]["summary"] = " ".join(index[c["id"]]["excerpt"].split())[:240]
+    for rule in doc.get("methodology_rules", []):
+        if isinstance(rule, dict) and rule.get("id"):
+            index[rule["id"]] = dict(path="Methodology rules", section="",
+                                     excerpt=str(rule.get("statement", ""))[:1200])
+            index[rule["id"]]["summary"] = " ".join(index[rule["id"]]["excerpt"].split())[:240]
     for obs in (doc.get("rtl_observations") or {}).get("entries", []):
         index[obs["id"]] = dict(path="RTL observation (design engineer review required)",
                                  excerpt=obs.get("text", "") + "\nCited RTL excerpts: "
@@ -1110,6 +1120,11 @@ def _render_references(markdown: str, index: dict) -> str:
     for token in re.findall(r"<!--dv-evidence:([A-Za-z0-9_-]+)-->", markdown):
         try:
             cited.update(i for i in decode(token)["citations"] if re.fullmatch(r"[A-Za-z0-9_-]+", i))
+        except (ValueError, KeyError, TypeError):
+            continue
+    for token in re.findall(r"📄<!--dv-sources:([A-Za-z0-9_,-]+)-->", markdown):
+        try:
+            cited.update(s["id"] for s in decode_sources(token))
         except (ValueError, KeyError, TypeError):
             continue
     if not cited:
@@ -1234,7 +1249,7 @@ def _render_coverage(cov: dict | None) -> list[str]:
     for label, items in (("Not covered", cov["uncovered"]), ("Covered only through the chunk", cov["chunk_only"])):
         if items:
             lines += [f"**{label}:**", ""] + [f"- {r['req_id']} ({r['section']}, p.{r['page']}): {r['statement']}"
-                                              for r in items] + [""]
+                                              f"{cite_marker([r['req_id']])}" for r in items] + [""]
     return lines
 
 
@@ -1247,7 +1262,7 @@ def _render_configurations(s: dict) -> list[str]:
         rnd = {True: "yes", False: "no", None: "undecided"}[e["randomize"]]
         cells = [f"{e['register']}.{e['field']}", e["bits"] or "-", e["access"], rnd,
                  "; ".join(e["legal_values"]) or "not stated", e["distribution"] or "-",
-                 "; ".join(e["constraints"]) or "-", e["reserved_handling"] or "-", _badge(e)]
+                 "; ".join(e["constraints"]) or "-", e["reserved_handling"] or "-", _badge(e) + _cite(e)]
         lines.append("| " + " | ".join(c.replace("|", "/") for c in cells) + " |")
     lines.append("")
     for e in s["configurations"]:

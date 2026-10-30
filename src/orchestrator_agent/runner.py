@@ -8,9 +8,12 @@ gate reverts to the owner with a review file and a resume command.
 import concurrent.futures
 import json
 import os
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+from dv_agent.core import cancel
 
 from . import decider as decider_mod
 from . import guards
@@ -109,15 +112,19 @@ def _now() -> str:
 def call_with_timeout(fn, timeout_s: float):
     """Run fn in a worker thread; return ("ok", value) or ("timeout", None).
 
-    A timeout stops waiting, not the worker: the thread lingers until the
-    tool returns. The run moves on to the owner gate instead of hanging.
+    A timeout stops waiting, not the worker (a thread cannot be killed). It does
+    signal the worker: the model client sees the cancellation token and starts no
+    further calls, so an abandoned tool neither spends tokens nor races the retry.
+    A request already in flight finishes, bounded by the client timeout.
     """
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    token = threading.Event()
     try:
-        future = executor.submit(fn)
+        future = executor.submit(cancel.in_scope(token, fn))
         try:
             return "ok", future.result(timeout=timeout_s)
         except concurrent.futures.TimeoutError:
+            token.set()
             future.cancel()
             return "timeout", None
     finally:

@@ -286,3 +286,16 @@ def test_registers_basic_mode_marks_and_reuses(spec_repo, tmp_path):
     assert json.loads((out / "registers.json").read_text())["mode"] == "basic"
     assert run_registers(out, _llm(), mode="basic")["reused"] is True
     assert run_registers(out, _llm(), mode="graph")["reused"] is False
+
+
+def test_register_sources_use_document_markers(graph, tmp_path):
+    from dv_agent.plan.registers import render
+    _, G = graph
+    md = "\n".join(render(_extract(G, tmp_path), "Register Map"))
+    assert "📄<!--dv-sources:" in md
+    detail = next(line for line in md.splitlines() if line.startswith("### CTRL "))
+    assert "📄<!--dv-sources:" in detail
+    field_row = next(line for line in md.splitlines() if line.startswith("| 7-4 |"))
+    assert "📄<!--dv-sources:" in field_row
+    conflict = next(line for line in md.splitlines() if line.startswith("> Conflict"))
+    assert "📄<!--dv-sources:" in conflict

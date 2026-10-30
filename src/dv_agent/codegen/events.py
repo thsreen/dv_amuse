@@ -5,7 +5,7 @@ from ..core.progress import emit_event
 
 STEPS=[
     ('code_selection','Select saved plan and RTL interface'),
-    ('code_grouping','Group features and dependencies'),
+    ('code_grouping','Plan clock, reset, interfaces and small feature tasks'),
     ('code_dependencies','Collate cross-group dependencies'),
     ('code_pseudocode','Retrieve excerpts and write feature pseudocode'),
     ('code_collation','Collate the implementation pseudocode'),
@@ -16,7 +16,6 @@ STEPS=[
     ('code_review','Review source-backed implementation'),
     ('code_hooks','Implement declared protocol extensions'),
     ('code_render','Render reusable SystemVerilog templates'),
-    ('code_compile','Compile with Xezim and UVM'),
     ('code_publish','Save code, tests and traceability'),
 ]
 

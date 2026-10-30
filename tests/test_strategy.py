@@ -145,3 +145,19 @@ def test_cli_strategy(run, capsys, monkeypatch):
     assert {a["name"] for a in out["agents"]} == {"bus_agent", "irq_agent", "clk_rst_agent"}
     assert main(["interfaces", "--out", str(run)]) == 0
     assert json.loads(capsys.readouterr().out)["reused"] is True
+
+
+def test_strategy_bullets_carry_document_markers(run):
+    import re
+    from dv_agent.plan.strategy import render
+    from dv_agent.report.provenance_badge import decode
+    _, st = _strategy(run)
+    bullets = [line for line in render(st, "Verification Strategy") if line.startswith("- ")]
+    assert bullets
+    for line in bullets:
+        match = re.match(r"- (?:✅|⚠️|🛑)<!--dv-evidence:([A-Za-z0-9_-]+)-->", line)
+        assert match, line
+        if decode(match.group(1))["citations"]:
+            assert "📄<!--dv-sources:" in line, line
+        else:
+            assert "📄" not in line, line

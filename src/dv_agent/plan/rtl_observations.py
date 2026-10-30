@@ -9,7 +9,7 @@ from rtl_agent.retrieval import QueryConfig, fetch_context
 
 from ..core.llm import LLMError
 from ..quality.repair import render_repairs, structured_with_repair
-from ..report.provenance_badge import badge
+from ..report.provenance_badge import badge, cite_marker
 
 FETCH_RULES = """Request read-only searches of the supplied RTL graph to investigate clock/reset handling,
 interconnected modules, dependency cones, control features, possible crossings and analysis gaps relevant
@@ -236,6 +236,6 @@ def render(result: dict, heading: str) -> list[str]:
             by_file.setdefault(_display_path(c["path"]), []).append((c["line_start"], span, cid))
         for path, spans in by_file.items():
             lines.append(f"- **RTL sources:** {path} ({len(spans)} excerpt{'s' if len(spans) != 1 else ''})")
-            lines += [f"  - lines {span} ({cid})" for _, span, cid in sorted(spans)]
+            lines += [f"  - lines {span}{cite_marker([cid])}" for _, span, cid in sorted(spans)]
         lines.append("")
     return lines + [""] + render_repairs(result.get("repair")) + ["<!--dv-rtl-observations-end-->", ""]

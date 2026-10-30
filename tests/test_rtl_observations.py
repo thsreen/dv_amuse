@@ -164,3 +164,16 @@ def test_strategy_must_handle_each_observation(inputs):
     run_testplan_doc(out, llm, rtl_graph_path=graph, mode="graph")
     st = next(s for s in doc(out)["sections"] if s["id"] == "strategy")["strategy"]
     assert any("no strategy handling action" in p for p in st["repair"]["unresolved"])
+
+
+def test_observation_excerpt_lines_use_document_markers():
+    from dv_agent.plan.rtl_observations import render
+    excerpt = dict(id="EX-1", path="rtl/top.sv", line_start=10, line_end=12,
+                   text="always @(posedge clk) q <= d;")
+    result = dict(status="PASS", graph_analysis_status="COMPLETE", fetches=[], entries=[
+        dict(id="OBS-1", kind="crossing", text="Possible crossing.", suggested_verification="Check it.",
+             spec_relationship="NOT_FOUND", designer_question="Q?", inference_reason="R.",
+             cited_rtl_excerpt_ids=["EX-1"])], evidence=[excerpt], repair=None)
+    md = "\n".join(render(result, "Observations from RTL"))
+    assert "lines 10-12 📄<!--dv-sources:EX-1-->" in md
+    assert "(EX-1)" not in md

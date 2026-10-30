@@ -623,3 +623,65 @@ def test_basic_plan_uses_chunks_and_reports_reduced_analysis(spec_repo, tmp_path
     assert (out / "testplan_doc.html").is_file()
     assert "Basic RAG demo draft" in (out / "testplan_doc.md").read_text()
     assert run_testplan_doc(out, llm, mode="basic")["reused"]
+
+
+def _cited_entry(**over):
+    entry = dict(text="Exercise the reload path.", kind="check", provenance="DOCUMENTED",
+                 inference_reason="", cited_req_ids=["REQ-1"], cited_chunk_ids=["CH-1"],
+                 cited_rtl_observation_ids=[], cited_methodology_ids=[], details=[], validation=[])
+    entry.update(over)
+    return entry
+
+
+def test_entry_tables_and_configurations_keep_document_markers():
+    from dv_agent.plan.testplan_doc import (_described, _render_configurations, _render_entry,
+                                            _render_table)
+    marker = "📄<!--dv-sources:REQ-1,CH-1-->"
+    entry = _cited_entry()
+    assert marker in _render_entry(entry, indicator_last=True)[0]
+    assert marker in "\n".join(_render_table([entry]))
+    assert marker in _described(entry, [])
+    config = dict(entry, register="CTRL", field="Enable", bits="0", access="RW", randomize=True,
+                  legal_values=["0", "1"], distribution="", constraints=[], reserved_handling="",
+                  notes="")
+    assert marker in "\n".join(_render_configurations(dict(configurations=[config], validation=[])))
+
+
+def test_section_provenance_strips_badges_but_keeps_markers():
+    from dv_agent.plan.testplan_doc import _section_provenance
+    from dv_agent.report.provenance_badge import badge, cite_marker
+    item = f"- {badge('DOCUMENTED', ['CH-1'], '')} text{cite_marker(['CH-1'])}"
+    out = _section_provenance("## Feature Description\n\n" + item + "\n")
+    assert "## Feature Description ✅<!--dv-evidence:" in out
+    assert "📄<!--dv-sources:CH-1-->" in out
+    assert out.count("✅<!--dv-evidence:") == 1
+
+
+def test_coverage_lists_carry_document_markers():
+    from dv_agent.plan.testplan_doc import _render_coverage
+    cov = dict(total=1, covered=0, ratio=0.0, chunk_only=[],
+               uncovered=[dict(req_id="REQ-7", section="2 Registers", page=2, statement="Reload works.")])
+    assert "📄<!--dv-sources:REQ-7-->" in "\n".join(_render_coverage(cov))
+
+
+def test_references_appendix_covers_marker_only_ids():
+    from dv_agent.plan.testplan_doc import _render_references
+    index = {"CH-9": dict(path="doc/spec.txt", section="S", page=1, excerpt="The thing works.")}
+    out = _render_references("- text 📄<!--dv-sources:CH-9-->\n", index)
+    assert "### Reference CH-9" in out and "The thing works." in out
+
+
+def test_evidence_index_covers_rtl_excerpts_and_methodology_rules():
+    import networkx as nx
+    from dv_agent.plan.testplan_doc import build_evidence_index
+    doc = dict(sections=[],
+               rtl_observations=dict(
+                   evidence=[dict(id="EX-1", path="rtl/top.sv", line_start=3, line_end=5,
+                                  text="always @(posedge clk) q <= d;")],
+                   entries=[]),
+               methodology_rules=[dict(id="METH-X", statement="Never sample an unknown value.")])
+    index = build_evidence_index(nx.MultiDiGraph(), doc)
+    assert index["EX-1"]["excerpt"].startswith("always @(posedge clk)")
+    assert index["EX-1"]["line_start"] == 3
+    assert index["METH-X"]["excerpt"] == "Never sample an unknown value."
+    assert index["METH-X"]["path"] == "Methodology rules"

@@ -3,6 +3,7 @@ import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 
+from ..core import cancel
 from ..core.fsutil import atomic_write_text
 from ..graph.graph_checkpoint import CheckpointLLM
 from ..core.progress import emit
@@ -202,4 +203,4 @@ def implement(llm, plan, directory, *, compiler_feedback=None):
         atomic_write_text(path,json.dumps(dict(id=hook.id,code=code,fact_ids=hook.fact_ids),indent=2)+'\n')
         return hook.id,code
     with ThreadPoolExecutor(max_workers=2) as executor:
-        return dict(executor.map(task,plan.hooks))
+        return dict(executor.map(cancel.bind(task),plan.hooks))

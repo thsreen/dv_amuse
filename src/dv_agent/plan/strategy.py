@@ -12,7 +12,7 @@ from ..core.llm import LLM, LLMError
 from ..core.progress import emit
 from ..quality.repair import render_repairs, structured_with_repair
 from ..core.trace import Tracer
-from ..report.provenance_badge import badge
+from ..report.provenance_badge import badge, cite_marker
 from ..quality.evidence_policy import PROVENANCE_RULES, assessment_schema, assessment
 
 AGENT_MODES = ["active", "passive", "reactive"]
@@ -318,7 +318,7 @@ def render(strategy: dict, heading: str) -> list[str]:
         return sorted({c for a in agents for c in a.get("cited_chunk_ids", [])})
 
     def point(text, citations, reason, provenance="INFERRED"):
-        return f"- {badge(provenance, citations, reason)} {text}"
+        return f"- {badge(provenance, citations, reason)} {text}{cite_marker(citations)}"
 
     def item_point(text, item, cites, reason):
         return point(text, item.get("cited_chunk_ids", cites),

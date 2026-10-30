@@ -809,3 +809,57 @@ def test_repl_fresh_twice_same_second_yields_distinct_dirs(tmp_path, monkeypatch
     text = "\n".join(shown)
     assert f"Fresh session in {same}-2" in text
     assert f"Fresh session in {same}-3" in text
+
+
+def test_timed_out_tool_is_cancelled_and_starts_no_more_model_calls():
+    import threading
+
+    from dv_agent.core import cancel
+    from dv_agent.core.llm import LLMError, MetaClient
+    from orchestrator_agent.runner import call_with_timeout
+
+    started, release, outcome = threading.Event(), threading.Event(), {}
+
+    class Boom:  # any SDK call after cancellation is a bug
+        class responses:
+            @staticmethod
+            def create(**_):
+                outcome["called"] = True
+                raise AssertionError("model call after cancellation")
+
+    def tool():
+        started.set()
+        release.wait(5)
+        try:
+            MetaClient(client=Boom, api_key="k").structured(name="n", instructions="i", payload={}, schema={})
+        except LLMError as exc:
+            outcome["error"] = exc.kind
+        finally:
+            outcome["done"] = True
+
+    assert call_with_timeout(tool, 0.2) == ("timeout", None)
+    assert started.is_set() and not cancel.is_cancelled()  # the caller's own context is unaffected
+    release.set()
+    for _ in range(100):
+        if outcome.get("done"):
+            break
+        threading.Event().wait(0.02)
+    assert outcome == {"error": "cancelled", "done": True}
+
+
+def test_cancellation_reaches_worker_pool_threads():
+    import concurrent.futures
+    import threading
+
+    from dv_agent.core import cancel
+
+    token = threading.Event()
+
+    def work():
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            return list(pool.map(cancel.bind(lambda _: cancel.is_cancelled()), range(3)))
+
+    runner = cancel.in_scope(token, work)
+    assert runner() == [False, False, False]
+    token.set()
+    assert runner() == [True, True, True]

@@ -20,6 +20,22 @@ def langfuse_configured() -> bool:
                 and os.getenv("LANGFUSE_SECRET_KEY", "").strip())
 
 
+def langfuse_captures_content() -> bool:
+    """Prompts, specification text and model output reach Langfuse only when this is set explicitly."""
+    return os.getenv("LANGFUSE_CAPTURE_CONTENT", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _for_langfuse(value: Any) -> Any:
+    """Keep span inputs/outputs local by default: the mirror gets their type and size, not their text."""
+    if value is None or langfuse_captures_content():
+        return value
+    try:
+        size = len(json.dumps(value, default=str, ensure_ascii=False).encode("utf-8"))
+    except (TypeError, ValueError):
+        size = None
+    return {"content": "withheld (set LANGFUSE_CAPTURE_CONTENT=1 to send)", "type": type(value).__name__, "bytes": size}
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
@@ -52,7 +68,7 @@ class Span:
             self.record["usage"] = usage
         if self._lf is not None:
             kwargs: dict[str, Any] = {k: v for k, v in dict(
-                output=output, metadata=metadata, level=level, status_message=status_message).items()
+                output=_for_langfuse(output), metadata=metadata, level=level, status_message=status_message).items()
                 if v is not None}
             if usage:
                 kwargs["usage_details"] = usage
@@ -126,7 +142,7 @@ class Tracer:
         """
         lf_cm, lf_obs = None, None
         if self._lf_client is not None:
-            kwargs: dict[str, Any] = dict(name=name, as_type=as_type, input=input, metadata=metadata)
+            kwargs: dict[str, Any] = dict(name=name, as_type=as_type, input=_for_langfuse(input), metadata=metadata)
             if model:
                 kwargs["model"] = model
             if _root:

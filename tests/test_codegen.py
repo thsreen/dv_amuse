@@ -532,3 +532,138 @@ def test_interrupted_generation_blocks_old_manifest_until_rebuilt(inputs, monkey
     assert json.loads((root/'output/code_generation_state.json').read_text())['status']=='BLOCKED'
     from dv_agent.codegen.simulator import run_saved_project
     assert run_saved_project(root/'output')['status']=='BLOCKED'
+
+
+def test_question_only_pseudocode_recovers_targeted_evidence_before_retry(inputs):
+    from dv_agent.codegen.workplan import design
+    root, spec, definition, contract, _ = inputs
+    llm = workflow_model(contract)
+    normal = llm.handlers['code_pseudocode']
+    seen = []
+    def pseudo(payload):
+        seen.append(payload)
+        if len(seen) == 1:
+            return dict(understanding='Need storage access details', preconditions=[], stimulus_steps=[],
+                        check_steps=[], coverage_steps=[], completion=[], facts=[],
+                        questions=['What is the CONTROL storage read/write contract?'])
+        assert payload['evidence']['focused_recovery']
+        assert 'questions alone' in payload['repair_feedback']
+        assert payload['previous_pseudocode']['questions']
+        assert 'Register CONTROL' in json.dumps(payload['evidence'])
+        return normal(payload)
+    llm.handlers['code_pseudocode'] = pseudo
+    result = design(llm, spec, definition, {'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},
+                    root/'output', pseudocode_only=True)
+    assert result['status'] == 'PSEUDOCODE_READY_NEEDS_REVIEW' and len(seen) == 2
+    assert (Path(result['work_dir'])/'storage_feature.recovery.context.json').is_file()
+    assert json.loads((root/'output/code_planning_issue.json').read_text())['status'] == 'RECOVERED'
+
+
+@pytest.mark.parametrize('failure', ['questions_only', 'missing_check', 'blank_step', 'no_completion', 'no_facts', 'blocker'])
+def test_incomplete_pseudocode_never_becomes_ready_or_reaches_foundation(inputs, failure):
+    from dv_agent.codegen.workplan import design
+    root, spec, definition, contract, _ = inputs
+    llm = workflow_model(contract)
+    normal = llm.handlers['code_pseudocode']
+    def pseudo(payload):
+        data = normal(payload)
+        if failure == 'questions_only':
+            for key in ('stimulus_steps', 'check_steps', 'coverage_steps'): data[key] = []
+            data['questions'] = ['What is the bus contract?']
+        elif failure == 'missing_check': data['check_steps'] = []
+        elif failure == 'blank_step': data['check_steps'] = ['  ']
+        elif failure == 'no_completion': data['completion'] = []
+        elif failure == 'no_facts': data['facts'] = []
+        else: data['blockers'] = ['No source-supported observable behavior for this assigned check']
+        return data
+    llm.handlers['code_pseudocode'] = pseudo
+    with pytest.raises(ValueError):
+        design(llm, spec, definition, {'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},
+               root/'output', pseudocode_only=True)
+    manifest = json.loads((root/'output/code_work_manifest.json').read_text())
+    assert manifest['status'] == 'BLOCKED' and manifest['blocked_stage'] == 'code_pseudocode:storage_feature'
+    assert len([n for n,p in llm.calls if n=='code_pseudocode']) == 2
+    assert not any(n in ('code_collation','code_foundation') for n,p in llm.calls)
+    assert not (Path(manifest['work_dir'])/'COLLATED_PSEUDOCODE.json').exists()
+    issue = json.loads((root/'output/code_planning_issue.json').read_text())
+    assert issue['status'] == 'BLOCKED' and issue['rejected_output']
+
+
+def test_collation_receives_full_feature_steps_and_repairs_empty_approach(inputs):
+    from dv_agent.codegen.workplan import design
+    root, spec, definition, contract, _ = inputs
+    llm = workflow_model(contract)
+    normal = llm.handlers['code_collation']
+    calls = []
+    def collate(payload):
+        calls.append(payload)
+        feature = payload['features']['storage_feature']
+        assert feature['stimulus_steps'] == ['Write a value, then read the same address']
+        assert feature['check_steps'] == ['Compare the observed read against the observed write']
+        assert feature['coverage_steps'] == ['Sample monitor transfers']
+        assert feature['completion'] and 'facts' not in feature
+        result = normal(payload)
+        if len(calls)==1: result['check_approach'] = []
+        else: assert 'nonempty check_approach' in payload['repair_feedback']
+        return result
+    llm.handlers['code_collation'] = collate
+    result = design(llm, spec, definition, {'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},
+                    root/'output', pseudocode_only=True)
+    assert result['status'] == 'PSEUDOCODE_READY_NEEDS_REVIEW' and len(calls) == 2
+
+
+def test_empty_collation_remains_blocked_after_repair(inputs):
+    from dv_agent.codegen.workplan import design
+    root, spec, definition, contract, _ = inputs
+    llm = workflow_model(contract, code_collation=lambda p:dict(shared_setup=[],
+        execution_order=[['storage_feature']],stimulus_approach=[],check_approach=[],coverage_approach=[],
+        questions=['Please clarify implementation']))
+    with pytest.raises(ValueError, match='nonempty shared_setup'):
+        design(llm, spec, definition, {'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},
+               root/'output', pseudocode_only=True)
+    manifest = json.loads((root/'output/code_work_manifest.json').read_text())
+    assert manifest['status']=='BLOCKED' and manifest['blocked_stage']=='code_collation'
+    assert manifest['pseudocode_tasks']==['storage_feature']
+    assert not (Path(manifest['work_dir'])/'COLLATED_PSEUDOCODE.json').exists()
+
+
+def test_large_collation_batches_actual_steps_without_discarding_them():
+    from dv_agent.codegen.workplan import Pseudocode, WorkTask, _collate
+    tasks = {}; features = {}; seen = []; requests = []
+    for i in range(12):
+        tid = f'feature_{i}'
+        tasks[tid] = WorkTask(id=tid,title=tid,category='checks',goal='Observe',
+                             plan_pointers=[f'/checks/{i}'],queries=['Observe'])
+        features[tid] = Pseudocode(understanding='Observe',preconditions=['Reset'],
+            stimulus_steps=['Drive '+str(i)+'x'*2000],check_steps=['Compare '+str(i)+'x'*2000],
+            coverage_steps=['Sample '+str(i)+'x'*2000],completion=['Terminate'],questions=[])
+    def call(name, payload, model, rules, check):
+        requests.append(payload)
+        assert len(json.dumps(payload)) < 48000
+        seen.extend(payload['features'])
+        ids = [d['id'] for d in payload['dependencies']]
+        result = model(shared_setup=['Reset'],execution_order=[ids],stimulus_approach=['Drive each feature'],
+                       check_approach=['Compare observations'],coverage_approach=['Monitor sampling'],questions=[])
+        check(result)
+        return result
+    approach = _collate(call, [], tasks, features)
+    assert set(seen)==set(features) and len(seen)==len(features)
+    assert len(requests)>2 and requests[-1]['collated_groups']
+    assert set(approach.execution_order[0])==set(features)
+
+
+def test_supported_check_only_feature_can_keep_nonessential_questions(inputs):
+    from dv_agent.codegen.workplan import design
+    root, spec, definition, contract, _ = inputs
+    llm = workflow_model(contract)
+    normal = llm.handlers['code_pseudocode']
+    def pseudo(payload):
+        result = normal(payload)
+        result.update(stimulus_steps=[], coverage_steps=[],
+                      questions=['Which optional regression seeds should be used?'])
+        return result
+    llm.handlers['code_pseudocode'] = pseudo
+    result = design(llm, spec, definition, {'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},
+                    root/'output', pseudocode_only=True)
+    assert result['status']=='PSEUDOCODE_READY_NEEDS_REVIEW'
+    assert len([n for n,p in llm.calls if n=='code_pseudocode'])==1

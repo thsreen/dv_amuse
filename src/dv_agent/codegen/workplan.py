@@ -62,6 +62,7 @@ class Pseudocode(Model):
     completion: list[str]
     facts: list[Fact] = Field(default_factory=list, max_length=32)
     questions: list[str]
+    blockers: list[str] = Field(default_factory=list)
 
 
 class StepImplementation(Model):
@@ -146,7 +147,7 @@ class Evidence:
                 self.windows[f'{sid}@{start}']=dict(source_id=sid,start=start,end=min(len(text),start+1600),text=text[start:start+1600])
         self.window_index=BM25({k:tokenize(v['text']) for k,v in self.windows.items()},1.5,0.75)
 
-    def fetch(self, queries, source_ids=(), *, item_limit=16):
+    def fetch(self, queries, source_ids=(), *, item_limit=16, focus=False):
         query=tokenize(' '.join(queries))
         scores=self.index.score(query)
         ranked=sorted(range(len(self.items)),key=lambda i:(-scores.get(str(i),0),self.items[i]['plan_pointer']))
@@ -154,8 +155,10 @@ class Evidence:
         wanted=set(source_ids)|{sid for item in selected for sid in item['source_ids']}
         ranks=self.window_index.score(query)
         direct=set(source_ids)
-        ordered=sorted(self.windows,key=lambda key:(0 if self.windows[key]['source_id'] in direct else
-            1 if self.windows[key]['source_id'] in wanted else 2,-ranks.get(key,0),key))
+        def rank(key):
+            priority=0 if self.windows[key]['source_id'] in direct else 1 if self.windows[key]['source_id'] in wanted else 2
+            return (-ranks.get(key,0),priority,key) if focus else (priority,-ranks.get(key,0),key)
+        ordered=sorted(self.windows,key=rank)
         windows=[];per_source={}
         for key in ordered:
             w=self.windows[key]
@@ -164,7 +167,7 @@ class Evidence:
             windows.append(w);per_source[w['source_id']]=per_source.get(w['source_id'],0)+1
             if len(windows)==8: break
         return dict(documented_items=selected,source_excerpts=windows,
-                    available_source_ids=sorted(wanted),retrieval_queries=queries)
+                    available_source_ids=sorted(wanted),retrieval_queries=queries,focused_recovery=focus)
 
 
 def _facts_in_context(facts, context):
@@ -174,6 +177,80 @@ def _facts_in_context(facts, context):
         if not any(w['source_id']==fact.source_id and locate_quote(w['text'],fact.quote) is not None
                    for w in context['source_excerpts']):
             raise ValueError('Fact quote must occur in a retrieved source excerpt')
+
+
+def _pseudocode_problems(pseudo, categories):
+    """Questions preserve gaps; they cannot substitute for an implementation."""
+    problems=[]
+    for key in ('understanding',):
+        if not getattr(pseudo,key).strip(): problems.append('Missing '+key)
+    for key in ('preconditions','stimulus_steps','check_steps','coverage_steps','completion','questions','blockers'):
+        if any(not text.strip() for text in getattr(pseudo,key)): problems.append('Blank text in '+key)
+    if not any((pseudo.stimulus_steps,pseudo.check_steps,pseudo.coverage_steps)):
+        problems.append('Feature needs actionable pseudocode; questions alone are not implementation steps')
+    for category,key in (('stimulus','stimulus_steps'),('checks','check_steps'),('coverage','coverage_steps')):
+        if category in categories and not getattr(pseudo,key): problems.append('Assigned '+category+' intention needs '+key)
+    if not pseudo.completion: problems.append('Missing bounded completion/termination criteria')
+    if not pseudo.facts: problems.append('Missing documented supporting facts for actionable pseudocode')
+    if pseudo.blockers: problems.append('Essential evidence blockers: '+'; '.join(pseudo.blockers))
+    return problems
+
+
+def _approach_check(approach, tasks, feature_ids):
+    seen=set()
+    known=set(feature_ids)
+    for wave in approach.execution_order:
+        if not wave or len(wave)!=len(set(wave)) or not set(wave)<=known or seen & set(wave):
+            raise ValueError('Collated pseudocode must include every feature exactly once')
+        if any(not ({d.task_id for d in tasks[tid].depends_on} & known)<=seen for tid in wave):
+            raise ValueError('Collated pseudocode violates feature dependencies')
+        seen.update(wave)
+    if seen!=known: raise ValueError('Collated pseudocode omitted a feature')
+    for key in ('shared_setup','stimulus_approach','check_approach','coverage_approach'):
+        values=getattr(approach,key)
+        if not values or any(not text.strip() for text in values):
+            raise ValueError('Collated pseudocode needs nonempty '+key+'; explain any inapplicable area explicitly')
+
+
+def _collate(call, strategy, tasks, pseudocode):
+    """Hierarchical collation preserves actual steps without a whole-plan prompt."""
+    features={tid:{key:value for key,value in p.model_dump().items() if key!='facts'} for tid,p in pseudocode.items()}
+    nodes=[dict(feature_ids=[tid],features={tid:data}) for tid,data in features.items()]
+    rules=('Collate supplied actual feature steps into cohesive language-neutral implementation pseudocode. '
+           'Preserve supported actions, preconditions, completion criteria and unresolved questions. '
+           'Provide nonempty shared_setup, stimulus_approach, check_approach and coverage_approach: '
+           'describe reusable setup, producer/consumer paths, sequence composition, monitor/check/scoreboard '
+           'relationships and monitor sampling. Explicitly explain an inapplicable area rather than leaving it empty. '
+           'No new DUT behavior or expected values, no SystemVerilog. Include each feature exactly once in '
+           'execution_order; honor dependencies within this batch. External dependencies are handled at final collation. '
+           'This is generation order, not permission for concurrent DUT traffic.')
+
+    def payload(group, level):
+        ids=[tid for node in group for tid in node['feature_ids']]
+        return dict(high_level_strategy=strategy,level=level,
+                    dependencies=[dict(id=tid,requires=[d.task_id for d in tasks[tid].depends_on]) for tid in ids],
+                    features={tid:data for node in group for tid,data in node.get('features',{}).items()},
+                    collated_groups=[node for node in group if 'approach' in node])
+
+    for level in range(8):
+        groups=[];group=[]
+        for node in nodes:
+            if group and len(json.dumps(payload(group+[node],level)))>32000:
+                groups.append(group);group=[]
+            group.append(node)
+        if group: groups.append(group)
+        reduced=[]
+        for batch,group in enumerate(groups):
+            data=payload(group,level);data['batch']=batch
+            ids=[tid for node in group for tid in node['feature_ids']]
+            approach=call('code_collation',data,ImplementationApproach,rules,
+                          lambda result: _approach_check(result,tasks,ids))
+            reduced.append(dict(feature_ids=ids,approach=approach.model_dump()))
+        if len(reduced)==1: return approach
+        if level and len(reduced)>=len(nodes):
+            raise ValueError('Collated summaries exceed context budget; split feature work rather than discarding steps')
+        nodes=reduced
+    raise ValueError('Collation exceeded bounded reduction depth')
 
 
 def _merge(plan, fragment):
@@ -211,7 +288,7 @@ def _document(task, pseudo, independent):
               '', '_Independent for planning/code generation; this does not authorize concurrent DUT stimulus._','',
               '## Understanding','',pseudo.understanding,'']
     for title,key in [('Preconditions','preconditions'),('Stimulus pseudocode','stimulus_steps'),
-                      ('Check pseudocode','check_steps'),('Coverage pseudocode','coverage_steps'),('Completion','completion'),('Questions','questions')]:
+                      ('Check pseudocode','check_steps'),('Coverage pseudocode','coverage_steps'),('Completion','completion'),('Questions','questions'),('Essential blockers','blockers')]:
         lines += ['## '+title,'']
         steps=[f'{i}. {text}' for i,text in enumerate(getattr(pseudo,key),1)]
         lines += (['```text']+steps+['```'] if key.endswith('_steps') else steps)+['']
@@ -231,8 +308,13 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
     evidence=Evidence(plan,sources)
     client=CheckpointLLM(llm,directory/'llm_cache'/'code_work',stage='code_work')
     records=[]
+    work_manifest=dict(work_dir=str(work),status='IN_PROGRESS',pseudocode_tasks=[],completed_tasks=[],
+                       tasks=[],review_status='NEEDS_REVIEW',
+                       quality_policy='actionable_source_backed_features_and_complete_collation')
+    _write(directory/'code_work_manifest.json',work_manifest)
     with Tracer(directory/'trace.jsonl','code_work',metadata={'model':llm.model}) as tracer:
-        def request(name,payload,model,rules,check=lambda result:None):
+        def request(name,payload,model,rules,check=lambda result:None,recover=None):
+            issue=None
             for attempt in range(2):
                 if len(json.dumps(payload))>48000: raise ValueError(f'{name}: work package too large; split this package')
                 emit(f'code work: {name}, {len(json.dumps(payload))} characters'+(' (repair)' if attempt else ''))
@@ -241,14 +323,21 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 try:
                     typed=model.model_validate(result.data);check(typed)
                 except ValueError as exc:
+                    issue=dict(stage=name,attempt=attempt+1,status='BLOCKED' if attempt else 'REPAIR_PENDING',
+                               task_id=payload.get('task',{}).get('id'),reason=str(exc),rejected_output=result.data)
+                    _write(directory/'code_planning_issue.json',issue)
                     if attempt: raise
-                    payload=payload|dict(repair_feedback=str(exc));continue
+                    payload=payload|dict(repair_feedback=str(exc))
+                    if recover is not None: payload=recover(payload,result.data,str(exc))
+                    continue
                 records.append(dict(stage=name,input_chars=len(json.dumps(payload)),cached=result.cached))
+                if issue:
+                    _write(directory/'code_planning_issue.json',issue|dict(status='RECOVERED'))
                 _write(directory/'code_context.json',dict(mode='feature_work_packages',requests=records,
                        max_request_chars=max(r['input_chars'] for r in records),work_dir=str(work)))
                 return typed
 
-        def call(name,payload,model,rules,check=lambda result:None):
+        def call(name,payload,model,rules,check=lambda result:None,recover=None):
             sid=name
             label=None
             if name=='code_pseudocode':
@@ -258,7 +347,14 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 sid+=':'+payload['task_id']
                 label='Implement '+tasks[payload['task_id']].title
             with stage(sid,label) as outcome:
-                result=request(name,payload,model,rules,check)
+                try:
+                    result=request(name,payload,model,rules,check,recover)
+                except (Exception,KeyboardInterrupt) as exc:
+                    if work_manifest is not None:
+                        work_manifest.update(status='BLOCKED',blocked_stage=sid,
+                                             reason=str(exc) if isinstance(exc,ValueError) else type(exc).__name__)
+                        _write(directory/'code_work_manifest.json',work_manifest)
+                    raise
                 outcome['reused']=records[-1]['cached']
                 return result
 
@@ -316,7 +412,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             '\n\n_Implementation planning requires review; independence does not imply safe parallel DUT traffic._\n')
         work_manifest=dict(work_dir=str(work),generation_waves=waves,pseudocode_tasks=[],completed_tasks=[],status='IN_PROGRESS',
             tasks=[dict(id=t.id,document=str(work/(t.id+'.md')),pseudocode=str(work/(t.id+'.pseudocode.json'))) for t in graph.tasks],
-            review_status='NEEDS_REVIEW')
+            review_status='NEEDS_REVIEW',quality_policy='actionable_source_backed_features_and_complete_collation')
         _write(directory/'code_work_manifest.json',work_manifest)
 
         completed={};pseudocode_by_id={};contexts={}
@@ -335,21 +431,41 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                              dependencies={d.task_id:completed[d.task_id] for d in task.depends_on},
                              interface=definition,evidence=selected)
                 _write(work/(tid+'.context.json'),payload)
+                categories={intent['category'] for intent in intentions if intent['plan_pointer'] in task.plan_pointers}
                 def pseudo_check(p):
                     _facts_in_context(p.facts,selected)
                     validate_facts(p.facts,plan,sources)
-                    if not (p.stimulus_steps or p.check_steps or p.coverage_steps or p.questions):
-                        raise ValueError('Feature needs actionable pseudocode or an explicit unresolved question')
-                    if (p.stimulus_steps or p.check_steps or p.coverage_steps) and not (p.facts or p.questions):
-                        raise ValueError('Pseudocode needs documented supporting facts or explicit source gaps')
+                    problems=_pseudocode_problems(p,categories)
+                    if problems: raise ValueError('; '.join(problems))
+
+                def recover_pseudo(retry,rejected,reason):
+                    nonlocal selected
+                    previous=rejected if isinstance(rejected,dict) else {}
+                    gaps=[q for key in ('blockers','questions') for q in
+                          (previous.get(key,[]) if isinstance(previous.get(key,[]),list) else []) if isinstance(q,str)]
+                    queries=gaps[:8]+task.queries+[task.goal]
+                    selected=evidence.fetch(queries,source_ids=direct,focus=True)
+                    emit(f'code feature {tid}: recover evidence for incomplete pseudocode')
+                    retry=retry|dict(evidence=selected,previous_pseudocode={k:v for k,v in previous.items() if k!='facts'})
+                    _write(work/(tid+'.recovery.context.json'),retry)
+                    return retry
+
                 pseudo=call('code_pseudocode',payload,Pseudocode,
-                    'Collate this feature and its dependency understanding into precise language-neutral pseudocode: '
-                    'preconditions, stimulus steps, comparisons/checks, monitor-sampled coverage and completion. '
-                    'Use algorithmic IF/FOR/WAIT/SAMPLE/COMPARE pseudocode, explicit termination and cleanup; '
-                    'label testbench timeouts as operational limits rather than DUT requirements. '
-                    'Relate producer/consumer flows and reset/configuration dependencies. Supply exact documented '
-                    'facts for behavior; INFERRED/ASSUMED intentions are guidance only. Unsupported expectations '
-                    'or missing evidence become questions, never invented facts. Do not emit SystemVerilog.',pseudo_check)
+                    'This is feature planning, not the final runnable CodePlan: retain supported partial algorithms '
+                    'even when other features or final bus bindings need clarification. Do not require a complete '
+                    'register map or all protocol settings to plan a supported monitor/check/coverage feature. '
+                    'Collate this feature and its dependencies into precise language-neutral pseudocode: '
+                    'preconditions, stimulus steps, comparisons/checks, monitor-sampled coverage and bounded completion. '
+                    'Provide steps for each assigned stimulus/checks/coverage intention; unused categories may be empty. '
+                    'Use algorithmic IF/FOR/WAIT/SAMPLE/COMPARE steps with termination and cleanup. '
+                    'Testbench timeouts are operational limits, not DUT requirements. '
+                    'Supply exact documented facts for behavior; INFERRED/ASSUMED intentions guide architecture only. '
+                    'Use symbolic references to supported settings if concrete bindings are unresolved, without inventing values. '
+                    'Questions record missing or ambiguous details; blockers list ONLY essential gaps preventing ALL supported '
+                    'work in this feature. Questions alone are not pseudocode. Inspect supplied documented items and excerpts '
+                    'before asking for information already present. On repair use recovered excerpts to resolve gaps, retaining '
+                    'supported work. Never invent expected behavior to fill a required list. Do not emit SystemVerilog.',
+                    pseudo_check,recover_pseudo)
                 _write(work/(tid+'.pseudocode.json'),pseudo.model_dump())
                 _artifact(work/(tid+'.md'),_document(task,pseudo,independent[tid]))
                 completed[tid]=dict(understanding=pseudo.understanding,completion=pseudo.completion,
@@ -357,26 +473,12 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 pseudocode_by_id[tid]=pseudo;contexts[tid]=selected
                 work_manifest['pseudocode_tasks'].append(tid)
                 _write(directory/'code_work_manifest.json',work_manifest)
-        def approach_check(a):
-            seen=set()
-            for stage in a.execution_order:
-                if not stage or len(stage)!=len(set(stage)) or not set(stage)<=tasks.keys() or seen & set(stage):
-                    raise ValueError('Collated pseudocode must include every feature exactly once')
-                if any(not {d.task_id for d in tasks[tid].depends_on}<=seen for tid in stage):
-                    raise ValueError('Collated pseudocode violates feature dependencies')
-                seen.update(stage)
-            if seen!=tasks.keys(): raise ValueError('Collated pseudocode omitted a feature')
-        approach=call('code_collation',dict(high_level_strategy=strategy,
-            dependencies=[dict(id=t.id,requires=[d.task_id for d in t.depends_on]) for t in graph.tasks],
-            features={tid:dict(understanding=p.understanding[:240],preconditions=[s[:120] for s in p.preconditions[:2]],
-                steps=dict(stimulus=len(p.stimulus_steps),checks=len(p.check_steps),coverage=len(p.coverage_steps)),
-                completion=[s[:120] for s in p.completion[:1]],unresolved_questions=len(p.questions))
-                for tid,p in pseudocode_by_id.items()}),ImplementationApproach,
-            'Collate ALL feature understanding into one cohesive language-neutral implementation pseudocode. '
-            'Identify reusable setup and producer/consumer paths, the order of dependent features, sequence composition, '
-            'monitor/check/scoreboard relationships and coverage sampling. Include every feature once in execution_order '
-            '(generation order only; concurrency of DUT traffic is decided separately). Keep source gaps as questions. '
-            'No new DUT behavior or expected values and no SystemVerilog.',approach_check)
+        try:
+            approach=_collate(call,strategy,tasks,pseudocode_by_id)
+        except ValueError as exc:
+            work_manifest.update(status='BLOCKED',blocked_stage='code_collation',reason=str(exc))
+            _write(directory/'code_work_manifest.json',work_manifest)
+            raise
         _write(work/'COLLATED_PSEUDOCODE.json',approach.model_dump())
         _artifact(work/'COLLATED_PSEUDOCODE.md','# Collated implementation pseudocode\n\n'+
             '\n'.join(f'- Stage {i+1}: '+', '.join(stage) for i,stage in enumerate(approach.execution_order))+'\n\n'+
