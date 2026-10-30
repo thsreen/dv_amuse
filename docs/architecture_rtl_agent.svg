@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="1326" viewBox="0 0 1240 1326" font-family="Helvetica, Arial, 'DejaVu Sans', sans-serif">
+<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b4252"/>
+    </marker>
+    <marker id="arrowLLM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5e35b1"/>
+    </marker>
+    <style>
+      .title { font-size: 24px; font-weight: 700; fill: #1f2430; }
+      .sub { font-size: 13px; fill: #4c566a; }
+      .h { font-size: 15px; font-weight: 700; fill: #1f2430; }
+      .hs { font-size: 13px; font-weight: 700; fill: #1f2430; }
+      .t { font-size: 12px; fill: #2e3440; }
+      .ts { font-size: 11px; fill: #2e3440; }
+      .m { font-size: 11px; fill: #4c566a; font-family: Menlo, Consolas, 'DejaVu Sans Mono', monospace; }
+      .lane { font-size: 12px; font-weight: 700; fill: #4c566a; letter-spacing: 1px; }
+      .stage { fill: #eef3fb; stroke: #4a6fa5; stroke-width: 1.5; }
+      .step { fill: #ffffff; stroke: #4a6fa5; stroke-width: 1.2; }
+      .art { fill: #f6f7f9; stroke: #a0a8b6; stroke-width: 1; }
+      .llm { fill: #f1ebfb; stroke: #5e35b1; stroke-width: 1.5; }
+      .check { fill: #fff4e5; stroke: #d9822b; stroke-width: 1.5; }
+      .trace { fill: #e9f6ef; stroke: #2e8b57; stroke-width: 1.5; }
+      .human { fill: #fdecec; stroke: #c0392b; stroke-width: 1.5; }
+      .flow { stroke: #3b4252; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .thin { stroke: #8a93a3; stroke-width: 1; fill: none; stroke-dasharray: 3 3; marker-end: url(#arrow); }
+      .bus { stroke: #5e35b1; stroke-width: 1.1; fill: none; stroke-dasharray: 5 4; }
+      .call { stroke: #5e35b1; stroke-width: 1.1; fill: none; stroke-dasharray: 5 4; marker-end: url(#arrowLLM); }
+      .badge { font-size: 10px; font-weight: 700; fill: #ffffff; }
+    </style>
+  </defs>
+<rect x="0" y="0" width="1240" height="1330" fill="#ffffff"/>
+<text x="30" y="40" class="title">rtl_agent: from explicit RTL files to interfaces, graph and cited context</text>
+<text x="30" y="62" class="sub">Independent of the specification flow. Static analysis only: roles, groupings and crossings are inferences with raw source</text>
+<text x="30" y="79" class="sub">attached, and unsupported analysis is reported as partial instead of guessed.</text>
+<text x="30" y="104" class="lane">INPUTS</text>
+<text x="330" y="104" class="lane">EXTRACTION (offline)</text>
+<text x="960" y="104" class="lane">OUTPUTS</text>
+<rect x="30" y="114" width="270" height="150" rx="8" class="art"/>
+<text x="44" y="136" class="h">Explicit RTL files</text>
+<text x="44" y="158" class="t">Compilation order chosen by you</text>
+<text x="44" y="175" class="t">-I include paths, -D defines</text>
+<text x="44" y="192" class="t">-P integer parameter overrides</text>
+<text x="44" y="209" class="t">Top module</text>
+<rect x="330" y="114" width="580" height="56" rx="8" class="stage"/>
+<text x="344" y="136" class="h">Source reader and preprocessor</text>
+<text x="898" y="136" class="m" text-anchor="end">source.py</text>
+<text x="344" y="158" class="t">Tokens with file, line and character spans; active configuration only</text>
+<rect x="330" y="190" width="580" height="70" rx="8" class="stage"/>
+<text x="344" y="212" class="h">Declaration extractor</text>
+<text x="898" y="212" class="m" text-anchor="end">extractor.py design.py</text>
+<text x="344" y="234" class="t">Ports, directions, widths, parameters; integer constant subset</text>
+<text x="344" y="251" class="t">Sized-literal arithmetic refused, never guessed</text>
+<rect x="330" y="280" width="580" height="70" rx="8" class="stage"/>
+<text x="344" y="302" class="h">Interface builder</text>
+<text x="898" y="302" class="m" text-anchor="end">builder.py commands.py</text>
+<text x="344" y="324" class="t">Compact interface JSON from a versioned template</text>
+<text x="344" y="341" class="t">Optional SystemVerilog export; provenance kept</text>
+<path d="M620,170 L620,188" class="flow"/>
+<path d="M620,260 L620,278" class="flow"/>
+<path d="M302,190 L328,142" class="thin"/>
+<rect x="960" y="114" width="250" height="236" rx="8" class="art"/>
+<text x="974" y="136" class="h">Interface outputs</text>
+<text x="974" y="158" class="t">rtl extraction (saved)</text>
+<text x="974" y="175" class="t">interface_definition.json</text>
+<text x="974" y="192" class="t">optional .sv export</text>
+<text x="974" y="209" class="m">Wiring inventory only:</text>
+<text x="974" y="226" class="m">direction, width, name</text>
+<path d="M912,315 L958,315" class="thin"/>
+<text x="30" y="384" class="lane">GRAPH BUILD</text>
+<rect x="30" y="394" width="270" height="260" rx="8" class="art"/>
+<text x="44" y="416" class="h">Three layers</text>
+<text x="44" y="438" class="t">L1  exact file/line/char spans,</text>
+<text x="44" y="455" class="t">    text and SHA-256</text>
+<text x="44" y="472" class="t">L2  modules, instance-qualified</text>
+<text x="44" y="489" class="t">    ports, signals, parameters,</text>
+<text x="44" y="506" class="t">    processes, control conditions</text>
+<text x="44" y="523" class="t">L3  seeded deterministic</text>
+<text x="44" y="540" class="t">    communities (navigation only)</text>
+<rect x="330" y="394" width="580" height="120" rx="8" class="stage"/>
+<text x="344" y="416" class="h">Graph builder</text>
+<text x="898" y="416" class="m" text-anchor="end">graph.py</text>
+<text x="344" y="438" class="t">Containment, instantiation, port connections, parameter settings</text>
+<text x="344" y="455" class="t">Process reads/writes, data and control dependencies, aliases</text>
+<text x="344" y="472" class="t">Event sensitivity; identical module types keep separate signals</text>
+<text x="344" y="489" class="t">Optional user feature labels over exact instance/signal paths</text>
+<rect x="330" y="534" width="580" height="120" rx="8" class="check"/>
+<text x="344" y="556" class="h">Inferences kept separate</text>
+<text x="898" y="556" class="m" text-anchor="end">INFERRED</text>
+<text x="344" y="578" class="t">Clock roots: edge-triggered sensitivity; reset: leading constant branch</text>
+<text x="344" y="595" class="t">Polarity from the condition; async vs sync from the event list</text>
+<text x="344" y="612" class="t">Names alone never decide a role; ambiguity becomes a diagnostic</text>
+<text x="344" y="629" class="t">Different clock roots in one cone: possible crossing, NEEDS_REVIEW</text>
+<path d="M620,514 L620,532" class="flow"/>
+<rect x="960" y="394" width="250" height="260" rx="8" class="art"/>
+<text x="974" y="416" class="h">Graph outputs</text>
+<text x="974" y="438" class="t">rtl_graph.json</text>
+<text x="974" y="455" class="t">graph-info: statistics,</text>
+<text x="974" y="472" class="t">domains, analysis gaps</text>
+<text x="974" y="489" class="t"></text>
+<text x="974" y="506" class="t">Unsupported constructs are</text>
+<text x="974" y="523" class="t">reported, status PARTIAL</text>
+<text x="974" y="540" class="t">instead of guessed</text>
+<path d="M912,454 L958,454" class="thin"/>
+<path d="M302,454 L328,454" class="thin"/>
+<text x="30" y="688" class="lane">RETRIEVAL (query / context)</text>
+<rect x="30" y="698" width="270" height="230" rx="8" class="stage"/>
+<text x="44" y="720" class="h">Seeds</text>
+<text x="288" y="720" class="m" text-anchor="end">retrieval.py dense.py</text>
+<text x="44" y="742" class="t">BM25 over names, expressions,</text>
+<text x="44" y="759" class="t">excerpts and relations</text>
+<text x="44" y="776" class="t">Optional dense cosine from</text>
+<text x="44" y="793" class="t">caller-supplied embeddings</text>
+<text x="44" y="810" class="t">(NumPy/JSON, no vector DB)</text>
+<text x="44" y="827" class="t">Exact instance or signal</text>
+<text x="44" y="844" class="t">matches anchor the query</text>
+<rect x="330" y="698" width="280" height="230" rx="8" class="stage"/>
+<text x="344" y="720" class="h">Propagate</text>
+<text x="598" y="720" class="m" text-anchor="end">retrieval.py</text>
+<text x="344" y="742" class="t">Personalized PageRank over a</text>
+<text x="344" y="759" class="t">typed, weighted semantic view</text>
+<text x="344" y="776" class="t">Source excerpts stay citations,</text>
+<text x="344" y="793" class="t">not bridges between instances</text>
+<text x="344" y="810" class="t">Scope restricts to an instance</text>
+<text x="344" y="827" class="t">and its descendants</text>
+<text x="344" y="844" class="t">Hop and expansion bounds</text>
+<rect x="630" y="698" width="280" height="230" rx="8" class="stage"/>
+<text x="644" y="720" class="h">Combined fetch</text>
+<text x="898" y="720" class="m" text-anchor="end">retrieval.py</text>
+<text x="644" y="742" class="t">Hierarchy and entity neighbors</text>
+<text x="644" y="759" class="t">Upstream / downstream cones</text>
+<text x="644" y="776" class="t">Clock and reset context</text>
+<text x="644" y="793" class="t">Community navigation</text>
+<text x="644" y="810" class="t">Minimum share per context source</text>
+<text x="644" y="827" class="t">Directed paths keep relation</text>
+<text x="644" y="844" class="t">direction</text>
+<path d="M300,813 L328,813" class="flow"/>
+<path d="M610,813 L628,813" class="flow"/>
+<rect x="960" y="698" width="250" height="230" rx="8" class="trace"/>
+<text x="974" y="720" class="h">Evidence bundle</text>
+<text x="974" y="742" class="t">Facts only with an exact,</text>
+<text x="974" y="759" class="t">hash-verified excerpt</text>
+<text x="974" y="776" class="t">VERIFIED vs NOT_INCLUDED</text>
+<text x="974" y="793" class="t">citations explicit</text>
+<text x="974" y="810" class="t">Defaults: 16 nodes, 3 hops,</text>
+<text x="974" y="827" class="t">48 facts, 16 excerpts,</text>
+<text x="974" y="844" class="t">24,000 excerpt characters</text>
+<path d="M912,813 L958,813" class="flow"/>
+<text x="30" y="962" class="lane">SPECIFICATION DRAFT (build-spec)</text>
+<rect x="30" y="972" width="880" height="110" rx="8" class="stage"/>
+<text x="44" y="994" class="h">RTL-derived specification draft</text>
+<text x="898" y="994" class="m" text-anchor="end">specification.py</text>
+<text x="44" y="1016" class="t">Seven ordered sections: introduction, IO ports, clocks, registers, operation, architecture, engineer questions</text>
+<text x="44" y="1033" class="t">Section layout is reusable; no design-specific facts are copied from the reference document</text>
+<text x="44" y="1050" class="t">Every claim: INFERRED, NEEDS_REVIEW, RTL_DESIGN_ENGINEER owner, with exact graph excerpt and line range</text>
+<text x="44" y="1067" class="m">rtl_derived_spec.json   doc/rtl_derived_spec.md</text>
+<rect x="960" y="972" width="250" height="110" rx="8" class="human"/>
+<text x="974" y="994" class="h">Engineer validation</text>
+<text x="974" y="1016" class="t">No automatic promotion;</text>
+<text x="974" y="1033" class="t">an approved document can be</text>
+<text x="974" y="1050" class="t">ingested as a normal spec</text>
+<path d="M912,1027 L958,1027" class="thin"/>
+<path d="M620,928 L620,970" class="thin"/>
+<text x="30" y="1116" class="lane">WHO CONSUMES WHAT</text>
+<rect x="30" y="1126" width="380" height="100" rx="8" class="art"/>
+<text x="44" y="1148" class="h">dv_agent test plan</text>
+<text x="44" y="1170" class="t">Prebuilt graph only, opt-in:</text>
+<text x="44" y="1187" class="t">&quot;Observations from RTL&quot; before strategy</text>
+<rect x="430" y="1126" width="380" height="100" rx="8" class="art"/>
+<text x="444" y="1148" class="h">UVM builder</text>
+<text x="444" y="1170" class="t">Interface JSON (wiring facts) only;</text>
+<text x="444" y="1187" class="t">graph facts and excerpts are blocked</text>
+<rect x="830" y="1126" width="380" height="100" rx="8" class="art"/>
+<text x="844" y="1148" class="h">orchestrator_agent</text>
+<text x="844" y="1170" class="t">Runs extract, graph, spec and query as</text>
+<text x="844" y="1187" class="t">tools; RTL-only repos use the spec draft flow</text>
+<rect x="30" y="1262" width="1180" height="44" rx="8" fill="#fafbfc" stroke="#d8dee9"/>
+<rect x="46" y="1276" width="16" height="16" class="stage"/><text x="68" y="1289" class="t">component / stage</text>
+<rect x="210" y="1276" width="16" height="16" class="art"/><text x="232" y="1289" class="t">artifact / data</text>
+<rect x="361" y="1276" width="16" height="16" class="llm"/><text x="383" y="1289" class="t">model API</text>
+<rect x="472" y="1276" width="16" height="16" class="check"/><text x="494" y="1289" class="t">check outside the model</text>
+<rect x="675" y="1276" width="16" height="16" class="trace"/><text x="697" y="1289" class="t">trace / viewer</text>
+<rect x="819" y="1276" width="16" height="16" class="human"/><text x="841" y="1289" class="t">owner / human decision</text>
+</svg>

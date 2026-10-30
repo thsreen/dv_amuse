@@ -1,4 +1,5 @@
 .venv/
+.deps/
 .env
 runs/
 __pycache__/
@@ -11,3 +12,4 @@ __pycache__/
 sim-results/
 e2e-sim-config.json
 .e2e-ssh/
+.e2e-bin/

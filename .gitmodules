@@ -1,6 +1,6 @@
-[submodule "tools/xezim"]
-	path = tools/xezim
-	url = https://github.com/aionhw/xezim.git
 [submodule "tools/e2e_sim"]
 	path = tools/e2e_sim
 	url = https://github.com/thsreen/e2e-sim.git
+[submodule "tools/xezim"]
+	path = tools/xezim
+	url = https://github.com/aionhw/xezim.git

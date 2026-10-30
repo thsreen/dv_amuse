@@ -1,0 +1,12 @@
+class {{AGENT}}_cfg extends uvm_object;
+  `uvm_object_utils({{AGENT}}_cfg)
+  virtual {{AGENT}}_if vif;
+  bit active = {{ACTIVE}};
+  bit reset_active = {{RESET_ACTIVE}};
+  int timeout_cycles = {{TIMEOUT}};
+  int bit_cycles = {{BIT_CYCLES}};
+  int data_bits = {{DATA_BITS}};
+  int parity_mode = {{PARITY}};
+  int stop_bits = {{STOP_BITS}};
+  function new(string name="{{AGENT}}_cfg"); super.new(name); endfunction
+endclass

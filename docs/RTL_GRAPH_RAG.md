@@ -4,6 +4,8 @@
 signal dependencies, clock/reset use and feature control. It is independently built; an explicitly
 supplied graph may feed the opt-in [test-plan RTL observations](RTL_OBSERVATIONS.md) stage (D-032).
 The compact interface JSON and UVM generation are unchanged.
+The graph also supports the separate [RTL-derived specification draft](RTL_SPECIFICATION.md),
+whose claims and downstream checks stay inferred until RTL engineer validation.
 
 ```mermaid
 flowchart LR

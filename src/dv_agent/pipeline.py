@@ -1,18 +1,19 @@
 """Pipeline stages, each wrapped in its own trace."""
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 
 from .community import build_communities
 from .graph_fetch import add_owner_edges, dependency_closure, dependency_order
 from .dense import Embedder, build_index, dense_scores, load_index, save_index
-from .extract import ExtractConfig, extract_dependencies, extract_requirements
+from .extract import MAX_WORKERS_CAP, ExtractConfig, extract_dependencies, extract_requirements
 from .fsutil import atomic_write_text
 from .html_report import render_html
 from .graph import build_structure, load_graph, save_graph
 from .ingest import ChunkConfig, discover, ingest, load_chunks, load_manifest
 from .llm import LLM, LLMError
-from .progress import emit_event
+from .progress import emit, emit_event
 from .planning import PlanConfig, build_test_plan
 from .retrieval import RetrievalConfig, layered_view, retrieve
 from .testplan_context import feature_index, fetch_context, requirement_context
@@ -23,9 +24,13 @@ from .registers import render as render_registers
 from .combined_fetch import step_targets
 from .strategy import build_strategy
 from .strategy import render as render_strategy
+from .slim_index import INDEX_FILE
+from .slim_index import build_index as build_slim_index
+from .slim_index import load_index as load_slim_index
 from .testplan_doc import DocConfig, build_evidence_index, build_testplan_doc, load_template, render_markdown, section_context
 from .trace import Tracer
 from .usage import run_totals, summarize
+from .evidence_policy import POLICY_VERSION
 
 TRACE_FILE = "trace.jsonl"
 GRAPH_FILE = "graph.json"
@@ -43,6 +48,13 @@ STRATEGY_JSON = "strategy.json"
 STRATEGY_MD = "strategy.md"
 STEP_FILES = (REGISTERS_JSON, REGISTERS_MD, INTERFACES_JSON, INTERFACES_MD, STRATEGY_JSON, STRATEGY_MD)
 DERIVED_FILES = (GRAPH_FILE, BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD, TESTPLAN_HTML) + STEP_FILES
+MODES = ("full", "fast", "basic")
+
+
+def _check_mode(mode: str) -> str:
+    if mode not in MODES:
+        raise ValueError(f"unknown mode: {mode} (expected one of {', '.join(MODES)})")
+    return mode
 RUN_MARKERS = ("manifest.json", BUILD_STATS, GRAPH_FILE, TRACE_FILE)
 
 
@@ -53,11 +65,12 @@ def _trace_info(tracer: Tracer) -> dict:
 
 
 def _doc_state(docs) -> dict[str, tuple[str, str]]:
-    return {d.path: (d.sha256, d.status) for d in docs}
+    return {d.path: (d.sha256, d.status, d.authority) for d in docs}
 
 
 def _ingest_summary(manifest, chunks: int) -> dict:
     return dict(repo=manifest.repo, repo_revision=manifest.repo_revision, chunks=chunks,
+                source_authority=manifest.source_authority,
                 documents=[d.model_dump(include={"doc_id", "path", "status", "reason", "pages"})
                            for d in manifest.documents])
 
@@ -72,7 +85,8 @@ def _ingest_current(repo: Path, out: Path, include: list[str] | None) -> bool:
 
 
 RUN_ARTIFACTS = ("manifest.json", "chunks.jsonl", "text", GRAPH_FILE, BUILD_STATS,
-                 TEST_PLAN, TESTPLAN_DOC, TESTPLAN_MD, TESTPLAN_HTML, *STEP_FILES, DENSE_DIR, "llm_cache", TRACE_FILE)
+                 TEST_PLAN, TESTPLAN_DOC, TESTPLAN_MD, TESTPLAN_HTML, *STEP_FILES, DENSE_DIR, INDEX_FILE,
+                 "llm_cache", TRACE_FILE)
 
 
 def _remove(p: Path) -> bool:
@@ -135,6 +149,8 @@ def _build_reusable(out: Path, mode: str, dense_mode: str) -> dict | None:
         return None
     if prev.get("mode") != mode or prev.get("dense_mode") != dense_mode:
         return None
+    if prev.get("checkpoint_pipeline") != 1:
+        return None
     if prev.get("llm", {}).get("status") not in ("PASS", "NOT_RUN"):
         return None
     # A build with failed chunks or groups is incomplete; rebuild so the cache can fill the gaps.
@@ -142,18 +158,25 @@ def _build_reusable(out: Path, mode: str, dense_mode: str) -> dict | None:
         return None
     if prev.get("dense", {}).get("status") == "BLOCKED":
         return None
+    if prev.get("mode") in ("fast", "basic") and load_slim_index(out) is None:
+        return None
     return prev | {"reused": True}
 
 
 def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None,
-                    embedder: Embedder | None = None, force: bool = False) -> dict:
-    mode = f"llm:{llm.model}" if llm is not None else "structural"
+                    embedder: Embedder | None = None, force: bool = False, mode: str = "full") -> dict:
+    _check_mode(mode)
+    fast = mode in ("fast", "basic")
+    build_mode = mode if fast else (f"llm:{llm.model}" if llm is not None else "structural")
+    if mode == "basic":
+        embedder = None
     dense_mode = f"dense:{embedder.model}" if embedder is not None else "none"
     if not force:
-        reused = _build_reusable(out, mode, dense_mode)
+        reused = _build_reusable(out, build_mode, dense_mode)
         if reused is not None:
             return reused
-    for name in (BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD, TESTPLAN_HTML, *STEP_FILES):
+    for name in (BUILD_STATS, TEST_PLAN, DENSE_DIR, TESTPLAN_DOC, TESTPLAN_MD, TESTPLAN_HTML, INDEX_FILE,
+                 *STEP_FILES):
         _remove(out / name)
     manifest, chunks = load_manifest(out), load_chunks(out)
     with Tracer(out / TRACE_FILE, "build_graph",
@@ -162,19 +185,38 @@ def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None
                 metadata={"model": getattr(llm, "model", None)}) as tracer:
         G = build_structure(manifest, chunks)
         stats: dict = {}
-        if llm is None:
+        if mode == "basic":
+            stats["llm"] = {"status": "NOT_RUN", "reason": "basic RAG: direct lexical chunk retrieval"}
+            stats["analysis_scope"] = "No model requirement/dependency extraction; no graph coverage claim."
+        elif llm is None:
             stats["llm"] = {"status": "NOT_RUN", "reason": "no LLM configured (MODEL_API_KEY unset)"}
         else:
+            workers = max(1, min((cfg or ExtractConfig()).max_workers, MAX_WORKERS_CAP))
+            parts = [f"model {llm.model}", f"workers {workers}"]
+            if getattr(llm, "timeout", None) is not None:
+                parts.append(f"timeout {llm.timeout:.0f}s")
+            if getattr(llm, "max_output_tokens", None) is not None:
+                parts.append(f"output budget {llm.max_output_tokens}")
+            if getattr(llm, "base_url", ""):
+                parts.append(f"endpoint {llm.base_url}")
+            emit("build config: " + ", ".join(parts))
+            from .graph_checkpoint import CheckpointLLM
+            graph_llm = CheckpointLLM(llm, out / "llm_cache" / "spec_graph")
+            cfg = replace(cfg or ExtractConfig(), checkpoint=lambda graph: save_graph(graph, out / GRAPH_FILE))
             try:
-                stats["requirements"] = extract_requirements(G, llm, tracer, cfg)
-                stats["dependencies"] = extract_dependencies(G, llm, tracer, cfg)
+                stats["requirements"] = extract_requirements(G, graph_llm, tracer, cfg)
+                stats["dependencies"] = (extract_dependencies(G, graph_llm, tracer, cfg)
+                                         if not stats["requirements"].get("failed_chunks") else
+                                         dict(groups=0, edges=0, rejected=0, failed_groups=[], status="NOT_RUN"))
                 incomplete = bool(stats["requirements"].get("failed_chunks") or stats["dependencies"].get("failed_groups"))
                 stats["llm"] = {"status": "BLOCKED" if incomplete else "PASS", "model": llm.model}
                 if incomplete:
                     stats["llm"]["reason"] = "partial extraction; failed source chunks or dependency groups"
             except LLMError as exc:
                 stats["llm"] = {"status": "BLOCKED", "reason": exc.kind, "model": llm.model}
-        stats["mode"], stats["dense_mode"] = mode, dense_mode
+        stats["mode"], stats["dense_mode"] = build_mode, dense_mode
+        stats["checkpoint_pipeline"] = 1
+        G.graph["extraction_stage_complete"] = stats["llm"]["status"] == "PASS"
         stats["owners"] = add_owner_edges(G)
         stats["communities"] = build_communities(G)
         if embedder is None:
@@ -192,6 +234,9 @@ def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None
             counts[n["type"]] = counts.get(n["type"], 0) + 1
         stats["nodes"] = counts
         stats["edges"] = G.number_of_edges()
+        if fast:
+            index = build_slim_index(out)
+            stats["slim_index"] = {"status": "PASS", "chunks": len(index.chunks)}
         G.graph["build_trace_id"] = tracer.trace_id
         save_graph(G, out / GRAPH_FILE)
         tracer.root.update(output=stats)
@@ -313,8 +358,15 @@ def _doc_summary(doc: dict, out: Path) -> dict:
 
 def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Path | None = None,
                      cfg: DocConfig | None = None, embedder: Embedder | None = None,
-                     force: bool = False, rtl_graph_path: Path | None = None, rtl_scope: str = "") -> dict:
+                     force: bool = False, rtl_graph_path: Path | None = None, rtl_scope: str = "",
+                     mode: str = "full") -> dict:
     """Generate the template-driven test-plan document (JSON + Markdown + HTML) from the graph."""
+    _check_mode(mode)
+    if mode == "basic":
+        embedder = None
+        cfg = cfg or DocConfig(max_chunks=6, max_register_chunks=10, max_entries=12,
+                               max_previous_entries=20, max_repairs=0, claims_check=False,
+                               register_workers=2)
     template = load_template(template_path)
     rtl_graph, rtl_input = None, None
     if rtl_scope and rtl_graph_path is None:
@@ -337,10 +389,13 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
             prev = json.loads(doc_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             prev = {}
-        if (prev.get("template_hash") == template["template_hash"] and prev.get("scope") == scope.strip()
-                and prev.get("model") == llm.model
+        if (prev.get("provenance_policy") == POLICY_VERSION
+                and prev.get("template_hash") == template["template_hash"] and prev.get("scope") == scope.strip()
+                and prev.get("model") == llm.model and prev.get("mode", "full") == mode
+                and prev.get("source_authority", "DOCUMENTED") == G.graph.get("source_authority", "DOCUMENTED")
                 and prev.get("graph_build_trace_id") == G.graph.get("build_trace_id")
                 and prev.get("rtl_input") == rtl_input
+                and prev.get('generation_status','COMPLETE') == 'COMPLETE'
                 and (prev.get("registers") is None or prev["registers"].get("extraction_signature") == extraction_signature())
                 and all(s["status"] == "PASS" or (s.get("generator") == "rtl_observations" and s["status"] == "NOT_RUN")
                         for s in prev.get("sections", [])) and prev.get("sections")
@@ -352,13 +407,52 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
     H = layered_view(G)
     index = _load_dense(out, embedder)
     dense_fn = (lambda q: dense_scores(embedder, index[0], index[1], q)) if index else None
+    slim = load_slim_index(out) or build_slim_index(out) if mode in ("fast", "basic") else None
     with Tracer(out / TRACE_FILE, "testplan_doc",
-                input={"template": template["template_id"], "scope": scope},
+                input={"template": template["template_id"], "scope": scope, "mode": mode},
                 metadata={"model": llm.model}) as tracer:
-        doc = build_testplan_doc(G, H, llm, tracer, template, scope, cfg, dense_fn,
-                                rtl_graph=rtl_graph, rtl_scope=rtl_scope)
+        from .graph_checkpoint import CheckpointLLM
+        plan_llm = CheckpointLLM(llm, out / "llm_cache" / "testplan", stage="testplan")
+        def checkpoint(snapshot):
+            # Copy before applying authority/presentation metadata to avoid mutating
+            # the builder's active sections. Persist lineage alongside partial views.
+            snapshot = json.loads(json.dumps(snapshot, default=str))
+            from .testplan_doc import enforce_source_authority
+            enforce_source_authority(snapshot, G.graph.get('source_authority','DOCUMENTED'))
+            snapshot.update(mode=mode, rtl_input=rtl_input, provenance_policy=POLICY_VERSION)
+            snapshot['evidence_index'] = build_evidence_index(G, snapshot)
+            save_graph(G, out / GRAPH_FILE)
+            atomic_write_text(doc_path, json.dumps(snapshot,indent=2,default=str))
+            _write_doc_views(snapshot, out, report_progress=False)
+            emit(f"testplan checkpoint: {len(snapshot['completed_sections'])}/{len(snapshot['sections'])} sections saved "
+                 f"to JSON, Markdown and HTML ({snapshot['generation_status']})")
+        try:
+            doc = build_testplan_doc(G, H, plan_llm, tracer, template, scope, cfg, dense_fn,
+                                    rtl_graph=rtl_graph, rtl_scope=rtl_scope, slim=slim, on_checkpoint=checkpoint)
+        except BaseException as exc:
+            status = 'INTERRUPTED' if isinstance(exc,(KeyboardInterrupt,SystemExit)) else 'ERROR'
+            emit(f"testplan generation {status}: {type(exc).__name__}; completed responses remain cached")
+            if doc_path.is_file():
+                snapshot = json.loads(doc_path.read_text())
+                if snapshot.get('trace_id') == tracer.trace_id:
+                    snapshot.update(generation_status=status, interruption_type=type(exc).__name__)
+                    try:
+                        checkpoint(snapshot)
+                    except Exception as save_error:
+                        emit(f"partial report update failed: {type(save_error).__name__}; original failure preserved")
+            raise
+        doc['generation_status'] = ('COMPLETE' if all(s['status']=='PASS' or
+            (s.get('generator')=='rtl_observations' and s['status']=='NOT_RUN') for s in doc['sections']) else 'PARTIAL')
+        doc["mode"] = mode
+        if mode == "basic":
+            doc["analysis_scope"] = ("Basic RAG demo draft: lexical source-chunk retrieval; no extracted requirement/dependency graph "
+                                     "or requirement-coverage measurement. Model claim judging disabled; source citation/quote "
+                                     "checks remain active. Engineer review required.")
         save_graph(G, out / GRAPH_FILE)
+    from .testplan_doc import enforce_source_authority
+    enforce_source_authority(doc, G.graph.get("source_authority", "DOCUMENTED"))
     doc["rtl_input"] = rtl_input
+    doc["provenance_policy"] = POLICY_VERSION
     doc["token_usage"] = {"Test-plan run": summarize(out / TRACE_FILE, tracer.trace_id)}
     if G.graph.get("build_trace_id"):
         doc["token_usage"]["Graph build"] = summarize(out / TRACE_FILE, G.graph["build_trace_id"])
@@ -368,8 +462,9 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
     return _doc_summary(doc, out) | _trace_info(tracer) | {"reused": False}
 
 
-def _write_doc_views(doc: dict, out: Path, *, preserve_markdown: bool = False) -> None:
-    emit_event("substep_start", id="render_views", label="Render Markdown and HTML reports")
+def _write_doc_views(doc: dict, out: Path, *, preserve_markdown: bool = False, report_progress: bool = True) -> None:
+    if report_progress:
+        emit_event("substep_start", id="render_views", label="Render Markdown and HTML reports")
     if not doc.get("evidence_index") and (out / GRAPH_FILE).is_file():
         doc["evidence_index"] = build_evidence_index(load_graph(out / GRAPH_FILE), doc)
     md_path = out / TESTPLAN_MD
@@ -379,7 +474,8 @@ def _write_doc_views(doc: dict, out: Path, *, preserve_markdown: bool = False) -
         markdown = render_markdown(doc)
         atomic_write_text(md_path, markdown)
     atomic_write_text(out / TESTPLAN_HTML, render_html(markdown))
-    emit_event("substep_done", id="render_views", status="PASS")
+    if report_progress:
+        emit_event("substep_done", id="render_views", status="PASS")
 
 
 def render_testplan(out: Path) -> dict:
@@ -395,22 +491,26 @@ def render_testplan(out: Path) -> dict:
 
 
 def run_registers(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | None = None,
-                  force: bool = False) -> dict:
+                  force: bool = False, mode: str = "full") -> dict:
     """Fetch the register map definitions from the specification into registers.json / registers.md."""
+    _check_mode(mode)
     G = load_graph(out / GRAPH_FILE)
     path = out / REGISTERS_JSON
     prev = None if force else _load_current(path, scope.strip(), llm.model, G,
-                                          extra={"extraction_signature": extraction_signature()})
+                                          extra={"extraction_signature": extraction_signature(),
+                                                 "mode": mode})
     if prev is not None:
         return _registers_summary(prev, out) | {"reused": True}
     H = layered_view(G)
     index = _load_dense(out, embedder)
     dense_fn = (lambda q: dense_scores(embedder, index[0], index[1], q)) if index else None
-    with Tracer(out / TRACE_FILE, "registers", input={"scope": scope}, metadata={"model": llm.model}) as tracer:
-        result = extract_registers(G, H, llm, tracer, scope.strip(), RegisterConfig(), dense_fn)
+    slim = load_slim_index(out) or build_slim_index(out) if mode in ("fast", "basic") else None
+    with Tracer(out / TRACE_FILE, "registers", input={"scope": scope, "mode": mode},
+                metadata={"model": llm.model}) as tracer:
+        result = extract_registers(G, H, llm, tracer, scope.strip(), RegisterConfig(), dense_fn, slim)
         tracer.root.update(output={"status": result["status"], "registers": len(result["registers"])})
-    result |= dict(scope=scope.strip(), model=llm.model, graph_build_trace_id=G.graph.get("build_trace_id"),
-                   trace_id=tracer.trace_id)
+    result |= dict(provenance_policy=POLICY_VERSION, scope=scope.strip(), model=llm.model, graph_build_trace_id=G.graph.get("build_trace_id"),
+                   trace_id=tracer.trace_id, mode=mode)
     atomic_write_text(path, json.dumps(result, indent=2, default=str))
     atomic_write_text(out / REGISTERS_MD, "\n".join(render_registers(result, "Register Map")))
     return _registers_summary(result, out) | _trace_info(tracer) | {"reused": False}
@@ -442,7 +542,7 @@ def _load_current(path: Path, scope: str, model: str, G, extra: dict | None = No
           and prev.get("graph_build_trace_id") == G.graph.get("build_trace_id")
           and prev.get("status") in ("PASS", "NOT_RUN")
           and all(prev.get(k) == v for k, v in (extra or {}).items()))
-    return prev if ok else None
+    return prev if ok and prev.get("provenance_policy") == POLICY_VERSION else None
 
 
 def _dense_fn(out: Path, embedder: Embedder | None):
@@ -451,18 +551,22 @@ def _dense_fn(out: Path, embedder: Embedder | None):
 
 
 def run_interfaces(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | None = None,
-                   force: bool = False) -> dict:
+                   force: bool = False, mode: str = "full") -> dict:
     """Isolate and group interface definitions into interfaces.json / interfaces.md."""
+    _check_mode(mode)
     G = load_graph(out / GRAPH_FILE)
     scope = scope.strip()
-    prev = None if force else _load_current(out / INTERFACES_JSON, scope, llm.model, G)
+    prev = None if force else _load_current(out / INTERFACES_JSON, scope, llm.model, G, extra={"mode": mode})
     if prev is not None:
         return _interfaces_summary(prev, out) | {"reused": True}
-    with Tracer(out / TRACE_FILE, "interfaces", input={"scope": scope}, metadata={"model": llm.model}) as tracer:
-        result = extract_interfaces(G, layered_view(G), llm, tracer, scope, InterfaceConfig(), _dense_fn(out, embedder))
+    slim = load_slim_index(out) or build_slim_index(out) if mode in ("fast", "basic") else None
+    with Tracer(out / TRACE_FILE, "interfaces", input={"scope": scope, "mode": mode},
+                metadata={"model": llm.model}) as tracer:
+        result = extract_interfaces(G, layered_view(G), llm, tracer, scope, InterfaceConfig(),
+                                    _dense_fn(out, embedder), slim)
         tracer.root.update(output={"status": result["status"], "groups": len(result["groups"])})
-    result |= dict(scope=scope, model=llm.model, graph_build_trace_id=G.graph.get("build_trace_id"),
-                   trace_id=tracer.trace_id)
+    result |= dict(provenance_policy=POLICY_VERSION, scope=scope, model=llm.model, graph_build_trace_id=G.graph.get("build_trace_id"),
+                   trace_id=tracer.trace_id, mode=mode)
     atomic_write_text(out / INTERFACES_JSON, json.dumps(result, indent=2, default=str))
     atomic_write_text(out / INTERFACES_MD, "\n".join(render_interfaces(result, "Interface Definitions")))
     return _interfaces_summary(result, out) | _trace_info(tracer) | {"reused": False}
@@ -477,28 +581,32 @@ def _interfaces_summary(result: dict, out: Path) -> dict:
 
 
 def run_strategy(out: Path, llm: LLM, *, scope: str = "", embedder: Embedder | None = None,
-                 force: bool = False) -> dict:
+                 force: bool = False, mode: str = "full") -> dict:
     """Verification strategy built from the documented interface and register steps."""
+    _check_mode(mode)
     scope = scope.strip()
-    ifs = run_interfaces(out, llm, scope=scope, embedder=embedder)
-    regs = run_registers(out, llm, scope=scope, embedder=embedder)
+    ifs = run_interfaces(out, llm, scope=scope, embedder=embedder, mode=mode)
+    regs = run_registers(out, llm, scope=scope, embedder=embedder, mode=mode)
     interfaces = json.loads((out / INTERFACES_JSON).read_text(encoding="utf-8"))
     registers = json.loads((out / REGISTERS_JSON).read_text(encoding="utf-8"))
     G = load_graph(out / GRAPH_FILE)
     inputs = dict(interfaces_trace_id=interfaces["trace_id"], registers_trace_id=registers["trace_id"])
-    prev = None if force else _load_current(out / STRATEGY_JSON, scope, llm.model, G, inputs)
+    prev = None if force else _load_current(out / STRATEGY_JSON, scope, llm.model, G,
+                                          inputs | {"mode": mode, "strategy_style": "overview_v1"})
     if prev is not None:
         return _strategy_summary(prev, out) | {"reused": True, "inputs": dict(interfaces=ifs["reused"], registers=regs["reused"])}
     H = layered_view(G)
     dense_fn = _dense_fn(out, embedder)
-    with Tracer(out / TRACE_FILE, "strategy", input={"scope": scope} | inputs, metadata={"model": llm.model}) as tracer:
+    slim = load_slim_index(out) or build_slim_index(out) if mode in ("fast", "basic") else None
+    with Tracer(out / TRACE_FILE, "strategy", input={"scope": scope, "mode": mode} | inputs,
+                metadata={"model": llm.model}) as tracer:
         ctx = section_context(G, H, {"queries": STRATEGY_QUERIES}, scope, DocConfig(), dense_fn,
-                              targets=step_targets(G, interfaces, registers), tracer=tracer)
+                              targets=step_targets(G, interfaces, registers), tracer=tracer, slim=slim)
         result = build_strategy(llm, tracer, interfaces, registers, scope, ctx)
         tracer.root.update(output={"status": result["status"], "agents": len(result["agents"])},
                            metadata={"chunk_ids": sorted({c for a in result["agents"] for c in a["cited_chunk_ids"]})})
-    result |= dict(scope=scope, model=llm.model, graph_build_trace_id=G.graph.get("build_trace_id"),
-                   trace_id=tracer.trace_id, **inputs)
+    result |= dict(provenance_policy=POLICY_VERSION, scope=scope, model=llm.model, graph_build_trace_id=G.graph.get("build_trace_id"),
+                   trace_id=tracer.trace_id, mode=mode, strategy_style="overview_v1", **inputs)
     atomic_write_text(out / STRATEGY_JSON, json.dumps(result, indent=2, default=str))
     atomic_write_text(out / STRATEGY_MD, "\n".join(render_strategy(result, "High Level Verification Strategy")))
     return (_strategy_summary(result, out) | _trace_info(tracer)

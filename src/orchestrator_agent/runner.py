@@ -7,6 +7,7 @@ gate reverts to the owner with a review file and a resume command.
 """
 import concurrent.futures
 import json
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +20,86 @@ from .tools import REGISTRY, RTL_BEHAVIOR, StepContext
 TRACE_FILE = "orchestrator_trace.jsonl"
 RESULT_FILE = "orchestrator_result.json"
 REVIEW_FILE = "orchestrator_review.json"
+ASK_FILE = "orchestrator_ask.json"
+
+SINGLE_TOOL_TIMEOUT_S = 600.0
+
+# Markers that prove a directory is an orchestrator run dir. reset_out_dir
+# refuses to clear a non-empty directory without one of these.
+RUN_MARKERS = (ASK_FILE, TRACE_FILE, RESULT_FILE, REVIEW_FILE, "dv", "rtl",
+               "rtl_graph", "rtl_spec", "uvm", "code")
+
+
+def reset_out_dir(out_dir: Path | str) -> list[str]:
+    """Delete every cached/derived entry in an orchestrator run directory.
+
+    Returns the cleared top-level names. Refuses a non-empty directory with
+    no run markers, so a mistyped --out cannot wipe an unrelated folder.
+    """
+    out = Path(out_dir)
+    if not out.exists():
+        out.mkdir(parents=True, exist_ok=True)
+        return []
+    entries = sorted(out.iterdir(), key=lambda p: p.name)
+    if entries and not any((out / marker).exists() for marker in RUN_MARKERS):
+        raise ValueError(f"{out} has no orchestrator run markers; refusing to clear it")
+    import shutil
+    cleared = []
+    for child in entries:
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+        cleared.append(child.name)
+    return cleared
+
+
+def run_single_tool(tool: str, args: dict, *, out_dir: Path | str, llm=None,
+                    embedder=None, extra_prompt: str = "", force: bool = False,
+                    registry: dict | None = None,
+                    timeout_s: float = SINGLE_TOOL_TIMEOUT_S) -> dict:
+    """Execute one registry tool outside the flow order, guards enforced.
+
+    Used by the terminal for adjacent asks ("rerun registers"). Unknown tools
+    and guard violations return BLOCKED without executing anything; the call
+    is appended to the run trace for audit.
+    """
+    specs = registry if registry is not None else REGISTRY
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    trace_path = out_dir / TRACE_FILE
+
+    def emit(event: str, **fields):
+        record = dict(ts=_now(), event=event, **fields)
+        with trace_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, default=str) + "\n")
+
+    if tool not in specs:
+        summary = f"NO_NEW_TOOLS: unknown tool {tool!r}"
+        emit("guard_block", tool=tool, violations=[summary])
+        return dict(status="BLOCKED", summary=summary, files=[])
+    spec = specs[tool]
+    violations = guards.pre_tool_check(
+        tool=tool, args=args, extra_prompt=extra_prompt, out_dir=out_dir,
+        rtl_behavior_files=set())
+    if violations:
+        emit("guard_block", tool=tool, violations=violations)
+        return dict(status="BLOCKED", summary=violations[0], files=[])
+    if spec.needs_llm and llm is None:
+        return dict(status="BLOCKED", summary=f"{tool} needs MODEL_API_KEY", files=[])
+    emit("single_tool_start", tool=tool, args=args)
+    context = StepContext(out_dir=out_dir, llm=llm, embedder=embedder,
+                          extra_prompt=extra_prompt, force=force)
+    if tool in ("dv_build_graph", "dv_testplan"):
+        # Checkpointed model stages: wait for completion like the flow loop.
+        result = spec.run(args, context)
+    else:
+        outcome, value = call_with_timeout(lambda: spec.run(args, context), timeout_s)
+        result = value if outcome == "ok" else dict(
+            status="TIMEOUT", summary=f"{tool} exceeded {timeout_s:g}s", files=[])
+    emit("single_tool_done", tool=tool, status=result.get("status", "FAIL"),
+         summary=result.get("summary", ""))
+    return result
 
 
 def _now() -> str:
@@ -248,14 +329,16 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
                                    "steps), then approve the step to run again.")
         emit("tool_start", step=step_id, tool=tool, attempt=runs.get(step_id, 0),
              revisit=revisits.get(step_id, 0),
-             extra_prompt=extra_prompt or None)
+             extra_prompt=extra_prompt or None, request_timeout_s=getattr(llm,'timeout',None),
+             request_attempts=getattr(llm,'max_attempts',None))
+        tool_started = time.monotonic()
         if dry_run:
             result = dict(status="NOT_RUN", summary="dry run", files=[])
         else:
             context = StepContext(out_dir=out_dir, llm=llm, embedder=embedder,
                                   extra_prompt=extra_prompt, force=force)
             def invoke():
-                if event_sink is None or spec.agent != "dv":
+                if spec.agent != "dv":
                     return spec.run(args, context)
                 from dv_agent import progress
                 progress.set_sink(lambda message: emit("task_progress", step=step_id, message=message))
@@ -267,8 +350,19 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
                 finally:
                     progress.set_sink(None)
                     progress.set_event_sink(None)
-            outcome, value = call_with_timeout(invoke,
-                                               step["timeout_s"])
+            try:
+                if tool in ("dv_build_graph", "dv_testplan"):
+                    # Model stages have bounded API retries and durable checkpoints.
+                    # Wait rather than leave a timed-out background writer.
+                    outcome, value = "ok", invoke()
+                else:
+                    outcome, value = call_with_timeout(invoke, step["timeout_s"])
+            except KeyboardInterrupt:
+                step_records[step_id] = dict(status='INTERRUPTED', summary='Interrupted by user; successful responses and partial report preserved')
+                emit('tool_interrupted',step=step_id,tool=tool,error_type='KeyboardInterrupt',
+                     elapsed_s=round(time.monotonic()-tool_started,3))
+                return finish('NEEDS_REVIEW',f"step {step_id!r} interrupted by user",pending=step_id,
+                              approvals_needed=[step_id],question='Resume the same run to reuse completed responses; do not use --fresh.')
             if outcome == "timeout":
                 result = dict(status="TIMEOUT",
                               summary=f"{tool} exceeded {step['timeout_s']}s",
@@ -287,14 +381,16 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
                             attempt=runs.get(step_id, 0),
                             revisit=revisits.get(step_id, 0),
                             extra_prompt=extra_prompt or None))
-        emit("tool_done", step=step_id, status=status, summary=summary)
+        emit("tool_done", step=step_id, status=status, summary=summary,
+             elapsed_s=round(time.monotonic()-tool_started,3))
         if status == "PASS" and tool == "dv_testplan" and not dry_run:
             doc = next((f for f in result.get("files", [])
                         if f.endswith("testplan_doc.json")), None)
             post = guards.post_testplan_check(
                 doc_path=Path(doc) if doc else out_dir / "missing_testplan_doc.json",
                 rtl_used=bool((result.get("detail") or {}).get("rtl_used")
-                              or args.get("rtl_graph")))
+                              or args.get("rtl_graph")),
+                expected_authority=args.get("source_authority"))
             if post:
                 blocked_violations.extend(f"{step_id}: {v}" for v in post)
                 emit("guard_block", step=step_id, violations=post)
@@ -310,7 +406,7 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
                 index += 1
             else:
                 pending_revisit = None
-            if llm is None or dry_run:
+            if llm is None or dry_run or os.getenv("DV_AGENT_MODE") == "basic":
                 continue
             next_step = order[index] if index < len(order) else None
             decision, decider_error = decider_mod.decide(
@@ -380,7 +476,8 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
                 pending_revisit = None
             continue
         if not is_revisit and runs[step_id] < step["max_attempts"]:
-            emit("tool_retry", step=step_id, status=status)
+            emit("tool_retry", step=step_id, status=status, next_attempt=runs[step_id]+1,
+                 recovery='Reuse successful response checkpoints; changed dependent context may need regeneration')
             continue
         return finish(
             "NEEDS_REVIEW",

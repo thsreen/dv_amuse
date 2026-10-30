@@ -45,14 +45,74 @@ def test_scoreboards_register_model_and_virtual_sequences(run):
     assert st["virtual_sequences"][0]["agents"] == ["clk_rst_agent", "bus_agent"]
 
 
+def test_source_supported_strategy_item_keeps_its_own_status(run):
+    from test_testplan_doc import strategy_handler
+    def supported(payload):
+        data = strategy_handler(payload)
+        source = payload["chunks"][0]
+        # Model can report an explicit source requirement without being forced inferred by section.
+        data["agents"][0]["correctness"][0].update(
+            description=source["text"], support=dict(provenance="DOCUMENTED", quote=source["text"],
+                                                    chunk_id=source["chunk_id"], inference_reason=""))
+        return data
+    run_testplan_doc(run, _llm(testplan_strategy=supported))
+    doc = json.loads((run / "testplan_doc.json").read_text())
+    st = next(s for s in doc["sections"] if s["id"] == "strategy")["strategy"]
+    assert st["agents"][0]["provenance"] == "INFERRED"
+    assert st["agents"][0]["correctness"][0]["provenance"] == "DOCUMENTED"
+    assert "✅<!--dv-evidence:" in (run / "testplan_doc.md").read_text()
+
+
+def test_overview_rendering_keeps_details_for_downstream_plan(run):
+    from test_testplan_doc import strategy_handler
+    from dv_agent.strategy import render, strategy_summary
+    def overview(payload):
+        data = strategy_handler(payload)
+        source = payload["chunks"][0]
+        data["overview"] = [dict(text="Prioritize reset bring-up before constrained-random traffic.",
+                                 support=dict(provenance="INFERRED", quote=source["text"],
+                                              chunk_id=source["chunk_id"],
+                                              inference_reason="Bring-up establishes a known starting state."))]
+        return data
+    run_testplan_doc(run, _llm(testplan_strategy=overview))
+    doc = json.loads((run / "testplan_doc.json").read_text())
+    st = next(s for s in doc["sections"] if s["id"] == "strategy")["strategy"]
+    md = "\n".join(render(st, "High Level Verification Strategy"))
+    assert "Prioritize reset bring-up" in md and "⚠️<!--dv-evidence:" in md
+    assert "### Agents" not in md and "BUS_ADDR" not in md and "Sequence `" not in md
+    assert st["agents"] and st["scoreboards"]  # downstream implementation context preserved
+    assert any(line.startswith("Approach:") for line in strategy_summary(st))
+
+
 def test_uncovered_interface_group_is_a_gap_and_a_question(run):
     doc, st = _strategy(run)
     assert [g["interface_group"] for g in st["gaps"]] == ["Ungrouped signals"]
     questions = next(s for s in doc["sections"] if s["id"] == "questions")["entries"]
     assert any("Ungrouped signals" in q["text"] and "assigns no agent" in q["text"] for q in questions)
     md = (run / "testplan_doc.md").read_text()
-    assert "### Agents" in md and "| bus_agent | Register bus | active | BUS_ADDR, BUS_WDATA, BUS_WE |" in md
-    assert "- Correctness (agent_scoreboard): read data matches the register model" in md
+    assert "### Agents" in md and "Agent `bus_agent` (active)" in md
+    assert "Drives: BUS_ADDR, BUS_WDATA, BUS_WE" in md
+    assert "Correctness (agent_scoreboard) in `bus_agent`: read data matches the register model" in md
+
+
+def test_every_strategy_bullet_has_its_own_evidence_status(run):
+    import re
+    from dv_agent.strategy import render
+    from dv_agent.provenance_badge import decode
+    _, st = _strategy(run)
+    lines = render(st, "Verification Strategy")
+    assert not any(line.startswith("|") for line in lines)
+    bullets = [line for line in lines if line.startswith("- ")]
+    assert bullets
+    states = []
+    for line in bullets:
+        match = re.match(r"- (?:✅|⚠️|🛑)<!--dv-evidence:([A-Za-z0-9_-]+)-->", line)
+        assert match, line
+        state = decode(match.group(1))
+        states.append(state["state"])
+        if state["state"] == "INFERRED":
+            assert state["citations"] and state["reason"]
+    assert "INFERRED" in states and "NO_REFERENCE" in states
 
 
 def test_standalone_strategy_uses_documented_steps_and_reuses(run):

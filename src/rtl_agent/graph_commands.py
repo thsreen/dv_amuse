@@ -34,6 +34,10 @@ def add_graph_commands(sub):
     index.add_argument("--graph", type=Path, required=True)
     index.add_argument("--embeddings", type=Path, required=True, help="JSON with model and node-ID vectors")
     index.add_argument("--out", type=Path, required=True)
+    spec = sub.add_parser("build-spec", help="draft a review-required specification from a saved RTL graph")
+    spec.add_argument("--graph", type=Path, required=True)
+    spec.add_argument("--out", type=Path, required=True)
+    spec.add_argument("--template", type=Path, help="UART-inspired specification template JSON")
 
 
 def _write(G, path: Path, obj: dict, protected: list[Path]):
@@ -43,6 +47,9 @@ def _write(G, path: Path, obj: dict, protected: list[Path]):
 
 def run_graph_command(args):
     try:
+        if args.cmd == "build-spec":
+            from .specification import build_specification
+            return build_specification(args.graph, args.out, args.template)
         from .graph import BuildConfig, build_graph, load_graph, save_graph
         from .retrieval import QueryConfig, fetch_context
         if args.cmd == "build-graph":

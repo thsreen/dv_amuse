@@ -2,6 +2,7 @@
 import hashlib
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 from rtl_agent.dense import fingerprint
 from rtl_agent.retrieval import QueryConfig, fetch_context
@@ -204,24 +205,37 @@ def compact(result: dict | None) -> dict:
                                             "spec_relationship", "review_status")} for e in (result or {}).get("entries", [])])
 
 
+def _display_path(path: str) -> str:
+    """Last three path components: identifies the file without exposing the local directory layout."""
+    parts = Path(path).parts
+    return "/".join(parts[-3:]) if Path(path).is_absolute() else path
+
+
 def render(result: dict, heading: str) -> list[str]:
-    lines = [f"## {heading}", "", "Implementation observations; intended behavior remains specification-authoritative.",
+    lines = ["<!--dv-rtl-observations-->", f"## {heading}", "", "Implementation observations; intended behavior remains specification-authoritative.",
              "**RTL design engineer review required. No observation is approved automatically.**", ""]
     if result["status"] != "PASS":
-        return lines + [f"**{result['status']}**: {result.get('error', '')}", ""]
-    lines += [f"Graph analysis: {result.get('graph_analysis_status', 'unknown')}; "
+        return lines + [f"**{result['status']}**: {result.get('error', '')}", "", "<!--dv-rtl-observations-end-->", ""]
+    lines += [f"**Graph analysis:** {result.get('graph_analysis_status', 'unknown')}; "
               f"{len(result.get('fetches', []))} bounded graph fetch(es). Findings are not exhaustive.", ""]
     if not result["entries"]:
         lines += ["No additional sourced observations found within the retrieval budget.", ""]
     by_id = {c["id"]: c for c in result.get("evidence", [])}
     for e in result["entries"]:
         reason = e.get("inference_reason") or e.get("spec_relationship") or "Derived from the cited RTL excerpts; RTL engineer review required."
-        lines += [f"- **{e['id']}** {badge('INFERRED', e['cited_rtl_excerpt_ids'], reason)} NEEDS_REVIEW (RTL design engineer) ({e['kind']}): {e['text']}",
-                  f"  - Inference: {reason}",
-                  f"  - Proposed test: {e['suggested_verification']}",
-                  f"  - Spec comparison: {e['spec_relationship']} (gap/conflict unconfirmed)",
-                  f"  - Designer question: {e['designer_question']}"]
+        lines += [f"### {e['id']} — {e['kind']} {badge('INFERRED', e['cited_rtl_excerpt_ids'], reason)}", "",
+                  e['text'], "", "**Review:** NEEDS_REVIEW — RTL design engineer", "",
+                  f"- **Inference:** {reason}",
+                  f"- **Proposed test:** {e['suggested_verification']}",
+                  f"- **Specification comparison:** {e['spec_relationship']} (gap/conflict unconfirmed)",
+                  f"- **Designer question:** {e['designer_question']}"]
+        by_file: dict[str, list[tuple[int, str, str]]] = {}
         for cid in e["cited_rtl_excerpt_ids"]:
             c = by_id[cid]
-            lines.append(f"  - RTL source: {c['path']}:{c['line_start']}-{c['line_end']} ({cid})")
-    return lines + [""] + render_repairs(result.get("repair"))
+            span = str(c["line_start"]) if c["line_start"] == c["line_end"] else f"{c['line_start']}-{c['line_end']}"
+            by_file.setdefault(_display_path(c["path"]), []).append((c["line_start"], span, cid))
+        for path, spans in by_file.items():
+            lines.append(f"- **RTL sources:** {path} ({len(spans)} excerpt{'s' if len(spans) != 1 else ''})")
+            lines += [f"  - lines {span} ({cid})" for _, span, cid in sorted(spans)]
+        lines.append("")
+    return lines + [""] + render_repairs(result.get("repair")) + ["<!--dv-rtl-observations-end-->", ""]

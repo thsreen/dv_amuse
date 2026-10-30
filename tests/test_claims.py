@@ -28,7 +28,7 @@ def clean_entries(contradiction_until_repaired=True, always_wrong=False):
         chunks = [c["chunk_id"] for c in payload["chunks"]]
         entry = {"text": f"{payload['section']['id']} behaviour is exercised", "kind": None, "provenance": "INFERRED",
                  "cited_req_ids": [], "cited_chunk_ids": chunks[:1], "details": []}
-        kinds = {"feature_description": "purpose", "stimulus": "directed_test", "checks": "agent_scoreboard",
+        kinds = {"feature_description": "purpose", "verification_plan": "sequence_implementation", "stimulus": "directed_test", "checks": "agent_scoreboard",
                  "coverage": "covergroup", "callouts": "reuse", "assumptions": "assumption", "questions": "question"}
         entry["kind"] = kinds[payload["section"]["id"]]
         entries = [entry]
@@ -77,7 +77,7 @@ def test_claim_still_unsupported_after_repairs_is_downgraded(run):
     assert wrong["provenance"] == "ASSUMED" and "claims check" in wrong["validation"][-1]
     assert stim["claims_check"]["downgraded"] == 1 and len(stim["repair"]["refusals"]) == 2
     questions = _section(run, "questions")["entries"]
-    assert any("7. Stimulus step could not be completed" in q["text"] for q in questions)
+    assert any("8. Sequences and Stimulus step could not be completed" in q["text"] for q in questions)
     assert "> Claims check:" in (run / "testplan_doc.md").read_text()
 
 

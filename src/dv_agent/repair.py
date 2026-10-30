@@ -46,14 +46,15 @@ class RepairOutcome:
 
 def structured_with_repair(llm: LLM, tracer: Tracer, *, name: str, instructions: str, payload: dict,
                            schema: dict, check: Callable[[dict], list[str]],
-                           max_repairs: int | None = None) -> RepairOutcome:
+                           max_repairs: int | None = None, _span_parent: str | None = None) -> RepairOutcome:
     """Call the model, then refuse and repair until the checks pass or the repair budget is spent.
 
     The first call's LLMError propagates (the step is BLOCKED); an error during a repair keeps the
     last answer and records the error.
     """
     budget = default_max_repairs() if max_repairs is None else max_repairs
-    result = llm.structured(name=name, instructions=instructions, payload=payload, schema=schema, tracer=tracer)
+    result = llm.structured(name=name, instructions=instructions, payload=payload, schema=schema, tracer=tracer,
+                            _span_parent=_span_parent)
     outcome = RepairOutcome(data=result.data)
     problems = check(result.data)
     while problems and len(outcome.history) < budget:
@@ -61,12 +62,12 @@ def structured_with_repair(llm: LLM, tracer: Tracer, *, name: str, instructions:
         outcome.history.append(dict(attempt=attempt, problems=problems))
         emit(f"{name}: checks refused the answer, repair attempt {attempt}/{budget} "
              f"({len(problems)} problems)")
-        with tracer.span(f"refusal:{name}", input={"attempt": attempt, "problems": problems}) as span:
+        with tracer.span(f"refusal:{name}", input={"attempt": attempt, "problems": problems}, _parent=_span_parent) as span:
             try:
                 result = llm.structured(
                     name=name, instructions=instructions + REPAIR_INSTRUCTIONS,
                     payload=payload | {"previous_output": outcome.data, "refusal": problems},
-                    schema=schema, tracer=tracer)
+                    schema=schema, tracer=tracer, _span_parent=span.id)
             except LLMError as exc:
                 outcome.repair_error = exc.kind
                 span.update(level="ERROR", status_message=exc.kind)

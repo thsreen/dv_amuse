@@ -1,0 +1,12 @@
+class {{AGENT}}_driver extends uvm_driver #(cg_item);
+  `uvm_component_utils({{AGENT}}_driver)
+  {{AGENT}}_cfg cfg;
+  function new(string name, uvm_component parent); super.new(name,parent); endfunction
+  task run_phase(uvm_phase phase);
+    forever begin
+      seq_item_port.get_next_item(req);
+{{DRIVER_HOOK}}
+      seq_item_port.item_done();
+    end
+  endtask
+endclass

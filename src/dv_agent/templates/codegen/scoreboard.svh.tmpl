@@ -1,0 +1,34 @@
+class cg_scoreboard extends uvm_subscriber #(cg_item);
+  `uvm_component_utils(cg_scoreboard)
+  virtual reset_if reset_vif;
+  bit reset_active;
+  int unsigned comparisons;
+  int unsigned minimum_comparisons=1;
+{{DECLARATIONS}}
+  function new(string name, uvm_component parent); super.new(name,parent); endfunction
+  function void flush();
+{{RESET_STATE}}
+  endfunction
+  task run_phase(uvm_phase phase);
+    forever begin
+      @(reset_vif.reset);
+      if(reset_vif.reset == reset_active) flush();
+    end
+  endtask
+  function void write(cg_item item);
+    cg_item tr;
+    if (!$cast(tr, item.clone())) `uvm_fatal("SB_COPY", "transaction copy failed")
+    if (tr.error) `uvm_error("FRAME_ERROR", "observed malformed frame")
+{{REGISTER_COMPARE}}
+{{ROUTE_COMPARE}}
+{{SCOREBOARD_HOOK}}
+  endfunction
+  function void check_phase(uvm_phase phase);
+{{DRAIN_CHECK}}
+    if(comparisons < minimum_comparisons)
+      `uvm_error("NO_COMPARISON", $sformatf("only %0d comparisons; require %0d", comparisons, minimum_comparisons))
+  endfunction
+  function void report_phase(uvm_phase phase);
+    `uvm_info("SCOREBOARD_SUMMARY", $sformatf("comparisons=%0d", comparisons), UVM_LOW)
+  endfunction
+endclass

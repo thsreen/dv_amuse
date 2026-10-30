@@ -1,0 +1,187 @@
+"""Deterministic evidence, topology, width and hook checks before SV rendering."""
+import re
+
+from ..extract import locate_quote
+from .contracts import identifier, pointer
+
+
+ROLES = {
+    "wishbone": {"addr": "input", "wdata": "input", "rdata": "output", "sel": "input",
+                 "we": "input", "stb": "input", "cyc": "input", "ack": "output"},
+    "serial": {"rx": "input", "tx": "output"},
+}
+
+
+def validate(plan, specification, definition, sources):
+    if specification.get("source_authority") == "RTL_INFERRED":
+        raise ValueError("Unvalidated RTL-derived expectations cannot be compiled into verification code")
+    identifier(plan.top)
+    for define in plan.defines:
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(?:=[A-Za-z0-9_']+)?", define):
+            raise ValueError('Invalid explicit build define')
+    ports = {p["name"]: p for p in definition["ports"]}
+    if len(ports) != len(definition["ports"]):
+        raise ValueError("Duplicate physical ports")
+    for p in ports.values():
+        identifier(p["name"])
+        if "width" not in p:
+            match = re.fullmatch(r"\[(\d+):(\d+)\]", p.get("range", ""))
+            if not match:
+                raise ValueError("Code generation needs resolved port widths")
+            p = dict(p, width=abs(int(match[1]) - int(match[2])) + 1)
+            ports[p["name"]] = p
+        if not 1 <= p["width"] <= 64 or p["direction"] not in ("input", "output"):
+            raise ValueError("Unsupported port shape: explicit 1..64-bit input/output required")
+    if plan.clock == plan.reset:
+        raise ValueError("Clock and reset must be distinct")
+    for name in (plan.clock, plan.reset):
+        if name not in ports or ports[name]["direction"] != "input" or ports[name]["width"] != 1:
+            raise ValueError("Clock/reset binding must be an explicit scalar DUT input")
+    for category in (plan.facts, plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.routes, plan.checks, plan.tests, plan.hooks):
+        ids = [identifier(item.id) for item in category]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Duplicate code-plan IDs")
+    facts = {f.id: f for f in plan.facts}
+    for fact in plan.facts:
+        try:
+            origin = pointer(specification, fact.plan_pointer)
+        except (KeyError, IndexError, ValueError, TypeError):
+            raise ValueError(f"Fact {fact.id} points outside the testplan") from None
+        if not isinstance(origin, dict) or origin.get("provenance") != "DOCUMENTED":
+            raise ValueError(f"Fact {fact.id} is not a documented plan item")
+        if origin.get("cited_rtl_observation_ids") or origin.get("review_owner") == "RTL_DESIGN_ENGINEER":
+            raise ValueError("RTL observations cannot supply executable expectations")
+        allowed = set(origin.get("cited_chunk_ids", [])) | set(origin.get("cited_req_ids", []))
+        if origin.get("chunk_id"):
+            allowed.add(origin["chunk_id"])
+        allowed.update(s["chunk_id"] for s in origin.get("sources", []) if isinstance(s, dict) and s.get("chunk_id"))
+        if fact.source_id not in allowed or fact.source_id not in sources:
+            raise ValueError(f"Fact {fact.id} lacks an eligible source")
+        if locate_quote(sources[fact.source_id], fact.quote) is None:
+            raise ValueError(f"Fact {fact.id} quote does not match its source")
+    for category in (plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.routes, plan.checks, plan.tests, plan.hooks):
+        for item in category:
+            if not set(item.fact_ids) <= facts.keys():
+                raise ValueError(f"Unknown evidence for {item.id}")
+    agents = {a.id: a for a in plan.agents}
+    # A single package holds all generated classes, including generated drain/vseqs.
+    symbols=['cg_item','cg_env','cg_scoreboard','cg_system_coverage']
+    symbols += [a.id+'_'+suffix for a in plan.agents for suffix in ('cfg','sequencer','driver','monitor','coverage','agent')]
+    symbols += [s.id for s in plan.sequences] + [t.id for t in plan.tests]
+    symbols += [t.id+'_vseq' for t in plan.tests]
+    symbols += [t.id+'_'+a.id+'_drain' for t in plan.tests for a in plan.agents if a.active]
+    if len(symbols)!=len(set(symbols)):
+        raise ValueError('Generated class names collide; choose distinct component/sequence/test IDs')
+    if any(a.id in {'sb','system_cov','build_phase','connect_phase','new'} or a.id.endswith('_control') for a in plan.agents):
+        raise ValueError('Agent name collides with environment infrastructure')
+    owners = {plan.clock: "clock_uvc", plan.reset: "reset_uvc"}
+    for tie in plan.tie_offs:
+        if (tie.signal not in ports or ports[tie.signal]["direction"] != "input" or tie.signal in owners
+                or tie.value >= 1 << ports[tie.signal]["width"]):
+            raise ValueError("Invalid or competing tie-off")
+        owners[tie.signal] = tie.id
+    for a in plan.agents:
+        expected = ROLES.get(a.protocol)
+        required = set(expected or {})
+        if a.protocol=='wishbone' and 'sel' not in a.bindings and a.bindings.get('wdata') in ports and ports[a.bindings['wdata']]['width']==8:
+            required.remove('sel')
+        if expected and set(a.bindings) != required:
+            raise ValueError(f"Agent {a.id} requires roles {sorted(expected)}")
+        for role, name in a.bindings.items():
+            identifier(role)
+            if role in ('clk','reset'):
+                raise ValueError('Protocol role collides with shared clock/reset')
+            if name not in ports or name in (plan.clock, plan.reset):
+                raise ValueError(f"Invalid signal binding {a.id}.{role}")
+            p = ports[name]
+            if expected and p["direction"] != expected[role]:
+                raise ValueError(f"Wrong DUT direction for {a.id}.{role}")
+            if p["direction"] == "input" and a.active:
+                if name in owners:
+                    raise ValueError(f"Competing drive ownership for {name}")
+                owners[name] = a.id
+        if a.protocol == "wishbone":
+            if ports[a.bindings["wdata"]]["width"] != ports[a.bindings["rdata"]]["width"]:
+                raise ValueError("Bus read/write widths differ")
+            if 'sel' in a.bindings and ports[a.bindings["sel"]]["width"] * 8 != ports[a.bindings["wdata"]]["width"]:
+                raise ValueError("Byte-select width does not match data width")
+        scalar = ("rx", "tx") if a.protocol == "serial" else ("we", "stb", "cyc", "ack") if a.protocol == "wishbone" else ()
+        if any(ports[a.bindings[r]]["width"] != 1 for r in scalar):
+            raise ValueError("Protocol control/serial pins must be scalar")
+    # Other DUT inputs must be explicitly bound; do not silently tie flow-control inputs.
+    missing = {n for n, p in ports.items() if p["direction"] == "input"} - owners.keys()
+    if missing:
+        raise ValueError(f"Unbound DUT inputs require an explicit agent/binding: {sorted(missing)}")
+    register_addresses = set()
+    for r in plan.registers:
+        if (r.agent, r.address) in register_addresses:
+            raise ValueError("Banked/aliased register mirrors require an explicit extension")
+        register_addresses.add((r.agent, r.address))
+        if r.agent not in agents or agents[r.agent].protocol != "wishbone":
+            raise ValueError("Register must reference a bus agent")
+        if r.address >= 1 << ports[agents[r.agent].bindings["addr"]]["width"]:
+            raise ValueError("Register address exceeds interface width")
+        if r.mask >= 1 << r.width or r.reset is not None and not 0 <= r.reset < 1 << r.width:
+            raise ValueError("Register reset/mask exceeds its width")
+        if r.width > ports[agents[r.agent].bindings['rdata']]['width']:
+            raise ValueError('Register exceeds bus data width')
+    sequences = {s.id: s for s in plan.sequences}
+    for seq in plan.sequences:
+        if seq.agent not in agents or not agents[seq.agent].active:
+            raise ValueError("Sequence needs an active agent")
+        agent = agents[seq.agent]
+        for op in seq.operations:
+            if op.kind == "idle":
+                continue
+            bus = op.kind in ("read", "write", "random_write", "poll")
+            if ((agent.protocol=='custom' and op.kind!='custom') or
+                    (agent.protocol!='custom' and (op.kind=='custom' or bus != (agent.protocol == "wishbone")))):
+                raise ValueError("Sequence operation incompatible with its agent")
+            width = ports[agent.bindings["wdata"]]["width"] if bus else agent.data_bits
+            if max(op.data, op.mask) >= 1 << width:
+                raise ValueError("Sequence value/mask exceeds transaction width")
+            if bus and op.address >= 1 << ports[agent.bindings["addr"]]["width"]:
+                raise ValueError("Sequence address exceeds interface width")
+    for test in plan.tests:
+        for stage in test.stages:
+            if not stage or not set(stage) <= sequences.keys():
+                raise ValueError("Test references unknown/empty sequence stage")
+            ids = [sequences[name].agent for name in stage]
+            if len(ids) != len(set(ids)):
+                raise ValueError("Concurrent stage must not race sequences on the same sequencer")
+    events = {"wishbone": {"write", "read"}, "serial": {"rx", "tx"}, "custom": {"transaction"}}
+    for route in plan.routes:
+        for condition in route.when:
+            if condition.agent not in agents or agents[condition.agent].protocol!='wishbone':
+                raise ValueError('Route qualification requires an observed bus register')
+            agent=agents[condition.agent]
+            if condition.address >= 1 << ports[agent.bindings['addr']]['width']:
+                raise ValueError('Qualification address exceeds bus width')
+            if max(condition.mask,condition.value,condition.initial_value or 0) >= 1 << ports[agent.bindings['wdata']]['width']:
+                raise ValueError('Qualification value/mask exceeds bus width')
+            if condition.value & ~condition.mask:
+                raise ValueError('Qualification value must fit its comparison mask')
+        for side in ("expected", "actual"):
+            a = getattr(route, side + "_agent")
+            if a not in agents or getattr(route, side + "_event") not in events[agents[a].protocol]:
+                raise ValueError("Scoreboard route needs compatible monitored event kinds")
+            agent=agents[a]
+            width=ports[agent.bindings['wdata']]['width'] if agent.protocol=='wishbone' else agent.data_bits if agent.protocol=='serial' else 64
+            if route.mask >= 1 << width:
+                raise ValueError('Route comparison mask exceeds observed data width')
+            address=getattr(route,side+'_address')
+            if address is not None and (agent.protocol!='wishbone' or not 0 <= address < 1 << ports[agent.bindings['addr']]['width']):
+                raise ValueError('Route address filter requires a valid bus address')
+        if (route.expected_agent, route.expected_event, route.expected_address) == (route.actual_agent, route.actual_event, route.actual_address):
+            raise ValueError("Scoreboard cannot compare an event against itself")
+    for check in plan.checks:
+        if check.agent not in agents or agents[check.agent].protocol != "wishbone":
+            raise ValueError("Built-in protocol checks require a bus agent")
+    for hook in plan.hooks:
+        if hook.slot=='scoreboard.compare':
+            if hook.target not in {r.id for r in plan.routes}: raise ValueError('Scoreboard hook requires a route target')
+        elif hook.target not in agents:
+            raise ValueError('Agent hook requires an agent target')
+        elif hook.slot in ('driver.body','monitor.body') and agents[hook.target].protocol!='custom':
+            raise ValueError('Protocol body hooks require the custom protocol; builtin behavior is template-owned')
+    return ports

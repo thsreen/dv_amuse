@@ -10,6 +10,43 @@ resume command.
 
 ## Interactive testplan flow
 
+For a live demo using basic RAG, start:
+
+```sh
+.venv/bin/python -m orchestrator_agent --mode basic
+```
+
+Then enter `Generate verification collateral for ../baseline_repos/uart16550` and `/plan`.
+The same four commands remain available. Advanced `run` also accepts `--mode basic`.
+`DV_AGENT_MODE=basic` is the equivalent environment setting.
+
+Basic mode targets a 10–15 minute UART-sized demo: it builds a local lexical chunk index without model
+requirement/dependency extraction or embeddings, follows the fixed flow without model decider calls,
+and retrieves source chunks directly for planning. Register extraction keeps every selected source
+window and the deterministic register-table inventory, using two workers with deterministic merging.
+Planning uses smaller retrieval/entry limits and no validation repair rounds or separate model claim
+judges for ordinary sections. Citation, quote, register validation and inferred RTL review rules remain.
+RTL observations retain their claim judge. The interactive/advanced orchestrator model client uses a
+150-second request timeout and two API attempts in basic mode. Full/fast also default
+to 150 seconds per request, retaining their five-attempt recovery. Set
+`META_REQUEST_TIMEOUT_SECONDS` to override the request timeout.
+
+The report explicitly identifies the reduced analysis scope. Requirement graph coverage is unavailable;
+this is a review-required demo draft, not equivalent to the full analysis. Successful responses still
+checkpoint for same-directory recovery. API service latency and failures can exceed the target;
+10–15 minutes is a target, not an enforced whole-run deadline. Live timing requires an unrestricted
+terminal with API connectivity. Existing `fast` mode still builds the evidence graph; `basic` skips it.
+
+Graph extraction saves and resumes completed batches automatically; generation API calls recover with at most five attempts. See [graph and API recovery](GRAPH_RECOVERY.md). Fast mode now changes retrieval, while requirement/dependency extraction occurs in `spec_graph` before planning.
+
+Completed testplan sections immediately update partial JSON, Markdown and HTML
+reports. Pending sections are labeled; interruptions preserve the latest output.
+Detailed request/attempt diagnostics are in `<run>/dv/llm_requests.jsonl`, section
+and exception spans in `<run>/dv/trace.jsonl`, and workflow progress/results in
+`<run>/orchestrator_trace.jsonl`. Logs identify timeout duration, input size, retry
+number and exception type without logging API credentials. See the recovery guide
+for fields and the distinction between partial views and response-cache recovery.
+
 Run `.venv/bin/orchestrate-agent` from this repository and describe the local
 design repository in one sentence, for example:
 
@@ -21,19 +58,76 @@ The terminal scans the named repository without writing to it, identifies the
 specification documents and RTL top, and immediately prints the steps it will
 run in English. The testplan step expands into interface isolation, register
 recovery, every section from the template, and Markdown/HTML rendering.
-The interactive terminal has four commands:
+The default template has a separate **Verification Plan** immediately after **High Level Verification Strategy**.
+Strategy defines the verification architecture; the plan describes implementation of sequences, monitors,
+checks, scoreboards/predictors, coverage, and test integration using consistent component names.
+Later Sequences and Stimulus, Checks and Scoreboards, Functional Coverage, and Integration and Reuse
+sections elaborate that plan. Proposed implementation architecture remains INFERRED with source citations.
+Generated JSON records ordered `subsections` for each content section: stable `id`, readable `heading`,
+`layout` (bullets/table/expandable row), and a `content_path` JSON pointer. Entry sections additionally
+record zero-based `entry_indexes` into that section's canonical entries, avoiding duplicate evidence.
+Template `presentation.subsection_titles` controls headings such as Sequence Implementation and
+Scoreboard Implementation; unknown kinds receive readable title-case names. Entry groups follow first
+occurrence, with RTL-driven coverage last. Markdown/HTML render those subsections with bold semantic
+level-three headings and bullets or the existing check/coverage tables. Register row metadata also
+describes Description and Fields detail subsections. No model call is needed for this formatting step.
+Interface tables use the same JSON properties for every group: `name`, `width`, `direction` (DUT-relative),
+`active_level`, `availability`, and `description`, with source quote/location and a `documented` boolean
+map for those properties. Active level/edge applies to control signals and clocks regardless of whether
+their peer is internal or external; data/address signals use `not_applicable` (shown as —).
+Availability is a source-stated build/define/mode condition; blank means not specified, not proven unconditional.
+In the HTML register map, click a register row (or activate its register-name button with the keyboard)
+to expand its description and field subtable. Clicking it again collapses it; opening another register
+closes the previous one. Printed reports and no-JavaScript views include all details. Markdown retains
+the same descriptions and field tables with pairing markers for HTML rendering. Missing descriptions
+or fields are explicitly reported as not recovered from the specification.
+Table source cells show an evidence indicator only. Its tooltip includes a one-line source excerpt,
+inference reason where applicable, and links to the reference evidence. These compact excerpts are
+deterministic excerpts, not new model interpretations; the evidence index saves source summaries in JSON.
+
+Provenance follows a shared source-support rule across generators and claim checking: direct statements
+and unambiguous factual normalizations with no added assumptions are DOCUMENTED (for example,
+slave → responder, or an explicit enable bit → configuration control). Added architecture choices,
+hypotheses and assumptions beyond source facts are INFERRED, with reasoning; unsupported claims are
+ASSUMED. Interfaces classify group properties separately, and strategy classifies environment,
+agents, sequences/checks, scoreboards, register model and virtual sequences individually. New
+DOCUMENTED classifications require an exact supporting source quote; matching a quote establishes
+traceability, while semantic support still relies on generation/claim checks and human review.
+No extra classification API pass is added. A policy marker invalidates old final/step caches;
+changed prompts/schemas invalidate affected raw response checkpoints. Unvalidated RTL evidence stays
+INFERRED pending RTL engineer validation under the existing authority guards.
+If no specification document exists, or the prompt explicitly asks for a
+specification from RTL, `/plan` first creates an [RTL-derived specification draft](RTL_SPECIFICATION.md).
+Every claim and downstream check from that draft stays `INFERRED` and `NEEDS_REVIEW`
+until an RTL engineer validates a separate approved specification. `/code` is
+blocked for an unvalidated RTL-derived plan.
+The interactive terminal has five commands:
 
 | Command | Action |
 | --- | --- |
-| `/plan` | Ingest specifications, build spec and RTL graphs, recover registers/configurable controls, and write `testplan_doc.json`, editable Markdown and readable HTML. |
-| `/code` | If no plan exists in this session, run `/plan` first. Build a UVM scaffold from cited `DOCUMENTED` plan items only; exclude inferred/uncited items and RTL observations. Also build one basic compile/clock/reset smoke test. |
-| `/run` | Run the basic built smoke test with local Xezim and save its log/result. |
-| `/regress` | Run every executable test listed in the code manifest and save results. Currently `/code` builds one smoke test; protocol-specific functional tests still need reviewed implementation. |
+| `/plan` | Ingest specifications, or draft one from RTL with inferred authority; build graphs, recover registers/configurable controls, and write `testplan_doc.json`, editable Markdown and readable HTML. |
+| `/code` | Generate `/plan` if needed. With a configured model, design/review a documented-source implementation contract, render reusable functional UVM components and compile. Without a model or explicit code contract, retain the labeled legacy smoke scaffold. |
+| `/run` | Execute the first built test with local Xezim; functional UVM tests require UVM sources and real checking/coverage evidence. |
+| `/regress` | Execute all tests in the current code manifest and retain per-test/seed logs and coverage. |
+| `/fresh` | Start over: new run directory, no cached state reused. The earlier run is kept for review. Saying "start fresh" works too. |
+
+Beyond the commands, the terminal answers adjacent free-text asks instead of
+only scanning repositories: "why did it fail" explains the review, "show
+interfaces/registers/strategy/testplan" summarizes saved artifacts, "validate
+flow.json" checks a flow file, "status" reports the run, and "rerun registers"
+re-executes one step. Reruns execute a single registry tool through the same
+never-do guards as the flow (unknown tools and out-of-directory or RTL-tainted
+arguments are blocked); code generation stays behind `/code` with its
+documented-only policy. `run --fresh` clears cached and derived state in
+`--out` (refusing directories without run markers) and reruns.
 
 `/plan` requires `MODEL_API_KEY`. `/run` and `/regress` need a local `xezim`
 executable on `PATH` or `XEZIM_BIN` set to its full path. A missing simulator
-or plan reports BLOCKED; it never reports a simulated PASS. The smoke test
-does not claim functional correctness. Ctrl-D leaves the terminal. The
+or plan reports BLOCKED; it never reports a simulated PASS. Functional generation
+also requires `XEZIM_UVM_DIR` pointing to a UVM source release. The legacy smoke
+test does not claim functional correctness. See [CODE_GENERATION.md](CODE_GENERATION.md)
+for contracts, templates, supported behaviors, recovery and current validation limits.
+Ctrl-D leaves the terminal. The
 advanced non-interactive CLI below remains available for custom flow files.
 
 As soon as `/plan` saves the report, the terminal opens a loopback-only viewer

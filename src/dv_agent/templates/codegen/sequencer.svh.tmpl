@@ -1,0 +1,5 @@
+class {{AGENT}}_sequencer extends uvm_sequencer #(cg_item);
+  `uvm_component_utils({{AGENT}}_sequencer)
+  {{AGENT}}_cfg cfg;
+  function new(string name, uvm_component parent); super.new(name, parent); endfunction
+endclass

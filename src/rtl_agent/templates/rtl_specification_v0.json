@@ -1,0 +1,13 @@
+{
+  "template_id": "rtl_specification_v0",
+  "title": "RTL-Derived Specification Draft",
+  "sections": [
+    {"id": "introduction", "heading": "1. Introduction", "source": "top module and source inventory"},
+    {"id": "io_ports", "heading": "2. IO Ports", "source": "top-level port declarations"},
+    {"id": "clocks", "heading": "3. Clocks and Reset", "source": "clock/reset candidates and sequential processes"},
+    {"id": "registers", "heading": "4. Registers", "source": "sequentially written state; addresses require separate evidence", "query": "software-visible register address decode bus write read access reset fields"},
+    {"id": "operation", "heading": "5. Operation", "source": "output dependency paths and control relationships", "query": "module operation input output data path handshake control state transitions"},
+    {"id": "architecture", "heading": "6. Architecture", "source": "instance hierarchy"},
+    {"id": "questions", "heading": "7. Questions for RTL Engineer", "source": "static-analysis gaps and unresolved behaviour"}
+  ]
+}

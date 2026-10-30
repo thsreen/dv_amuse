@@ -59,7 +59,7 @@ def test_force_rebuilds_graph(spec_repo, tmp_path):
     run_build_graph(out, _llm())
     forced_llm = _llm()
     forced = run_build_graph(out, forced_llm, force=True)
-    assert forced["reused"] is False and forced_llm.calls
+    assert forced["reused"] is False and not forced_llm.calls  # rebuild from durable batches
 
 
 def test_structural_build_is_not_reused_for_llm_build(spec_repo, tmp_path):

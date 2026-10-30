@@ -116,7 +116,8 @@ def test_unknown_citations_are_withheld_after_bounded_repair(inputs):
     result = doc(out)["rtl_observations"]
     assert result["status"] == "BLOCKED" and result["entries"] == []
     assert result["repair"]["unresolved"] and len(result["repair"]["refusals"]) == 2
-    assert sum(name == "rtl_observations" for name, _ in llm.calls) == 3
+    # The identical second repair is replayed, but validation still withholds it.
+    assert sum(name == "rtl_observations" for name, _ in llm.calls) == 2
 
 
 def test_supported_citation_cannot_bypass_independent_claim_check(inputs):

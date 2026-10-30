@@ -177,3 +177,11 @@ def no_langfuse(monkeypatch):
     monkeypatch.delenv("MODEL_API_KEY", raising=False)
     # Ordinary CLI tests must not reload real credentials from the developer's .env.
     monkeypatch.setattr("dv_agent.cli.load_env_file", lambda path: None)
+
+
+@pytest.fixture(autouse=True)
+def _clear_progress_sinks():
+    yield
+    from dv_agent.progress import set_global_sink, set_sink
+    set_sink(None)
+    set_global_sink(None)

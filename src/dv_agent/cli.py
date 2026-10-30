@@ -14,7 +14,7 @@ from .pipeline import (GRAPH_FILE, clear_llm_cache, clear_run, run_build_graph, 
                        run_ingest, run_interfaces, run_query, run_registers, run_strategy, run_test_plan, run_usage,
                        run_testplan_doc, render_testplan)
 from .planning import PlanConfig
-from .progress import emit, set_sink, stderr_sink
+from .progress import emit, set_global_sink, stderr_sink
 from .usage import run_totals
 from .retrieval import RetrievalConfig
 
@@ -53,6 +53,13 @@ def _llm_mode(arg: str | None) -> str:
     return mode
 
 
+def _mode(arg: str | None) -> str:
+    mode = (arg or os.getenv("DV_AGENT_MODE", "") or "full").strip().lower()
+    if mode not in ("full", "fast", "basic"):
+        raise UsageError(f"mode must be one of ('full', 'fast', 'basic'), got {mode!r}")
+    return mode
+
+
 def _models_for(mode: str):
     """(llm, embedder) honouring the mode: off never calls the API; on requires a key."""
     if mode == "off":
@@ -65,6 +72,16 @@ def _models_for(mode: str):
 
 class UsageError(Exception):
     pass
+
+
+def _extract_config(workers: int | None):
+    """ExtractConfig from --workers (None keeps the DV_AGENT_MAX_WORKERS default)."""
+    if workers is None:
+        return None
+    from .extract import MAX_WORKERS_CAP, ExtractConfig
+    if workers < 1:
+        raise UsageError(f"--workers must be at least 1, got {workers}")
+    return ExtractConfig(max_workers=min(workers, MAX_WORKERS_CAP))
 
 
 def _require(out: Path, *names: str) -> None:
@@ -111,6 +128,10 @@ def _main(argv: list[str] | None) -> int:
                     "(structural layers only, no API calls); env DV_AGENT_LLM_MODE")
     pb.add_argument("--force", action="store_true", help="rebuild the graph even if it is current")
     pb.add_argument("--fresh", action="store_true", help="delete the LLM cache and rebuild from scratch")
+    pb.add_argument("--workers", type=int, default=None, metavar="N",
+                    help="parallel extraction calls, 1-4 (default 1; env DV_AGENT_MAX_WORKERS)")
+    pb.add_argument("--mode", choices=("full", "fast", "basic"),
+                    help="full (default) or fast (slim index, lazy cited requirements); env DV_AGENT_MODE")
 
     pp = sub.add_parser("plan", help="build verification test-plan items for requirements")
     pp.add_argument("requirement_ids", nargs="+")
@@ -127,6 +148,8 @@ def _main(argv: list[str] | None) -> int:
         sp.add_argument("--scope", default="", help="block or feature to focus retrieval on (default: whole spec)")
         sp.add_argument("--force", action="store_true", help=f"regenerate even if {name}.json is current")
         sp.add_argument("--fresh", action="store_true", help="delete the LLM cache and regenerate")
+        sp.add_argument("--mode", choices=("full", "fast", "basic"),
+                        help="full (default) or fast (slim index retrieval); env DV_AGENT_MODE")
 
     pt = sub.add_parser("testplan", help="generate the template-driven test-plan document (JSON + Markdown + HTML)")
     pt.add_argument("--out", type=Path, required=True)
@@ -136,6 +159,8 @@ def _main(argv: list[str] | None) -> int:
     pt.add_argument("--fresh", action="store_true", help="delete the LLM cache and regenerate")
     pt.add_argument("--rtl-graph", type=Path, help="opt in to review-required implementation observations from this graph")
     pt.add_argument("--rtl-scope", default="", help="instance scope within --rtl-graph")
+    pt.add_argument("--mode", choices=("full", "fast", "basic"),
+                    help="full (default) or fast (slim index, lazy cited requirements); env DV_AGENT_MODE")
 
     pr = sub.add_parser("render-testplan", help="refresh HTML from editable testplan Markdown without model calls")
     pr.add_argument("--out", type=Path, help="run or runs directory (default with --serve: runs/)")
@@ -156,6 +181,10 @@ def _main(argv: list[str] | None) -> int:
     pa.add_argument("--fresh", action="store_true",
                     help="delete all generated artifacts (cache, graph, plan, trace) and run from scratch")
     pa.add_argument("--llm", choices=LLM_MODES, help="auto (default), on, or off; env DV_AGENT_LLM_MODE")
+    pa.add_argument("--workers", type=int, default=None, metavar="N",
+                    help="parallel extraction calls, 1-4 (default 1; env DV_AGENT_MAX_WORKERS)")
+    pa.add_argument("--mode", choices=("full", "fast", "basic"),
+                    help="full (default) or fast (slim index, lazy cited requirements); env DV_AGENT_MODE")
 
     pq = sub.add_parser("query", help="retrieve ranked evidence with graph paths")
     pq.add_argument("text")
@@ -193,6 +222,16 @@ def _main(argv: list[str] | None) -> int:
     from rtl_agent.cli import add_commands
     add_commands(sub)
 
+    pcode = sub.add_parser("build-code", help="build functional verification from a documented testplan and code contract")
+    pcode.add_argument("--testplan", type=Path, required=True)
+    pcode.add_argument("--interface", type=Path, required=True)
+    pcode.add_argument("--out", type=Path, required=True)
+    pcode.add_argument("--contract", type=Path, help="explicit code_plan.json; otherwise model designs one")
+    pcode.add_argument("--rtl-file", type=Path, action="append", required=True)
+    pcode.add_argument("--top", required=True)
+    pcode.add_argument("--llm", choices=LLM_MODES, default="auto")
+    pcode.add_argument("--no-compile", action="store_true", help="record compilation as NOT_RUN")
+
     puvm = sub.add_parser("build-uvm", help="build an extendable UVM scaffold from interface JSON")
     puvm.add_argument("interface", type=Path, help="interface_definition.json")
     puvm.add_argument("--out", type=Path, required=True, help="separate coding-flow output directory")
@@ -209,9 +248,20 @@ def _main(argv: list[str] | None) -> int:
     puvm.add_argument("--force", action="store_true", help="replace generated files in the output directory")
 
     args = p.parse_args(argv)
+    if args.cmd == "build-code":
+        from .codegen import build_project
+        set_global_sink(stderr_sink)
+        llm, _ = _models_for(args.llm)
+        try:
+            result = build_project(args.testplan,args.interface,args.out,llm=llm,contract_path=args.contract,
+                                   rtl_files=args.rtl_file,expected_top=args.top,compile=not args.no_compile)
+        except OSError as exc:
+            raise UsageError(f"Code generation input/tool unavailable: {exc}") from None
+        print(json.dumps(result,indent=2))
+        return 0 if result['compile']['status'] in ('PASS','NOT_RUN') else 1
     if args.cmd in ("ingest", "build-graph", "plan", "interfaces", "registers", "strategy",
                     "testplan", "pipeline"):
-        set_sink(stderr_sink)  # progress goes to stderr; stdout stays pure JSON
+        set_global_sink(stderr_sink)  # progress goes to stderr, incl. worker threads
     if args.cmd == "build-uvm":
         from .uvm import build_uvm, write_uvm
         if not args.interface.is_file():
@@ -253,8 +303,9 @@ def _main(argv: list[str] | None) -> int:
         force = args.force or args.fresh
         if llm is not None:
             llm.cache_dir = args.out / "llm_cache"
-        emit(f"building graph in {args.out} (--llm {_llm_mode(args.llm)})")
-        result = run_build_graph(args.out, llm, embedder=embedder, force=force)
+        emit(f"building graph in {args.out} (--llm {_llm_mode(args.llm)}, --mode {_mode(args.mode)})")
+        result = run_build_graph(args.out, llm, _extract_config(args.workers),
+                                      embedder=embedder, force=force, mode=_mode(args.mode))
         if result.get("reused"):
             emit("build done: reused cached graph")
         else:
@@ -282,7 +333,8 @@ def _main(argv: list[str] | None) -> int:
         llm.cache_dir = args.out / "llm_cache"
         step = {"interfaces": run_interfaces, "registers": run_registers, "strategy": run_strategy}[args.cmd]
         emit(f"running the {args.cmd} step")
-        result = step(args.out, llm, scope=args.scope, embedder=_embedder(), force=args.force or args.fresh)
+        result = step(args.out, llm, scope=args.scope, embedder=_embedder(), force=args.force or args.fresh,
+                        mode=_mode(args.mode))
         emit(f"{args.cmd} done: {result['status']}" + (" (reused cached output)" if result.get("reused") else ""))
         _print(result | {"cache_cleared": removed})
     elif args.cmd == "render-testplan":
@@ -311,7 +363,8 @@ def _main(argv: list[str] | None) -> int:
         emit("generating the test-plan document")
         result = run_testplan_doc(args.out, llm, scope=args.scope, template_path=args.template,
                                   embedder=_embedder(), force=args.force or args.fresh,
-                                  rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope)
+                                  rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope,
+                                  mode=_mode(args.mode))
         if result.get("reused"):
             emit("testplan done: reused cached document")
         else:
@@ -335,8 +388,9 @@ def _main(argv: list[str] | None) -> int:
         emit(f"ingest done: {result['ingest']['chunks']} chunks")
         if llm is not None:
             llm.cache_dir = out / "llm_cache"
-        emit(f"[2/{len(stages)}] build-graph (--llm {_llm_mode(args.llm)})")
-        result["build"] = run_build_graph(out, llm, embedder=embedder, force=force)
+        emit(f"[2/{len(stages)}] build-graph (--llm {_llm_mode(args.llm)}, --mode {_mode(args.mode)})")
+        result["build"] = run_build_graph(out, llm, _extract_config(args.workers),
+                                                 embedder=embedder, force=force, mode=_mode(args.mode))
         pos = 2
         if args.requirements:
             pos += 1
@@ -349,7 +403,8 @@ def _main(argv: list[str] | None) -> int:
             emit(f"[{pos}/{len(stages)}] testplan: generating the test-plan document")
             result["testplan"] = run_testplan_doc(out, llm, scope=args.scope, template_path=args.template,
                                                   embedder=embedder, force=force,
-                                                  rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope)
+                                                  rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope,
+                                                  mode=_mode(args.mode))
         emit("pipeline done")
         ran = [r["trace_id"] for r in (result.get(k) for k in ("ingest", "build", "plan", "testplan"))
                if r and not r.get("reused") and r.get("trace_id")]

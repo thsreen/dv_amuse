@@ -99,12 +99,19 @@ def _smoke_source(top: str, definition: dict, clock: str, reset: str | None, act
     return "\n".join(lines)
 
 
-def build_code(out: Path, variables: dict) -> dict:
+def build_code(out: Path, variables: dict, *, llm=None) -> dict:
     plan_path = out / "dv" / "testplan_doc.json"
     interface_path = out / "rtl" / "interface_definition.json"
     if not plan_path.is_file() or not interface_path.is_file():
         raise ValueError("/code needs a saved plan and JSON interface; run /plan first")
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    if plan.get("source_authority") == "RTL_INFERRED":
+        raise ValueError("/code requires RTL engineer validation of the RTL-derived specification; all current checks are INFERRED")
+    contract=variables.get("code_contract")
+    if llm is not None or contract:
+        from dv_agent.codegen import build_project
+        return build_project(plan_path,interface_path,out,llm=llm,contract_path=contract,
+                             rtl_files=variables.get("rtl_graph_files", []),expected_top=variables.get("rtl_top"))
     definition = json.loads(interface_path.read_text(encoding="utf-8"))
     rtl_files = [Path(p).resolve() for p in variables.get("rtl_graph_files", [])]
     if not rtl_files or any(not p.is_file() for p in rtl_files):
@@ -142,10 +149,16 @@ def build_code(out: Path, variables: dict) -> dict:
 
 
 def run_tests(out: Path, *, regress: bool = False) -> dict:
+    state_path=out/'code_generation_state.json'
+    if state_path.is_file() and json.loads(state_path.read_text()).get('status') in ('BLOCKED','BUILDING'):
+        return dict(status='BLOCKED',reason='Latest code generation did not complete; run /code successfully first',tests=[])
     path = out / CODE_MANIFEST
     if not path.is_file():
         raise ValueError("no built tests; run /code first")
     manifest = json.loads(path.read_text(encoding="utf-8"))
+    if manifest.get("contract") == "verification_codegen_v1":
+        from dv_agent.codegen.simulator import run_project
+        return run_project(manifest,regress=regress,timeout=SIM_TIMEOUT_S)
     tests = manifest.get("tests", [])
     if not tests:
         raise ValueError("code manifest has no built tests")

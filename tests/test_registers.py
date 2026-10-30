@@ -80,6 +80,13 @@ def test_merges_sources_and_records_conflicts_instead_of_choosing(graph, tmp_pat
     assert [r["abbreviation"] for r in res["registers"]] == ["CTRL", "STAT"]  # sorted by address
 
 
+def test_parallel_register_batches_preserve_verified_merge(graph, tmp_path):
+    _, G = graph
+    sequential = _extract(G, tmp_path, cfg=RegisterConfig(max_repairs=0))
+    parallel = _extract(G, tmp_path, cfg=RegisterConfig(max_repairs=0, max_workers=2))
+    assert parallel == sequential
+
+
 def test_field_checks_overlap_and_undocumented_values(graph, tmp_path):
     _, G = graph
     res = _extract(G, tmp_path)
@@ -248,3 +255,34 @@ def test_register_cache_from_before_configuration_identification_is_not_reused(g
     result.pop("extraction_signature")
     path.write_text(json.dumps(result))
     assert run_registers(out, llm)["reused"] is False
+
+
+def test_register_chunks_slim_returns_cited_chunks(spec_repo, tmp_path):
+    from dv_agent.graph import build_structure
+    from dv_agent.ingest import load_chunks, load_manifest
+    from dv_agent.pipeline import run_ingest
+    from dv_agent.registers import register_chunks
+    from dv_agent.slim_index import build_index
+
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    G = build_structure(load_manifest(out), load_chunks(out))
+    chunks = register_chunks(G, layered_view(G), "tmr32", RegisterConfig(), slim=build_index(out))
+    assert chunks and any(c.get("source") == "slim" for c in chunks)
+    assert all({"chunk_id", "text", "score", "doc_path", "pages"} <= set(c) for c in chunks)
+
+
+def test_registers_fast_mode_marks_and_reuses(spec_repo, tmp_path):
+    import json
+
+    from dv_agent.pipeline import run_build_graph, run_ingest, run_registers
+    from test_testplan_doc import _llm
+
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    run_build_graph(out, _llm(), mode="fast")
+    first = run_registers(out, _llm(), mode="fast")
+    assert first["status"] == "PASS" and first["reused"] is False
+    assert json.loads((out / "registers.json").read_text())["mode"] == "fast"
+    assert run_registers(out, _llm(), mode="fast")["reused"] is True
+    assert run_registers(out, _llm(), mode="full")["reused"] is False

@@ -65,9 +65,13 @@ def discover(repo: Path, include: list[str] | None = None) -> list[SourceDoc]:
     docs: list[SourceDoc] = []
     for path, kind in found:
         rel = path.relative_to(repo).as_posix()
-        sha = _sha256(path.read_bytes())
+        raw = path.read_bytes()
+        sha = _sha256(raw)
+        authority = ("RTL_INFERRED" if kind == "markdown" and
+                     (path.name == "rtl_derived_spec.md" or
+                      raw.startswith(b"<!-- rtl-derived-spec: INFERRED;")) else "DOCUMENTED")
         docs.append(SourceDoc(doc_id=f"DOC-{sha[:12]}", path=rel, kind=kind, sha256=sha,
-                              status="INGESTED"))
+                              status="INGESTED", authority=authority))
 
     if include:
         for d in docs:
@@ -446,12 +450,16 @@ def ingest(repo: Path, out: Path, include: list[str] | None = None,
         doc.text_path = f"text/{doc.doc_id}.txt"
         atomic_write_text(out / doc.text_path, text)
         doc_chunks = chunk_document(doc, text, heading_mode, cfg)
+        for chunk in doc_chunks:
+            chunk.authority = doc.authority
         if not doc_chunks:
             doc.status, doc.reason = "FAILED", "no extractable text"
         chunks.extend(doc_chunks)
     manifest = Manifest(repo=str(repo), repo_revision=_repo_revision(repo),
                         created_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                        include=include, documents=docs)
+                        include=include, documents=docs,
+                        source_authority=("RTL_INFERRED" if any(d.status == "INGESTED" and d.authority == "RTL_INFERRED"
+                                                                for d in docs) else "DOCUMENTED"))
     atomic_write_text(out / "chunks.jsonl", "".join(c.model_dump_json() + "\n" for c in chunks))
     atomic_write_text(out / "manifest.json", manifest.model_dump_json(indent=2))
     return manifest, chunks

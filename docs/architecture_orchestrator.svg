@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="1270" viewBox="0 0 1240 1270" font-family="Helvetica, Arial, 'DejaVu Sans', sans-serif">
+<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b4252"/>
+    </marker>
+    <marker id="arrowLLM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5e35b1"/>
+    </marker>
+    <style>
+      .title { font-size: 24px; font-weight: 700; fill: #1f2430; }
+      .sub { font-size: 13px; fill: #4c566a; }
+      .h { font-size: 15px; font-weight: 700; fill: #1f2430; }
+      .hs { font-size: 13px; font-weight: 700; fill: #1f2430; }
+      .t { font-size: 12px; fill: #2e3440; }
+      .ts { font-size: 11px; fill: #2e3440; }
+      .m { font-size: 11px; fill: #4c566a; font-family: Menlo, Consolas, 'DejaVu Sans Mono', monospace; }
+      .lane { font-size: 12px; font-weight: 700; fill: #4c566a; letter-spacing: 1px; }
+      .stage { fill: #eef3fb; stroke: #4a6fa5; stroke-width: 1.5; }
+      .step { fill: #ffffff; stroke: #4a6fa5; stroke-width: 1.2; }
+      .art { fill: #f6f7f9; stroke: #a0a8b6; stroke-width: 1; }
+      .llm { fill: #f1ebfb; stroke: #5e35b1; stroke-width: 1.5; }
+      .check { fill: #fff4e5; stroke: #d9822b; stroke-width: 1.5; }
+      .trace { fill: #e9f6ef; stroke: #2e8b57; stroke-width: 1.5; }
+      .human { fill: #fdecec; stroke: #c0392b; stroke-width: 1.5; }
+      .flow { stroke: #3b4252; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .thin { stroke: #8a93a3; stroke-width: 1; fill: none; stroke-dasharray: 3 3; marker-end: url(#arrow); }
+      .bus { stroke: #5e35b1; stroke-width: 1.1; fill: none; stroke-dasharray: 5 4; }
+      .call { stroke: #5e35b1; stroke-width: 1.1; fill: none; stroke-dasharray: 5 4; marker-end: url(#arrowLLM); }
+      .badge { font-size: 10px; font-weight: 700; fill: #ffffff; }
+    </style>
+  </defs>
+<rect x="0" y="0" width="1240" height="1270" fill="#ffffff"/>
+<text x="30" y="40" class="title">orchestrator_agent: bounded step-by-step control</text>
+<text x="30" y="62" class="sub">The flow file is the contract. The runner walks it in order; the model may only choose among continue, revisit,</text>
+<text x="30" y="79" class="sub">skip an optional step, or stop. Everything outside the contract fails closed and returns to the owner.</text>
+<text x="30" y="104" class="lane">CONTRACT (flow JSON)</text>
+<text x="330" y="104" class="lane">EXECUTION LOOP</text>
+<text x="960" y="104" class="lane">OWNER</text>
+<rect x="30" y="114" width="270" height="150" rx="8" class="art"/>
+<text x="44" y="136" class="h">Steps</text>
+<text x="44" y="158" class="t">id, tool, agent, args</text>
+<text x="44" y="175" class="t">${variable} substitution</text>
+<text x="44" y="192" class="t">optional flag, review gate</text>
+<text x="44" y="209" class="m">flows/testplan_flow.json</text>
+<text x="44" y="226" class="m">flows/rtl_derived_...json</text>
+<text x="44" y="243" class="m">flows/default_flow.json</text>
+<rect x="30" y="514" width="270" height="150" rx="8" class="art"/>
+<text x="44" y="536" class="h">Policy budgets</text>
+<text x="44" y="558" class="t">attempts per step</text>
+<text x="44" y="575" class="t">revisits per step</text>
+<text x="44" y="592" class="t">model overrides</text>
+<text x="44" y="609" class="t">total tool calls</text>
+<text x="44" y="626" class="t">step and global timeouts</text>
+<text x="44" y="643" class="t">follow-up prompt size</text>
+<rect x="30" y="284" width="270" height="210" rx="8" class="check"/>
+<text x="44" y="306" class="h">Never-do list (guards.py)</text>
+<text x="44" y="328" class="t">No RTL behavior into UVM</text>
+<text x="44" y="345" class="t">RTL observations stay INFERRED</text>
+<text x="44" y="362" class="t">No design mutation: writes only</text>
+<text x="44" y="379" class="t">  under the output directory</text>
+<text x="44" y="396" class="t">Spec steps take no RTL input</text>
+<text x="44" y="413" class="t">Model uses only named steps/tools</text>
+<text x="44" y="430" class="t">Skips only optional steps</text>
+<text x="44" y="447" class="t">Unknown rule or tool: fail closed</text>
+<rect x="330" y="114" width="580" height="66" rx="8" class="stage"/>
+<text x="344" y="136" class="h">1  Load and validate flow</text>
+<text x="898" y="136" class="m" text-anchor="end">flow.py</text>
+<text x="344" y="158" class="t">Schema, known tools and rules, budgets; unresolved variables refused</text>
+<rect x="330" y="200" width="580" height="66" rx="8" class="stage"/>
+<text x="344" y="222" class="h">2  Guard the proposed call</text>
+<text x="898" y="222" class="m" text-anchor="end">guards.py</text>
+<text x="344" y="244" class="t">Argument keys, prompts, output paths and spec-only tools checked before any call</text>
+<rect x="330" y="286" width="580" height="92" rx="8" class="stage"/>
+<text x="344" y="308" class="h">3  Run the tool (tool registry)</text>
+<text x="898" y="308" class="m" text-anchor="end">tools.py runner.py</text>
+<text x="344" y="330" class="t">Attempts and timeout enforced; only paths and counts enter the trace</text>
+<text x="344" y="347" class="t">Tool provenance class: SPEC, INTERFACE, RTL_BEHAVIOR, UVM</text>
+<rect x="330" y="398" width="580" height="92" rx="8" class="llm"/>
+<text x="344" y="420" class="h">4  Bounded decider</text>
+<text x="844" y="420" class="m" text-anchor="end">decider.py</text>
+<rect x="854" y="407" width="44" height="18" rx="9" fill="#5e35b1"/><text x="864" y="420" class="badge">LLM</text>
+<text x="344" y="442" class="t">continue | revisit with follow-up question | skip optional | stop</text>
+<text x="344" y="459" class="t">Invalid or forbidden proposal is logged; the recommended order continues</text>
+<rect x="330" y="510" width="580" height="66" rx="8" class="trace"/>
+<text x="344" y="532" class="h">5  Record</text>
+<text x="898" y="532" class="m" text-anchor="end">runner.py</text>
+<text x="344" y="554" class="t">orchestrator_trace.jsonl, orchestrator_result.json; events feed the dashboard</text>
+<path d="M620,180 L620,198" class="flow"/>
+<path d="M620,266 L620,284" class="flow"/>
+<path d="M620,378 L620,396" class="flow"/>
+<path d="M620,490 L620,508" class="flow"/>
+<path d="M912,543 L925,543 L925,252 L912,252" class="thin"/>
+<path d="M302,160 L328,160" class="thin"/>
+<path d="M302,300 L315,300 L315,233 L328,233" class="thin"/>
+<path d="M302,580 L320,580 L320,332 L328,332" class="thin"/>
+<rect x="960" y="114" width="250" height="180" rx="8" class="human"/>
+<text x="974" y="136" class="h">Review gate</text>
+<text x="974" y="158" class="t">Budget exhausted</text>
+<text x="974" y="175" class="t">Timeout</text>
+<text x="974" y="192" class="t">Guard violation</text>
+<text x="974" y="209" class="t">Review-gated step</text>
+<text x="974" y="226" class="m">orchestrator_review.json</text>
+<text x="974" y="243" class="m">exit status 3</text>
+<rect x="960" y="314" width="250" height="130" rx="8" class="human"/>
+<text x="974" y="336" class="h">Owner decision</text>
+<text x="974" y="358" class="t">Reads the review file</text>
+<text x="974" y="375" class="t">Approves with --approve</text>
+<text x="974" y="392" class="t">or revises the request</text>
+<rect x="960" y="464" width="250" height="112" rx="8" class="art"/>
+<text x="974" y="486" class="h">Resume and status</text>
+<text x="974" y="508" class="t">status shows result and</text>
+<text x="974" y="525" class="t">pending review</text>
+<text x="974" y="542" class="t">run resumes at the step</text>
+<path d="M912,215 L958,215" class="thin"/>
+<path d="M1085,294 L1085,312" class="flow"/>
+<path d="M1085,444 L1085,462" class="flow"/>
+<text x="30" y="706" class="lane">INTERACTIVE TERMINAL (four commands)</text>
+<rect x="30" y="716" width="270" height="170" rx="8" class="stage"/>
+<text x="44" y="738" class="h">Repo intake</text>
+<text x="288" y="738" class="m" text-anchor="end">repo_intake.py</text>
+<text x="44" y="760" class="t">Bounded read-only scan</text>
+<text x="44" y="777" class="t">Finds spec documents,</text>
+<text x="44" y="794" class="t">RTL files and top module</text>
+<text x="44" y="811" class="t">Skips backups, bench, sim</text>
+<rect x="330" y="716" width="280" height="170" rx="8" class="stage"/>
+<text x="344" y="738" class="h">Flow selection</text>
+<text x="598" y="738" class="m" text-anchor="end">repl.py</text>
+<text x="344" y="760" class="t">Spec present: spec + RTL-</text>
+<text x="344" y="777" class="t">observations testplan flow</text>
+<text x="344" y="794" class="t">RTL only (or asked for): RTL-</text>
+<text x="344" y="811" class="t">derived spec flow, INFERRED</text>
+<text x="344" y="828" class="t">English preview of every step</text>
+<rect x="630" y="716" width="280" height="170" rx="8" class="stage"/>
+<text x="644" y="738" class="h">Live dashboard</text>
+<text x="898" y="738" class="m" text-anchor="end">tui.py</text>
+<text x="644" y="760" class="t">Steps checked off</text>
+<text x="644" y="777" class="t">Token usage and current tool</text>
+<text x="644" y="794" class="t">Plan stages: interfaces, registers,</text>
+<text x="644" y="811" class="t">each section, rendering</text>
+<text x="644" y="828" class="t">Elapsed time at completion only</text>
+<rect x="960" y="716" width="250" height="170" rx="8" class="trace"/>
+<text x="974" y="738" class="h">Report viewer</text>
+<text x="974" y="760" class="t">Starts when the plan is saved</text>
+<text x="974" y="777" class="t">Prints URL, HTML and Markdown</text>
+<text x="974" y="794" class="t">paths; lists all plans</text>
+<path d="M300,800 L328,800" class="flow"/>
+<path d="M610,800 L628,800" class="flow"/>
+<path d="M910,800 L958,800" class="thin"/>
+<text x="30" y="918" class="lane">COMMANDS</text>
+<rect x="30" y="928" width="1180" height="36" rx="6" class="step"/>
+<text x="42" y="948" class="hs">/plan</text>
+<text x="120" y="951" class="t">Ingest, build spec and RTL graphs, recover registers and controls, write JSON, Markdown, HTML</text>
+<rect x="30" y="974" width="1180" height="36" rx="6" class="step"/>
+<text x="42" y="994" class="hs">/code</text>
+<text x="120" y="997" class="t">Runs /plan first if needed; UVM from cited DOCUMENTED items only; builds a smoke test</text>
+<rect x="30" y="1020" width="1180" height="36" rx="6" class="step"/>
+<text x="42" y="1040" class="hs">/run</text>
+<text x="120" y="1043" class="t">Runs the smoke test with local Xezim; saves log and result</text>
+<rect x="30" y="1066" width="1180" height="36" rx="6" class="step"/>
+<text x="42" y="1086" class="hs">/regress</text>
+<text x="120" y="1089" class="t">Runs every executable test in the code manifest; missing simulator is BLOCKED</text>
+<text x="30" y="1140" class="m">Tools wrapped (tools.py): dv_ingest, dv_build_graph, dv_interfaces, dv_registers, dv_strategy, dv_testplan, dv_context,</text>
+<text x="30" y="1158" class="m">rtl_extract, rtl_build_interface, rtl_build_graph, rtl_build_spec, rtl_query, uvm_build</text>
+<rect x="30" y="1200" width="1180" height="44" rx="8" fill="#fafbfc" stroke="#d8dee9"/>
+<rect x="46" y="1214" width="16" height="16" class="stage"/><text x="68" y="1227" class="t">component / stage</text>
+<rect x="210" y="1214" width="16" height="16" class="art"/><text x="232" y="1227" class="t">artifact / data</text>
+<rect x="361" y="1214" width="16" height="16" class="llm"/><text x="383" y="1227" class="t">model API</text>
+<rect x="472" y="1214" width="16" height="16" class="check"/><text x="494" y="1227" class="t">check outside the model</text>
+<rect x="675" y="1214" width="16" height="16" class="trace"/><text x="697" y="1227" class="t">trace / viewer</text>
+<rect x="819" y="1214" width="16" height="16" class="human"/><text x="841" y="1227" class="t">owner / human decision</text>
+</svg>

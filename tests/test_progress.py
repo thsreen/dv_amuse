@@ -1,5 +1,6 @@
 """Progress reporting: silent by default, per-step lines on stderr via the CLI."""
 import json
+import threading
 from types import SimpleNamespace
 
 import httpx
@@ -8,10 +9,10 @@ import pytest
 
 from dv_agent import progress
 from dv_agent.cli import main
-from dv_agent.extract import extract_requirements
+from dv_agent.extract import ExtractConfig, extract_requirements
 from dv_agent.graph import build_structure
 from dv_agent.ingest import load_chunks, load_manifest
-from dv_agent.llm import MetaClient
+from dv_agent.llm import FakeLLM, LLMError, MetaClient
 from dv_agent.pipeline import run_build_graph, run_ingest
 from dv_agent.trace import Tracer
 
@@ -70,7 +71,7 @@ def test_pipeline_progress_goes_to_stderr_and_stdout_stays_json(spec_repo, tmp_p
     captured = capsys.readouterr()
     assert json.loads(captured.out)["build"]["llm"]["status"] == "NOT_RUN"
     assert "dv-agent: [1/2] ingest:" in captured.err
-    assert "dv-agent: [2/2] build-graph (--llm off)" in captured.err
+    assert "dv-agent: [2/2] build-graph (--llm off, --mode full)" in captured.err
     assert "dv-agent: pipeline done" in captured.err
 
 
@@ -95,4 +96,78 @@ def test_llm_retry_reports_progress():
     schema = {"type": "object", "properties": {"x": {"type": "string"}}, "required": ["x"],
               "additionalProperties": False}
     assert client.structured(name="t", instructions="i", payload={}, schema=schema).data == {"x": "ok"}
-    assert len(seen) == 1 and "RateLimitError" in seen[0] and "retrying in 2s" in seen[0]
+    assert seen[0] == "llm call 't' start (model m)"
+    retries = [m for m in seen if "retrying in" in m]
+    assert len(retries) == 1 and "RateLimitError" in retries[0] and "retrying in 2s" in retries[0]
+    assert seen[-1].startswith("llm call 't' done (") and "attempts 2" in seen[-1]
+
+
+def test_global_sink_reaches_worker_threads():
+    seen, guard = [], threading.Lock()
+
+    def capture(message):
+        with guard:
+            seen.append(message)
+
+    progress.set_global_sink(capture)
+    threads = [threading.Thread(target=progress.emit, args=(f"line-{i}",)) for i in range(16)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    progress.set_global_sink(None)
+    assert sorted(seen) == sorted(f"line-{i}" for i in range(16))
+
+
+def test_thread_local_sink_wins_and_unset_falls_through():
+    thread_seen, global_seen = [], []
+    progress.set_global_sink(global_seen.append)
+    progress.set_sink(thread_seen.append)
+    progress.emit("hello")
+    assert thread_seen == ["hello"] and global_seen == []
+    progress.set_sink(None)
+    progress.emit("falls through")
+    assert thread_seen == ["hello"] and global_seen == ["falls through"]
+    progress.set_global_sink(None)
+
+
+def test_structured_emits_start_done_and_fail_lines():
+    seen = []
+    progress.set_sink(seen.append)
+    llm = FakeLLM({"ok": lambda payload: {"x": 1}})
+    schema = {"type": "object", "properties": {"x": {"type": "integer"}},
+              "required": ["x"], "additionalProperties": False}
+    llm.structured(name="ok", instructions="i", payload={}, schema=schema)
+    assert seen[0] == "llm call 'ok' start (model fake-llm)"
+    assert seen[1].startswith("llm call 'ok' done (") and "attempts 0" in seen[1]
+
+    def denied(payload):
+        raise LLMError("auth", "simulated")
+
+    llm = FakeLLM({"no": denied})
+    with pytest.raises(LLMError):
+        llm.structured(name="no", instructions="i", payload={}, schema=schema)
+    assert seen[-1].startswith("llm call 'no' failed: auth after ")
+
+
+def test_parallel_fetch_emits_start_lines(spec_repo, tmp_path, fake_llm):
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    G = build_structure(load_manifest(out), load_chunks(out))
+    seen = []
+    progress.set_global_sink(seen.append)
+    with Tracer(out / "t.jsonl", "t") as tracer:
+        extract_requirements(G, fake_llm, tracer, ExtractConfig(max_workers=4))
+    progress.set_global_sink(None)
+    starts = [m for m in seen if m.startswith("fetch chunk CH-") and "start [dv_extract_" in m]
+    assert starts, seen
+    assert any("attempts" in m and m.startswith("llm call 'spec_requirements' done") for m in seen)
+
+
+def test_build_graph_emits_config_line(spec_repo, tmp_path, fake_llm):
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    seen = []
+    progress.set_sink(seen.append)
+    run_build_graph(out, fake_llm, ExtractConfig(max_workers=4))
+    assert "build config: model fake-llm, workers 4" in seen

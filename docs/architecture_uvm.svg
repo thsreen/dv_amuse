@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="1210" viewBox="0 0 1240 1210" font-family="Helvetica, Arial, 'DejaVu Sans', sans-serif">
+<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b4252"/>
+    </marker>
+    <marker id="arrowLLM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5e35b1"/>
+    </marker>
+    <style>
+      .title { font-size: 24px; font-weight: 700; fill: #1f2430; }
+      .sub { font-size: 13px; fill: #4c566a; }
+      .h { font-size: 15px; font-weight: 700; fill: #1f2430; }
+      .hs { font-size: 13px; font-weight: 700; fill: #1f2430; }
+      .t { font-size: 12px; fill: #2e3440; }
+      .ts { font-size: 11px; fill: #2e3440; }
+      .m { font-size: 11px; fill: #4c566a; font-family: Menlo, Consolas, 'DejaVu Sans Mono', monospace; }
+      .lane { font-size: 12px; font-weight: 700; fill: #4c566a; letter-spacing: 1px; }
+      .stage { fill: #eef3fb; stroke: #4a6fa5; stroke-width: 1.5; }
+      .step { fill: #ffffff; stroke: #4a6fa5; stroke-width: 1.2; }
+      .art { fill: #f6f7f9; stroke: #a0a8b6; stroke-width: 1; }
+      .llm { fill: #f1ebfb; stroke: #5e35b1; stroke-width: 1.5; }
+      .check { fill: #fff4e5; stroke: #d9822b; stroke-width: 1.5; }
+      .trace { fill: #e9f6ef; stroke: #2e8b57; stroke-width: 1.5; }
+      .human { fill: #fdecec; stroke: #c0392b; stroke-width: 1.5; }
+      .flow { stroke: #3b4252; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .thin { stroke: #8a93a3; stroke-width: 1; fill: none; stroke-dasharray: 3 3; marker-end: url(#arrow); }
+      .bus { stroke: #5e35b1; stroke-width: 1.1; fill: none; stroke-dasharray: 5 4; }
+      .call { stroke: #5e35b1; stroke-width: 1.1; fill: none; stroke-dasharray: 5 4; marker-end: url(#arrowLLM); }
+      .badge { font-size: 10px; font-weight: 700; fill: #ffffff; }
+    </style>
+  </defs>
+<rect x="0" y="0" width="1240" height="1210" fill="#ffffff"/>
+<text x="30" y="40" class="title">UVM builder and simulation: from reviewed inputs to a runnable smoke test</text>
+<text x="30" y="62" class="sub">Script-owned template code fills the structure. Protocol behavior and expected values need review, so the generated</text>
+<text x="30" y="79" class="sub">scoreboard starts disabled and every output is NEEDS_REVIEW. Simulation results never claim functional correctness.</text>
+<text x="30" y="104" class="lane">INPUTS</text>
+<text x="330" y="104" class="lane">build-uvm</text>
+<text x="960" y="104" class="lane">OUTPUT TREE</text>
+<rect x="30" y="114" width="270" height="100" rx="8" class="art"/>
+<text x="44" y="136" class="h">Interface JSON</text>
+<text x="44" y="158" class="t">From rtl_agent: ports, directions,</text>
+<text x="44" y="175" class="t">widths (wiring facts only)</text>
+<rect x="30" y="230" width="270" height="100" rx="8" class="art"/>
+<text x="44" y="252" class="h">Explicit clock and reset</text>
+<text x="44" y="274" class="t">Clock required; reset needs an</text>
+<text x="44" y="291" class="t">explicit active polarity, never inferred</text>
+<rect x="30" y="346" width="270" height="120" rx="8" class="art"/>
+<text x="44" y="368" class="h">Test plan (optional)</text>
+<text x="44" y="390" class="t">Only cited DOCUMENTED items</text>
+<text x="44" y="407" class="t">are passed on by the terminal;</text>
+<text x="44" y="424" class="t">inferred, uncited and RTL</text>
+<text x="44" y="441" class="t">observations are filtered out</text>
+<rect x="30" y="482" width="270" height="100" rx="8" class="art"/>
+<text x="44" y="504" class="h">Agent arguments (optional)</text>
+<text x="44" y="526" class="t">Reviewed names and custom snippets</text>
+<text x="44" y="543" class="t">through a bounded argument contract</text>
+<rect x="330" y="114" width="580" height="70" rx="8" class="stage"/>
+<text x="344" y="136" class="h">Validate</text>
+<text x="898" y="136" class="m" text-anchor="end">uvm.py</text>
+<text x="344" y="158" class="t">Identifiers, widths, clock/reset binding; bidirectional ports and unpacked</text>
+<text x="344" y="175" class="t">arrays refused until a drive policy is given</text>
+<rect x="330" y="204" width="580" height="150" rx="8" class="stage"/>
+<text x="344" y="226" class="h">Templates: uvm_agent_v1</text>
+<text x="898" y="226" class="m" text-anchor="end">templates/uvm_agent</text>
+<text x="344" y="248" class="t">interface, item, cfg, sequencer, driver, monitor, scoreboard, agent, env,</text>
+<text x="344" y="265" class="t">base sequence, named sequences, test, package</text>
+<text x="344" y="282" class="t">Versioned catalog; each class in its own .svh; package has imports and includes only</text>
+<text x="344" y="299" class="t">Driver drives on the falling edge, monitor samples on the rising edge</text>
+<rect x="330" y="374" width="580" height="110" rx="8" class="stage"/>
+<text x="344" y="396" class="h">Common UVCs (copied on every build)</text>
+<text x="898" y="396" class="m" text-anchor="end">templates/common_uvc</text>
+<text x="344" y="418" class="t">clock: period, duty, enable, idle level, active/passive</text>
+<text x="344" y="435" class="t">reset: polarity, assert duration, active/passive, initial pulse, reset_pulse_seq</text>
+<text x="344" y="452" class="t">Identical sources across projects; README lists compile order and wiring</text>
+<rect x="330" y="504" width="580" height="78" rx="8" class="llm"/>
+<text x="344" y="526" class="h">Sequence controls (optional model call)</text>
+<text x="844" y="526" class="m" text-anchor="end">uvm.py</text>
+<rect x="854" y="513" width="44" height="18" rx="9" fill="#5e35b1"/><text x="864" y="526" class="badge">LLM</text>
+<text x="344" y="548" class="t">Plan information becomes bounded sequence controls only</text>
+<text x="344" y="565" class="t">Code and expected values are never model-written here</text>
+<path d="M620,184 L620,202" class="flow"/>
+<path d="M620,354 L620,372" class="flow"/>
+<path d="M620,484 L620,502" class="flow"/>
+<path d="M302,164 L328,150" class="thin"/>
+<path d="M302,290 L328,260" class="thin"/>
+<path d="M302,406 L328,540" class="thin"/>
+<path d="M302,532 L328,300" class="thin"/>
+<rect x="960" y="114" width="250" height="468" rx="8" class="art"/>
+<text x="974" y="136" class="h">Generated package</text>
+<text x="974" y="158" class="m">&lt;prefix&gt;_if.sv</text>
+<text x="974" y="175" class="m">&lt;prefix&gt;_pkg.sv</text>
+<text x="974" y="192" class="m">uvm/*.svh</text>
+<text x="974" y="209" class="m">  item  cfg  sequencer</text>
+<text x="974" y="226" class="m">  driver  monitor</text>
+<text x="974" y="243" class="m">  scoreboard (disabled)</text>
+<text x="974" y="260" class="m">  agent  env</text>
+<text x="974" y="277" class="m">  base_seq  named seqs</text>
+<text x="974" y="294" class="m">  test</text>
+<text x="974" y="311" class="m">common_uvc/</text>
+<text x="974" y="328" class="m">  clock/   reset/</text>
+<text x="974" y="345" class="m">  README.md</text>
+<text x="974" y="362" class="m">uvm_manifest.json</text>
+<text x="974" y="470" class="hs">Status: NEEDS_REVIEW</text>
+<text x="974" y="490" class="t">Extension points:</text>
+<text x="974" y="508" class="ts">drive_item, sample_item,</text>
+<text x="974" y="524" class="ts">check_sample, configure_item,</text>
+<text x="974" y="540" class="ts">apply_configuration</text>
+<path d="M912,300 L958,300" class="flow"/>
+<text x="30" y="646" class="lane">CODE AND RUN</text>
+<rect x="30" y="656" width="270" height="170" rx="8" class="check"/>
+<text x="44" y="678" class="h">Documented-only filter</text>
+<text x="44" y="700" class="t">documented_plan() keeps items</text>
+<text x="44" y="717" class="t">with citations and DOCUMENTED</text>
+<text x="44" y="734" class="t">provenance</text>
+<text x="44" y="751" class="t">Plan-supplied scaffold turns</text>
+<text x="44" y="768" class="t">base random stimulus off</text>
+<rect x="330" y="656" width="280" height="170" rx="8" class="stage"/>
+<text x="344" y="678" class="h">Build code</text>
+<text x="598" y="678" class="m" text-anchor="end">actions.py</text>
+<text x="344" y="700" class="t">Calls build-uvm with the filtered</text>
+<text x="344" y="717" class="t">plan and the interface JSON</text>
+<text x="344" y="734" class="t">Adds one smoke test: compile,</text>
+<text x="344" y="751" class="t">clock and reset</text>
+<text x="344" y="768" class="t">Writes tests.json manifest and</text>
+<text x="344" y="785" class="t">documented_plan.json; reuses by hash</text>
+<rect x="630" y="656" width="280" height="170" rx="8" class="stage"/>
+<text x="644" y="678" class="h">Run tests</text>
+<text x="898" y="678" class="m" text-anchor="end">actions.py</text>
+<text x="644" y="700" class="t">/run: the smoke test</text>
+<text x="644" y="717" class="t">/regress: every manifest test</text>
+<text x="644" y="734" class="t">Local xezim on PATH or XEZIM_BIN</text>
+<text x="644" y="751" class="t">Bounded runtime; stdout, stderr,</text>
+<text x="644" y="768" class="t">exit status and log saved</text>
+<rect x="960" y="656" width="250" height="170" rx="8" class="human"/>
+<text x="974" y="678" class="h">Result status</text>
+<text x="974" y="700" class="t">PASS / FAIL for the run only</text>
+<text x="974" y="717" class="t">BLOCKED if no simulator or</text>
+<text x="974" y="734" class="t">no plan</text>
+<text x="974" y="751" class="t">Never a sign-off of the design</text>
+<path d="M300,741 L328,741" class="flow"/>
+<path d="M610,741 L628,741" class="flow"/>
+<path d="M910,741 L958,741" class="flow"/>
+<path d="M1085,582 L1085,614 L250,614 L250,654" class="thin"/>
+<text x="30" y="860" class="lane">WHERE THE SIMULATOR RUNS</text>
+<rect x="30" y="870" width="580" height="120" rx="8" class="stage"/>
+<text x="44" y="892" class="h">Local Xezim</text>
+<text x="44" y="914" class="t">Default for /run and /regress</text>
+<text x="44" y="931" class="t">Installed CLI and version recorded with each result</text>
+<rect x="630" y="870" width="580" height="120" rx="8" class="stage"/>
+<text x="644" y="892" class="h">e2e_sim (optional submodule)</text>
+<text x="1198" y="892" class="m" text-anchor="end">tools/e2e_sim</text>
+<text x="644" y="914" class="t">Ephemeral cloud node sized per simulation</text>
+<text x="644" y="931" class="t">Uploads the local binary and sources, runs, fetches results,</text>
+<text x="644" y="948" class="t">then pauses the node so billing stops</text>
+<rect x="30" y="1020" width="1180" height="100" rx="8" class="human"/>
+<text x="44" y="1042" class="h">Boundaries</text>
+<text x="44" y="1064" class="t">No RTL behavior, graph facts or excerpts enter generated verification code: only the port inventory and the reviewed plan do</text>
+<text x="44" y="1081" class="t">Protocol-specific tests need an evidence-backed mapping and review; the smoke test only shows that the scaffold compiles and runs</text>
+<text x="44" y="1098" class="t">The design source is never modified to plant defects or raise coverage</text>
+<rect x="30" y="1148" width="1180" height="44" rx="8" fill="#fafbfc" stroke="#d8dee9"/>
+<rect x="46" y="1162" width="16" height="16" class="stage"/><text x="68" y="1175" class="t">component / stage</text>
+<rect x="210" y="1162" width="16" height="16" class="art"/><text x="232" y="1175" class="t">artifact / data</text>
+<rect x="361" y="1162" width="16" height="16" class="llm"/><text x="383" y="1175" class="t">model API</text>
+<rect x="472" y="1162" width="16" height="16" class="check"/><text x="494" y="1175" class="t">check outside the model</text>
+<rect x="675" y="1162" width="16" height="16" class="trace"/><text x="697" y="1175" class="t">trace / viewer</text>
+<rect x="819" y="1162" width="16" height="16" class="human"/><text x="841" y="1175" class="t">owner / human decision</text>
+</svg>

@@ -1,0 +1,9 @@
+class {{AGENT}}_monitor extends uvm_component;
+  `uvm_component_utils({{AGENT}}_monitor)
+  {{AGENT}}_cfg cfg;
+  uvm_analysis_port #(cg_item) ap;
+  function new(string name, uvm_component parent); super.new(name,parent); ap=new("ap",this); endfunction
+  task run_phase(uvm_phase phase);
+{{MONITOR_HOOK}}
+  endtask
+endclass

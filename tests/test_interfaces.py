@@ -33,6 +33,36 @@ def test_signals_are_verified_against_the_spec(spec_repo, tmp_path):
     assert names["TICK_O"]["availability"] == "TMR_HAS_TICK defined"
 
 
+def test_interface_metadata_is_bulleted_with_collapsed_quotes(spec_repo, tmp_path):
+    from dv_agent.interfaces import render
+    from dv_agent.html_report import render_html
+    _, G = _graph(spec_repo, tmp_path)
+    result = _extract(G, tmp_path)
+    md = "\n".join(render(result, "Interfaces"))
+    assert "- Function:" in md and "- DUT role:" in md
+    assert " | Category:" not in md
+    assert "<summary>Specification evidence</summary>" in md
+    header_at = md.index("### ")
+    info_at = md.index("<summary>ⓘ Interface info</summary>")
+    assert header_at < info_at < md.index("- Function:")
+    assert md.index("</details>", info_at) < md.index("| Signal |")
+    report = render_html(md)
+    assert '<details class="interface-info"><summary>ⓘ Interface info</summary>' in report
+    assert '<details class="interface-info" open' not in report
+    assert '<details class="source-quotes"><summary>Specification evidence</summary>' in report
+    assert '<details class="source-quotes" open' not in report
+    assert '<blockquote>' in report
+    assert "| Source |" not in md
+    fields = {"name", "width", "direction", "active_level", "availability", "description"}
+    saved = json.loads(json.dumps(result))
+    for group in saved["groups"]:
+        for signal in group["signals"]:
+            assert fields <= signal.keys()
+            assert fields == signal["documented"].keys()
+            row = next(line for line in md.splitlines() if line.startswith(f"| {signal['name']} |"))
+            assert row.count("|") == 7  # six columns; the Source column was removed
+
+
 def test_every_signal_in_exactly_one_group(spec_repo, tmp_path):
     _, G = _graph(spec_repo, tmp_path)
     res = _extract(G, tmp_path)
@@ -69,8 +99,8 @@ def test_interfaces_come_first_and_feed_every_section(spec_repo, tmp_path):
     assert {g["group"] for g in seen["stimulus"]} >= {"Register bus", "Interrupt"}
     assert all(seen[s] == seen["stimulus"] for s in seen)
     md = (out / "testplan_doc.md").read_text()
-    assert md.index("## Interface Definitions") < md.index("## 2. Feature Description")
-    assert "| TICK_O | 1 | output | not applicable | TMR_HAS_TICK defined |" in md
+    assert md.index("## 1.1 Interface Definitions") < md.index("## 2. Feature Description")
+    assert "| TICK_O | 1 | output | — | TMR_HAS_TICK defined |" in md
     doc = json.loads((out / "testplan_doc.json").read_text())
     questions = next(s for s in doc["sections"] if s["id"] == "questions")["entries"]
     assert any("TICK_O" in q["text"] and "Which interface" in q["text"] for q in questions)
@@ -135,7 +165,8 @@ def test_markdown_shows_connected_module_type(spec_repo, tmp_path):
     out, _ = _graph(spec_repo, tmp_path)
     run_testplan_doc(out, _llm())
     md = (out / "testplan_doc.md").read_text()
-    assert "Connected module type: interrupt_controller (interrupt controller)" in md
+    assert "Connected module type: interrupt_controller" in md
+    assert "Connected to: interrupt controller" in md
 
 
 def test_active_level_is_checked_against_the_quote(spec_repo, tmp_path):
@@ -149,3 +180,34 @@ def test_active_level_is_checked_against_the_quote(spec_repo, tmp_path):
     assert any("active level of IRQ" in q for q in qs) and not any("active level of RST_N" in q for q in qs)
     bus = next(c for c in compact(res) if c["group"] == "Reset")
     assert bus["signals"] == ["RST_N[1] input active-low"]
+
+
+def test_interface_chunks_slim_returns_cited_chunks(spec_repo, tmp_path):
+    from dv_agent.graph import build_structure
+    from dv_agent.ingest import load_chunks, load_manifest
+    from dv_agent.interfaces import InterfaceConfig, interface_chunks
+    from dv_agent.pipeline import run_ingest
+    from dv_agent.slim_index import build_index
+
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    G = build_structure(load_manifest(out), load_chunks(out))
+    chunks = interface_chunks(G, layered_view(G), "tmr32", InterfaceConfig(), slim=build_index(out))
+    assert chunks and any(c.get("source") == "slim" for c in chunks)
+    assert all({"chunk_id", "text", "score", "doc_path", "pages"} <= set(c) for c in chunks)
+
+
+def test_interfaces_fast_mode_marks_and_reuses(spec_repo, tmp_path):
+    import json
+
+    from dv_agent.pipeline import run_build_graph, run_ingest, run_interfaces
+    from test_testplan_doc import _llm
+
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    run_build_graph(out, _llm(), mode="fast")
+    first = run_interfaces(out, _llm(), mode="fast")
+    assert first["status"] == "PASS" and first["reused"] is False
+    assert json.loads((out / "interfaces.json").read_text())["mode"] == "fast"
+    assert run_interfaces(out, _llm(), mode="fast")["reused"] is True
+    assert run_interfaces(out, _llm(), mode="full")["reused"] is False

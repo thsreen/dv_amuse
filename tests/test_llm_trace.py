@@ -64,13 +64,37 @@ def test_errors_are_classified_without_leaking_details():
     with pytest.raises(LLMError) as exc:
         _call(client)
     assert exc.value.kind == "auth"
-    client = MetaClient(api_key="k", model="m", client=_client(["not json"]))
+    client = MetaClient(api_key="k", model="m", client=_client(["not json"] * 5))
     with pytest.raises(LLMError) as exc:
         _call(client)
     assert exc.value.kind == "parse"
     with pytest.raises(LLMError) as exc:
         _call(MetaClient(api_key="", model="m"))
     assert exc.value.kind == "config"
+
+
+def test_fifth_retry_changes_sampling_and_recovery_instructions():
+    fake = _client(["not json"] * 4 + ['{"x":"ok"}'])
+    client = MetaClient(api_key="k", model="m", client=fake)
+    result = _call(client)
+    calls = fake.responses.calls
+    assert len(calls) == 5
+    assert [c.get("temperature") for c in calls] == [None, 0.1, 0.3, 0.0, 0.2]
+    assert [c["max_output_tokens"] for c in calls] == [8192, 10240, 12800, 16000, 20000]
+    assert "Recovery attempt" in calls[4]["instructions"]
+    assert len(result.attempts) == 5 and result.attempts[0]["status"] == "parse"
+
+
+def test_request_budget_scales_with_input_and_respects_ceiling(monkeypatch):
+    monkeypatch.setenv("META_MAX_OUTPUT_TOKENS", "8192")
+    monkeypatch.setenv("META_MAX_OUTPUT_TOKENS_CEILING", "32768")
+    fake = _client(['{"x":"ok"}'] * 3)
+    client = MetaClient(api_key="k", model="m", client=fake)
+    for length in (100, 2000, 20000):
+        client.structured(name="chunk", instructions="rules", payload={"text": "x" * length}, schema=SCHEMA)
+    budgets = [c["max_output_tokens"] for c in fake.responses.calls]
+    assert budgets[0] == 8192 < budgets[1] < budgets[2] == 32768
+    assert client.max_output_tokens == 8192
 
 
 def test_tracer_nests_spans_and_records_errors(tmp_path):
@@ -162,16 +186,16 @@ def test_token_exhaustion_grows_budget_and_accounts_for_failed_attempt(tmp_path)
                         max_output_tokens=64, max_output_tokens_ceiling=128)
     with Tracer(tmp_path / "t.jsonl", "run") as tracer:
         assert _call(client, tracer=tracer).data == {"x": "ok"}
-    assert [c["max_output_tokens"] for c in fake.calls] == [64, 128]
+    assert [c["max_output_tokens"] for c in fake.calls] == [64, 80]
     totals = run_totals(tmp_path / "t.jsonl", tracer.trace_id)
     assert totals["api_calls"] == 2
     assert totals["consumed"]["input"] == 20 and totals["consumed"]["output"] == 40
     assert client.max_output_tokens == 64  # Later small calls start at their original budget.
 
 
-@pytest.mark.parametrize("reason,expected_calls", [("max_output_tokens", 2), ("content_filter", 1)])
+@pytest.mark.parametrize("reason,expected_calls", [("max_output_tokens", 5), ("content_filter", 1)])
 def test_token_retries_are_bounded_and_other_incomplete_responses_are_not_retried(reason, expected_calls, tmp_path):
-    fake = SequenceResponses(*[_response("incomplete", reason=reason) for _ in range(3)])
+    fake = SequenceResponses(*[_response("incomplete", reason=reason) for _ in range(5)])
     client = MetaClient(api_key="k", model="m", client=SimpleNamespace(responses=fake),
                         max_output_tokens=64, max_output_tokens_ceiling=128)
     with pytest.raises(LLMError) as error:
@@ -190,7 +214,7 @@ def test_chat_length_limit_uses_the_same_budget_recovery():
                         max_output_tokens_ceiling=128,
                         client=SimpleNamespace(chat=SimpleNamespace(completions=fake)))
     assert _call(client).data == {"x": "ok"}
-    assert [c["max_tokens"] for c in fake.calls] == [64, 128]
+    assert [c["max_tokens"] for c in fake.calls] == [64, 80]
 
 
 def test_partial_extraction_does_not_report_a_passing_graph(spec_repo, tmp_path, fake_llm):
@@ -203,3 +227,59 @@ def test_partial_extraction_does_not_report_a_passing_graph(spec_repo, tmp_path,
     result = run_build_graph(out, fake_llm)
     assert result["requirements"]["failed_chunks"]
     assert result["llm"]["status"] == "BLOCKED"
+
+
+def test_default_and_configurable_request_timeout(monkeypatch):
+    monkeypatch.delenv('META_REQUEST_TIMEOUT_SECONDS', raising=False)
+    assert MetaClient(api_key='k').timeout == 150
+    monkeypatch.setenv('META_REQUEST_TIMEOUT_SECONDS','180')
+    assert MetaClient(api_key='k').timeout == 180
+    assert MetaClient(api_key='k',timeout=150).timeout == 150
+    for value in ('0','-1','nan','inf'):
+        monkeypatch.setenv('META_REQUEST_TIMEOUT_SECONDS',value)
+        with pytest.raises(ValueError): MetaClient(api_key='k')
+
+
+def test_attempt_logging_is_immediate_detailed_and_sanitized(tmp_path):
+    import json
+    from dv_agent.graph_checkpoint import CheckpointLLM
+    path=tmp_path/'llm_requests.jsonl'
+    request=httpx.Request('POST','https://example.invalid')
+    secret='private-provider-body'
+    outcomes=[openai.APITimeoutError(request=request), '{"x":"ok"}']
+    fake=_client(outcomes)
+    original=fake.responses.create
+    def create(**kwargs):
+        records=[json.loads(line) for line in path.read_text().splitlines()]
+        assert records[-1]['event']=='attempt_start'
+        assert records[-1]['timeout_s']==150
+        return original(**kwargs)
+    fake.responses.create=create
+    llm=MetaClient(api_key=secret,model='m',client=fake,sleep=lambda seconds:None)
+    wrapper=CheckpointLLM(llm,tmp_path/'cache',stage='testplan')
+    with Tracer(tmp_path/'trace.jsonl','run') as tracer:
+        _call(wrapper,tracer=tracer)
+        _call(wrapper,tracer=tracer)
+    records=[json.loads(line) for line in path.read_text().splitlines()]
+    assert [r['event'] for r in records]==['request_start','attempt_start','attempt_done','retry_scheduled',
+                                          'attempt_start','attempt_done','cache_hit']
+    failed=records[2]
+    assert failed['error_type']=='APITimeoutError' and failed['duration_ms']>=0
+    assert failed['payload_bytes']>0 and failed['schema_bytes']>0 and failed['instructions_bytes']>0
+    assert records[3]['backoff_s']==2 and records[5]['response_id']=='resp-1'
+    assert records[2]['request_id']==records[5]['request_id']
+    assert secret not in path.read_text()
+
+
+def test_interruption_is_logged_in_request_and_trace(tmp_path):
+    import json
+    fake=_client([])
+    def interrupted(**kwargs): raise KeyboardInterrupt()
+    fake.responses.create=interrupted
+    llm=MetaClient(api_key='k',model='m',client=fake)
+    with pytest.raises(KeyboardInterrupt):
+        with Tracer(tmp_path/'trace.jsonl','run') as tracer: _call(llm,tracer=tracer)
+    events=[json.loads(line) for line in (tmp_path/'llm_requests.jsonl').read_text().splitlines()]
+    assert events[-1]['status']=='INTERRUPTED' and events[-1]['error_type']=='KeyboardInterrupt'
+    spans=read_trace(tmp_path/'trace.jsonl')
+    assert all(s['level']=='ERROR' and s['status_message']=='KeyboardInterrupt' for s in spans)

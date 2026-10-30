@@ -1,0 +1,27 @@
+class cg_system_coverage extends uvm_subscriber #(cg_item);
+  `uvm_component_utils(cg_system_coverage)
+  cg_item observed;
+  int route_event;
+  int unsigned samples;
+  virtual reset_if reset_vif;
+  bit reset_active;
+{{DECLARATIONS}}
+  covergroup interactions;
+    option.per_instance=1;
+    cp_route_activity: coverpoint route_event { {{ROUTE_BINS}} }
+  endgroup
+  function new(string name, uvm_component parent); super.new(name,parent); interactions=new(); endfunction
+  function void flush();
+{{RESET_STATE}}
+  endfunction
+  task run_phase(uvm_phase phase);
+    forever begin @(reset_vif.reset); if(reset_vif.reset==reset_active) flush(); end
+  endtask
+  function void write(cg_item tr);
+    if(!$cast(observed,tr.clone())) `uvm_fatal("SYSTEM_COV_COPY", "transaction copy failed")
+{{ROUTE_SAMPLING}}
+  endfunction
+  function void report_phase(uvm_phase phase);
+    `uvm_info("SYSTEM_COVERAGE", $sformatf("samples=%0d coverage=%0.2f", samples,interactions.get_inst_coverage()), UVM_LOW)
+  endfunction
+endclass

@@ -92,3 +92,23 @@ def test_bad_or_missing_template_is_a_clear_error(spec_repo, tmp_path, monkeypat
     bad.write_text(json.dumps({"template_id": "x", "sections": [{"id": "a", "generator": "entries"}]}))
     assert main(["testplan", "--out", str(out), "--template", str(bad)]) == 2
     assert "needs string id and heading" in capsys.readouterr().err
+
+
+def test_invalid_mode_is_rejected(spec_repo, tmp_path, monkeypatch, capsys):
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    monkeypatch.setenv("DV_AGENT_MODE", "turbo")
+    assert main(["build-graph", "--out", str(out)]) == 2
+    assert "mode must be one of" in capsys.readouterr().err
+
+
+def test_fast_build_graph_marks_mode(spec_repo, tmp_path, capsys):
+    import json
+
+    out = tmp_path / "run"
+    run_ingest(spec_repo, out)
+    assert main(["build-graph", "--out", str(out), "--llm", "off", "--mode", "fast"]) == 0
+    stats = json.loads((out / "build_stats.json").read_text())
+    assert stats["mode"] == "fast" and stats["slim_index"]["status"] == "PASS"
+    assert (out / "slim_index.json").is_file()
+    assert "--mode fast" in capsys.readouterr().err

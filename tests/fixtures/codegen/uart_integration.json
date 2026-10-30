@@ -1,0 +1,9 @@
+{
+  "description": "Explicit UART acceptance-fixture wiring configuration; not a claim extracted from the UART specification. Review this integration configuration before using it on another design.",
+  "statement": "The acceptance fixture selects DATA_BUS_WIDTH_8, drives wb_clk_i with a 10 ns testbench clock, binds wb_rst_i as active high, and ties unused wb_sel_i and modem inputs cts_pad_i, dsr_pad_i, ri_pad_i and dcd_pad_i to zero.",
+  "defines": ["DATA_BUS_WIDTH_8"],
+  "clock": "wb_clk_i",
+  "reset": "wb_rst_i",
+  "reset_active": "high",
+  "tie_offs": ["wb_sel_i", "cts_pad_i", "dsr_pad_i", "ri_pad_i", "dcd_pad_i"]
+}

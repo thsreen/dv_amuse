@@ -78,8 +78,10 @@ makes one `requirement_dependencies` call per entity group, inferring
 `DEPENDS_ON` / `CONSTRAINS` / `REFINES` / `CONFLICTS_WITH` edges, each
 requiring a verbatim evidence quote from an endpoint requirement and stored
 as `status=INFERRED`. Skipped entirely in `--llm off` (structural graph
-only). Known gap: extraction still drops rejected quotes instead of using
-the repair loop (review P2).
+only). `--workers N` / `DV_AGENT_MAX_WORKERS` (1-4, default 1) fetches chunk
+and group calls concurrently; the main thread still applies results in order,
+so the merged graph is identical to sequential. Known gap: extraction still
+drops rejected quotes instead of using the repair loop (review P2).
 
 ## 6. `community.py` — Stage 2c: community summaries (no LLM)
 

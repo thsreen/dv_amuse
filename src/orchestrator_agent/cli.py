@@ -44,8 +44,9 @@ def _models_for(mode: str):
         if mode == "on":
             raise UsageError("LLM mode is 'on' but MODEL_API_KEY is not set")
         return None, None
-    llm = MetaClient()
-    embedder = MetaEmbedder() if os.getenv("META_EMBED_MODEL", "").strip() else None
+    basic = os.getenv("DV_AGENT_MODE", "full") == "basic"
+    llm = MetaClient(max_attempts=2) if basic else MetaClient()
+    embedder = MetaEmbedder() if not basic and os.getenv("META_EMBED_MODEL", "").strip() else None
     return llm, embedder
 
 
@@ -75,6 +76,8 @@ def _resume_hint(argv: list[str]) -> str:
             continue
         if token.startswith("--approve="):
             continue
+        if token == "--fresh":
+            continue
         parts.append(token)
     return " ".join(parts)
 
@@ -94,6 +97,8 @@ def _main(argv: list[str] | None) -> int:
     parser = argparse.ArgumentParser(prog="orchestrate-agent")
     parser.add_argument("--llm", choices=LLM_MODES,
                         help="model use for the interactive terminal (default: auto)")
+    parser.add_argument("--mode", choices=("full", "fast", "basic"),
+                        help="basic: lexical RAG demo; skips requirement/dependency extraction")
     sub = parser.add_subparsers(dest="cmd", required=False)
 
     pr = sub.add_parser("run", help="execute a flow file step by step")
@@ -115,8 +120,11 @@ def _main(argv: list[str] | None) -> int:
     pr.add_argument("--approve", action="append", default=[],
                     help="approved step id(s), comma-separated (repeatable)")
     pr.add_argument("--llm", choices=LLM_MODES, help="auto (default), on, or off")
+    pr.add_argument("--mode", choices=("full", "fast", "basic"), default=argparse.SUPPRESS)
     pr.add_argument("--dry-run", action="store_true", help="resolve and guard every step, run nothing")
     pr.add_argument("--force", action="store_true", help="rerun stages even if outputs exist")
+    pr.add_argument("--fresh", action="store_true",
+                    help="clear cached/derived state in --out first, then rerun (refuses foreign dirs)")
 
     pv = sub.add_parser("validate", help="check a flow file without running it")
     pv.add_argument("--flow", type=Path, required=True)
@@ -125,6 +133,8 @@ def _main(argv: list[str] | None) -> int:
     ps.add_argument("--out", type=Path, required=True)
 
     args = parser.parse_args(args_list)
+    if args.mode:
+        os.environ["DV_AGENT_MODE"] = args.mode
     if args.cmd is None:
         from .repl import repl
         return repl(llm_mode=args.llm)
@@ -158,9 +168,18 @@ def _main(argv: list[str] | None) -> int:
         print(json.dumps(shown, indent=2, default=str))
         return 0
 
-    from .runner import run_flow
+    from .runner import reset_out_dir, run_flow
     if not args.flow.is_file():
         raise UsageError(f"flow file not found: {args.flow}")
+    force = args.force
+    if args.fresh:
+        try:
+            cleared = reset_out_dir(args.out)
+        except ValueError as exc:
+            raise UsageError(str(exc))
+        print(f"fresh: cleared {len(cleared)} entr{'y' if len(cleared) == 1 else 'ies'} "
+              f"from {args.out}", file=sys.stderr)
+        force = True
     variables: dict = {"include": list(args.include),
                        "rtl_files": list(args.rtl_files),
                        "rtl_graph_files": list(args.rtl_graph_files or args.rtl_files), "scope": args.scope}
@@ -184,7 +203,7 @@ def _main(argv: list[str] | None) -> int:
     llm, embedder = _models_for(_llm_mode(args.llm))
     result = run_flow(args.flow, out_dir=args.out, variables=variables, llm=llm,
                       embedder=embedder, approvals=_parse_approvals(args.approve),
-                      dry_run=args.dry_run, force=args.force,
+                      dry_run=args.dry_run, force=force,
                       resume_hint=_resume_hint(args_list))
     print(json.dumps(result, indent=2, default=str))
     if result["status"] == "PASS":

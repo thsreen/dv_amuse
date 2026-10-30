@@ -269,6 +269,7 @@ def _render(prefix: str, ports: list[dict], clock: str, reset: str | None,
         values["RESET_TEST_RUN"] = "\n".join([
             "      if (reset_control.is_active == UVM_ACTIVE && reset_control.auto_pulse) begin",
             '        reset_seq = reset_pulse_seq::type_id::create("reset_seq");',
+            "        reset_seq.cfg = reset_control;",
             "        reset_seq.start(reset_uvc.sqr);", "      end"])
     defaults = {
         "scoreboard.check": "// TODO: add a reviewed predictor and checks.",

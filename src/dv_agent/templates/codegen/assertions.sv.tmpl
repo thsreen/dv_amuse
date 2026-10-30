@@ -1,0 +1,5 @@
+module {{AGENT}}_assertions({{AGENT}}_if bus);
+  default clocking cb @(posedge bus.clk); endclocking
+  default disable iff (bus.reset == {{RESET_ACTIVE}});
+{{PROPERTIES}}
+endmodule

@@ -3,8 +3,8 @@
 Extracts every interface signal the specification defines and groups signals by the functionality of
 the interface and the type of module it connects to (bus master, interrupt controller, external
 device, clock generator...). Direction is recorded per signal but is not a grouping criterion.
-Signals are checked against the cited specification text; grouping is an interpretation and is
-always INFERRED. Purely specification-driven.
+Signals and individual group properties are classified against cited specification text.
+Direct facts and unambiguous normalizations are DOCUMENTED; additional assumptions are INFERRED.
 """
 import re
 from dataclasses import dataclass, field
@@ -17,9 +17,12 @@ from .llm import LLM, LLMError
 from .progress import emit
 from .repair import default_max_repairs, render_repairs, structured_with_repair
 from .retrieval import RetrievalConfig
-from .testplan_context import chunk_record, fetch_context
+from .testplan_context import chunk_record, fetch_context, fetch_context_slim
 from .trace import Tracer
 from .provenance_badge import badge
+from .evidence_policy import PROVENANCE_RULES, assessment_schema, assessment
+
+GROUP_PROPERTIES = ("name", "function", "category", "protocol", "connected_to", "peer_type", "dut_role", "is_sideband")
 
 CATEGORIES = ["bus", "serial_data", "flow_control", "interrupt", "clock", "reset", "sideband",
               "debug", "test", "power", "other"]
@@ -69,13 +72,16 @@ class InterfaceConfig:
 
 
 def interface_chunks(G: nx.MultiDiGraph, H: nx.Graph, scope: str, cfg: InterfaceConfig,
-                     dense_fn: Callable[[str], dict] | None = None) -> list[dict]:
+                     dense_fn: Callable[[str], dict] | None = None, slim=None) -> list[dict]:
     chunks: dict[str, dict] = {}
     for q in cfg.queries:
         query = " ".join(q.replace("{scope}", scope).split())
         if not query:
             continue
-        b = fetch_context(G, query, cfg=cfg.retrieval, H=H, dense=dense_fn(query) if dense_fn else None)
+        if slim is not None:
+            b = fetch_context_slim(slim, query, top_k=cfg.max_chunks)
+        else:
+            b = fetch_context(G, query, cfg=cfg.retrieval, H=H, dense=dense_fn(query) if dense_fn else None)
         for e in b["evidence"]:
             if e["chunk_id"] not in chunks or e["score"] > chunks[e["chunk_id"]]["score"]:
                 chunks[e["chunk_id"]] = e
@@ -104,6 +110,10 @@ def _schema(chunk_ids: list[str]) -> dict:
                           "dut_role": {"type": "string", "enum": DUT_ROLES},
                           "is_sideband": {"type": "boolean"},
                           "signals": {"type": "array", "items": text}, "rationale": text}}
+    grp["required"].append("property_evidence")
+    grp["properties"]["property_evidence"] = {
+        "type": "object", "additionalProperties": False, "required": list(GROUP_PROPERTIES),
+        "properties": {key: assessment_schema() for key in GROUP_PROPERTIES}}
     return {"type": "object", "additionalProperties": False, "required": ["signals", "groups"],
             "properties": {"signals": {"type": "array", "items": sig}, "groups": {"type": "array", "items": grp}}}
 
@@ -151,6 +161,13 @@ def _validate_signals(G: nx.MultiDiGraph, raw: list[dict], chunk_ids: set[str]) 
             provenance="DOCUMENTED" if quote else "INFERRED",
             direction_documented=direction_documented, active_level=level, active_level_documented=level_documented,
             width_documented=bool(width and quote and _name_in(quote, width)),
+            documented=dict(name=bool(quote and _name_in(quote, name)),
+                            width=bool(width and quote and _name_in(quote, width)),
+                            direction=direction_documented, active_level=level_documented,
+                            availability=bool(s.get("availability", "").strip()
+                                              and locate_quote(text, s["availability"].strip())),
+                            description=bool(s.get("description", "").strip()
+                                             and locate_quote(text, s["description"].strip()))),
             validation=[] if quote else ["defining quote not found verbatim; name found in chunk"])
     return list(signals.values()), notes
 
@@ -166,7 +183,7 @@ def _direction_summary(sigs: list[dict]) -> str:
     return "both directions"
 
 
-def _validate_groups(raw: list[dict], signals: list[dict]) -> tuple[list[dict], list[str]]:
+def _validate_groups(raw: list[dict], signals: list[dict], sources=None) -> tuple[list[dict], list[str]]:
     by_key = {_key(s["name"]): s for s in signals}
     assigned: set[str] = set()
     groups, notes = [], []
@@ -183,11 +200,15 @@ def _validate_groups(raw: list[dict], signals: list[dict]) -> tuple[list[dict], 
                 members.append(by_key[k])
         if not members:
             continue
+        evidence = {key: assessment(g.get("property_evidence", {}).get(key), sources or
+                                   {m["chunk_id"]: m.get("quote", "") for m in members},
+                                   [m["chunk_id"] for m in members]) for key in GROUP_PROPERTIES}
         groups.append(dict(name=g["name"].strip(), function=g["function"].strip(), category=g["category"],
                            protocol=g["protocol"].strip(), connected_to=g["connected_to"].strip(),
                            peer_type=g["peer_type"], grouping_key=f"{g['category']}|{g['peer_type']}",
                            dut_role=g["dut_role"], is_sideband=bool(g["is_sideband"]),
-                           rationale=g["rationale"].strip(), provenance="INFERRED",
+                           rationale=g["rationale"].strip(), provenance=evidence["name"]["provenance"],
+                           property_evidence=evidence,
                            direction_summary=_direction_summary(members),
                            signals=members, cited_chunk_ids=sorted({m["chunk_id"] for m in members})))
     by_grouping: dict[str, list[str]] = {}
@@ -219,9 +240,9 @@ def interface_problems(G: nx.MultiDiGraph, data: dict, chunk_ids: set[str]) -> l
 
 def extract_interfaces(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer, scope: str = "",
                        cfg: InterfaceConfig | None = None,
-                       dense_fn: Callable[[str], dict] | None = None) -> dict:
+                       dense_fn: Callable[[str], dict] | None = None, slim=None) -> dict:
     cfg = cfg or InterfaceConfig()
-    chunks = interface_chunks(G, H, scope, cfg, dense_fn)
+    chunks = interface_chunks(G, H, scope, cfg, dense_fn, slim)
     chunk_ids = [c["chunk_id"] for c in chunks]
     result = dict(status="PASS", chunk_ids=chunk_ids, signals=[], groups=[], validation=[])
     if not chunks:
@@ -230,14 +251,16 @@ def extract_interfaces(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                                          "pages": c["pages"], "text": c["text"][:cfg.chunk_chars]} for c in chunks])
     emit(f"isolating interfaces from {len(chunks)} chunks with {llm.model}")
     try:
-        out = structured_with_repair(llm, tracer, name="testplan_interfaces", instructions=INTERFACE_INSTRUCTIONS,
+        out = structured_with_repair(llm, tracer, name="testplan_interfaces", instructions=INTERFACE_INSTRUCTIONS + PROVENANCE_RULES
+                                     + "\nFor each group property return property_evidence with its status, supporting quote/chunk_id and inference_reason.",
                                      payload=payload, schema=_schema(chunk_ids),
                                      check=lambda d: interface_problems(G, d, set(chunk_ids)),
                                      max_repairs=cfg.max_repairs)
     except LLMError as exc:
         return result | dict(status="BLOCKED", error=exc.kind)
     signals, sig_notes = _validate_signals(G, out.data.get("signals", []), set(chunk_ids))
-    groups, grp_notes = _validate_groups(out.data.get("groups", []), signals)
+    groups, grp_notes = _validate_groups(out.data.get("groups", []), signals,
+                                       {cid: G.nodes[cid]["text"] for cid in chunk_ids})
     emit(f"interfaces done: {len(signals)} signals in {len(groups)} groups")
     return result | dict(signals=signals, groups=groups, validation=sig_notes + grp_notes, repair=out.summary())
 
@@ -278,25 +301,42 @@ def render(interfaces: dict, heading: str) -> list[str]:
         return lines + [f"**{interfaces['status']}**: {reason}", ""]
     for g in interfaces["groups"]:
         g_ids = [s["chunk_id"] for s in g["signals"] if s.get("chunk_id")]
-        lines += [f"### {g['name']} " + badge(g['provenance'], g_ids, g.get('rationale', '') or
-                                                 "Signals are grouped by inferred function and connected module type."),
-                  f"Function: {g['function']} | Category: {g['category']}{' (sideband)' if g['is_sideband'] else ''} | "
-                  f"Connected module type: {g['peer_type']} ({g['connected_to'] or 'not stated'}) | "
-                  f"Protocol: {g['protocol'] or 'not stated'} | DUT role: {g['dut_role']} | "
-                  f"Signal directions: {g['direction_summary']}", "",
-                  "| Signal | Width | Direction (DUT) | Active level | Availability | Description | Source |",
-                  "|---|---|---|---|---|---|---|"]
+        def status(key):
+            e = g.get("property_evidence", {}).get(key, {})
+            return badge(e.get("provenance", g["provenance"]), e.get("cited_chunk_ids", g_ids),
+                         e.get("inference_reason", g.get("rationale", "")), e.get("quote", ""))
+        lines += [f"### {g['name']} " + status("name"), "",
+                  "<details>", "<summary>ⓘ Interface info</summary>", ""]
+        for key, label in (("function", "Function"), ("category", "Category"),
+                           ("peer_type", "Connected module type"), ("connected_to", "Connected to"),
+                           ("protocol", "Protocol"), ("dut_role", "DUT role"), ("is_sideband", "Sideband")):
+            lines.append(f"- {label}: {g[key] if g[key] != '' else 'not stated'} {status(key)}")
+        directions_documented = all(s["direction_documented"] for s in g["signals"])
+        lines += [f"- Signal directions: {g['direction_summary']} "
+                  + badge("DOCUMENTED" if directions_documented else "INFERRED", g_ids,
+                          "Direction summary includes signal directions not explicitly stated in source."), "",
+                  "</details>", "",
+                  "| Signal | Width | Direction (DUT) | Active level / edge (if applicable) | Availability condition | Description |",
+                  "|---|---|---|---|---|---|"]
         for s in g["signals"]:
             direction = s["direction"] + ("" if s["direction_documented"] else " (not stated)")
             width = (s["width"] or "?") + ("" if s["width_documented"] or not s["width"] else " (not stated)")
             level = s["active_level"].replace("_", " ") + ("" if s["active_level_documented"]
                                                            or s["active_level"] in ("not_applicable", "unknown")
                                                            else " (not stated)")
-            lines.append(f"| {s['name']} | {width} | {direction} | {level} | {s['availability'] or '-'} | "
-                         f"{s['description'].replace('|', '/')} | {s['chunk_id']} p.{s['pages'][0]} "
-                         + badge(s['provenance'], [s['chunk_id']],
-                                 "Signal properties are interpreted from the cited source text.") + " |")
+            if s["active_level"] == "not_applicable":
+                level = "—"
+            lines.append(f"| {s['name']} | {width} | {direction} | {level} | {s['availability'] or 'not specified'} | "
+                         f"{s['description'].replace('|', '/')} |")
         lines.append("")
+        quotes = [(s['name'], s['chunk_id'], s['pages'][0], s.get('quote', ''))
+                  for s in g['signals'] if s.get('quote')]
+        if quotes:
+            lines += ["<details>", "<summary>Specification evidence</summary>", ""]
+            for name, cid, page, quote in quotes:
+                lines += [f"Source: `{name}`, {cid}, p.{page}", ""]
+                lines += ["> " + line for line in quote.splitlines()] + [""]
+            lines += ["</details>", ""]
     lines += [f"> Validation: {v}" for v in interfaces["validation"]]
     lines += render_repairs(interfaces.get("repair"))
     return lines + [""]

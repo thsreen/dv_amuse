@@ -5,6 +5,7 @@ in-process API, and returns a small summary. Heavy payloads stay in the
 artifacts on disk; only file paths and counts enter the orchestrator trace.
 """
 import json
+import os
 from argparse import Namespace
 from dataclasses import dataclass
 from pathlib import Path
@@ -58,6 +59,10 @@ def _dv_out(args: dict, ctx: StepContext) -> Path:
     return Path(args.get("out") or ctx.out_dir / "dv")
 
 
+def _pipeline_mode(args: dict) -> str:
+    return str(args.get("mode") or os.getenv("DV_AGENT_MODE") or "full").strip().lower()
+
+
 def run_dv_ingest(args: dict, ctx: StepContext) -> dict:
     try:
         out = _dv_out(args, ctx)
@@ -76,7 +81,7 @@ def run_dv_build_graph(args: dict, ctx: StepContext) -> dict:
     try:
         out = _dv_out(args, ctx)
         res = dv_pipeline.run_build_graph(out, ctx.llm, embedder=ctx.embedder,
-                                          force=args.get("force", ctx.force))
+                                          force=args.get("force", ctx.force), mode=_pipeline_mode(args))
     except Exception as exc:
         return _failed("dv_build_graph", exc)
     if res.get("llm", {}).get("status") == "BLOCKED":
@@ -90,7 +95,7 @@ def _dv_step(name: str, runner, args: dict, ctx: StepContext, *files: str) -> di
     try:
         out = _dv_out(args, ctx)
         res = runner(out, ctx.llm, scope=_opt_str(args, "scope"),
-                     embedder=ctx.embedder, force=args.get("force", ctx.force))
+                     embedder=ctx.embedder, force=args.get("force", ctx.force), mode=_pipeline_mode(args))
     except Exception as exc:
         return _failed(name, exc)
     if res.get("status") == "BLOCKED":
@@ -124,7 +129,7 @@ def run_dv_testplan(args: dict, ctx: StepContext) -> dict:
             template_path=Path(template) if template else None,
             embedder=ctx.embedder, force=args.get("force", ctx.force),
             rtl_graph_path=Path(rtl_graph) if rtl_graph else None,
-            rtl_scope=_opt_str(args, "rtl_scope"))
+            rtl_scope=_opt_str(args, "rtl_scope"), mode=_pipeline_mode(args))
     except Exception as exc:
         return _failed("dv_testplan", exc)
     sections = ", ".join(f"{s['id']}:{s['status']}" for s in res.get("sections", []))
@@ -236,6 +241,24 @@ def run_rtl_build_graph(args: dict, ctx: StepContext) -> dict:
                 files=_files(out, "rtl_graph.json"), detail=res)
 
 
+def run_rtl_build_spec(args: dict, ctx: StepContext) -> dict:
+    try:
+        from dv_agent.trace import Tracer
+        from rtl_agent.specification import build_specification
+        out = Path(args.get("out") or ctx.out_dir / "rtl_spec")
+        template = _opt_str(args, "template")
+        with Tracer(out / "trace.jsonl", "rtl_build_spec",
+                    input={"graph": str(args["graph"])},
+                    metadata={"model": getattr(ctx.llm, "model", None)}) as tracer:
+            res = build_specification(Path(args["graph"]), out,
+                                      Path(template) if template else None,
+                                      llm=ctx.llm, tracer=tracer)
+    except Exception as exc:
+        return _failed("rtl_build_spec", exc)
+    return dict(status="PASS", summary=f"RTL-derived draft: {res['claims']} inferred claims; RTL engineer review required",
+                files=_files(out, "rtl_derived_spec.json", "doc/rtl_derived_spec.md"), detail=res)
+
+
 def run_rtl_query(args: dict, ctx: StepContext) -> dict:
     try:
         text = _opt_str(args, "text")
@@ -326,6 +349,7 @@ REGISTRY: dict[str, ToolSpec] = {
     "rtl_extract": ToolSpec("rtl", INTERFACE, False, run_rtl_extract),
     "rtl_build_interface": ToolSpec("rtl", INTERFACE, False, run_rtl_build_interface),
     "rtl_build_graph": ToolSpec("rtl", RTL_BEHAVIOR, False, run_rtl_build_graph),
+    "rtl_build_spec": ToolSpec("rtl", RTL_BEHAVIOR, False, run_rtl_build_spec),
     "rtl_query": ToolSpec("rtl", RTL_BEHAVIOR, False, run_rtl_query),
     "uvm_build": ToolSpec("dv", UVM, False, run_uvm_build),
 }

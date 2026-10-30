@@ -5,7 +5,9 @@ failure disables Langfuse for the rest of the run instead of breaking the pipeli
 """
 import json
 import os
+import threading
 import time
+import traceback
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -70,6 +72,7 @@ class Tracer:
         self._root_input = input
         self._root_metadata = metadata or {}
         self._stack: list[str] = []
+        self._lock = threading.Lock()
         self.langfuse_error: str | None = None
         if use_langfuse is None:
             use_langfuse = client is not None or langfuse_configured()
@@ -113,7 +116,14 @@ class Tracer:
     @contextmanager
     def span(self, name: str, *, as_type: str = "span", input: Any = None,
              metadata: dict | None = None, model: str | None = None,
-             _root: bool = False) -> Iterator[Span]:
+             _root: bool = False, _parent: str | None = None) -> Iterator[Span]:
+        """Open a span. Worker threads pass _parent explicitly; sequential callers keep stack-top.
+
+        Stack push/pop and the sink append are locked so parallel spans keep exact
+        parents and the JSONL never interleaves. The Langfuse mirror may flatten
+        worker spans (SDK observation context is per-thread); the local file stays
+        authoritative (D-003).
+        """
         lf_cm, lf_obs = None, None
         if self._lf_client is not None:
             kwargs: dict[str, Any] = dict(name=name, as_type=as_type, input=input, metadata=metadata)
@@ -127,28 +137,34 @@ class Tracer:
                 if lf_obs is None:
                     lf_cm = None
         span_id = getattr(lf_obs, "id", None) or uuid.uuid4().hex[:16]
-        record = dict(trace_id=self.trace_id, span_id=span_id,
-                      parent_id=self._stack[-1] if self._stack else None, name=name, type=as_type,
-                      start_utc=_now(), input=input, metadata=metadata or {})
+        with self._lock:
+            parent_id = _parent if _parent is not None else (self._stack[-1] if self._stack else None)
+            self._stack.append(span_id)
+        record = dict(trace_id=self.trace_id, span_id=span_id, parent_id=parent_id,
+                      name=name, type=as_type, start_utc=_now(), input=input,
+                      metadata=metadata or {})
         if model:
             record["model"] = model
-        self._stack.append(span_id)
         started = time.perf_counter()
         span = Span(self, record, lf_obs)
         try:
             yield span
-        except Exception as exc:
-            span.update(level="ERROR", status_message=type(exc).__name__)
+        except BaseException as exc:
+            span.update(level="ERROR", status_message=type(exc).__name__,metadata={
+                'exception_type':type(exc).__name__, 'stack_frames':[
+                    dict(file=f.filename,line=f.lineno,function=f.name) for f in traceback.extract_tb(exc.__traceback__)[-12:]]})
             raise
         finally:
-            self._stack.pop()
             record["end_utc"] = _now()
             record["duration_ms"] = round((time.perf_counter() - started) * 1000, 1)
             if lf_cm is not None:
                 self._lf_call(lf_cm.__exit__, None, None, None)
-            self.sink.parent.mkdir(parents=True, exist_ok=True)
-            with self.sink.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(record, default=str) + "\n")
+            with self._lock:
+                if span_id in self._stack:
+                    self._stack.remove(span_id)
+                self.sink.parent.mkdir(parents=True, exist_ok=True)
+                with self.sink.open("a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(record, default=str) + "\n")
 
 
 def read_trace(sink: Path, trace_id: str | None = None) -> list[dict]:

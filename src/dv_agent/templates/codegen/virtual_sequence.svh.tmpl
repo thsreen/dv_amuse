@@ -1,0 +1,8 @@
+class {{TEST}}_vseq extends uvm_sequence;
+  `uvm_object_utils({{TEST}}_vseq)
+{{DECLARATIONS}}
+  function new(string name="{{TEST}}_vseq"); super.new(name); endfunction
+  task body();
+{{STAGES}}
+  endtask
+endclass

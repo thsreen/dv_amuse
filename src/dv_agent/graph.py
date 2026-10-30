@@ -50,11 +50,12 @@ def edges_of_type(G: nx.MultiDiGraph, node: str, etypes: set[str], *, out: bool 
 
 
 def build_structure(manifest: Manifest, chunks: list[Chunk]) -> nx.MultiDiGraph:
-    G = nx.MultiDiGraph(schema_version=1, repo=manifest.repo, repo_revision=manifest.repo_revision)
+    G = nx.MultiDiGraph(schema_version=1, repo=manifest.repo, repo_revision=manifest.repo_revision,
+                        source_authority=manifest.source_authority)
     docs = {d.doc_id: d for d in manifest.documents if d.status == "INGESTED"}
     for d in docs.values():
         G.add_node(d.doc_id, layer=3, type="document", title=d.path, path=d.path, kind=d.kind,
-                   sha256=d.sha256, page_offsets=d.page_offsets, text_path=d.text_path)
+                   sha256=d.sha256, page_offsets=d.page_offsets, text_path=d.text_path, authority=d.authority)
     prev: dict[str, str] = {}
     for c in sorted(chunks, key=lambda c: (c.doc_id, c.char_start)):
         parent = c.doc_id

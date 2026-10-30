@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="990" viewBox="0 0 1240 990" font-family="Helvetica, Arial, 'DejaVu Sans', sans-serif">
+<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b4252"/>
+    </marker>
+    <marker id="arrowLLM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5e35b1"/>
+    </marker>
+    <style>
+      .title { font-size: 24px; font-weight: 700; fill: #1f2430; }
+      .sub { font-size: 13px; fill: #4c566a; }
+      .h { font-size: 15px; font-weight: 700; fill: #1f2430; }
+      .hs { font-size: 13px; font-weight: 700; fill: #1f2430; }
+      .t { font-size: 12px; fill: #2e3440; }
+      .ts { font-size: 11px; fill: #2e3440; }
+      .m { font-size: 11px; fill: #4c566a; font-family: Menlo, Consolas, 'DejaVu Sans Mono', monospace; }
+      .lane { font-size: 12px; font-weight: 700; fill: #4c566a; letter-spacing: 1px; }
+      .stage { fill: #eef3fb; stroke: #4a6fa5; stroke-width: 1.5; }
+      .step { fill: #ffffff; stroke: #4a6fa5; stroke-width: 1.2; }
+      .art { fill: #f6f7f9; stroke: #a0a8b6; stroke-width: 1; }
+      .llm { fill: #f1ebfb; stroke: #5e35b1; stroke-width: 1.5; }
+      .check { fill: #fff4e5; stroke: #d9822b; stroke-width: 1.5; }
+      .trace { fill: #e9f6ef; stroke: #2e8b57; stroke-width: 1.5; }
+      .human { fill: #fdecec; stroke: #c0392b; stroke-width: 1.5; }
+      .flow { stroke: #3b4252; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .thin { stroke: #8a93a3; stroke-width: 1; fill: none; stroke-dasharray: 3 3; marker-end: url(#arrow); }
+      .bus { stroke: #5e35b1; stroke-width: 1.1; fill: none; stroke-dasharray: 5 4; }
+      .call { stroke: #5e35b1; stroke-width: 1.1; fill: none; stroke-dasharray: 5 4; marker-end: url(#arrowLLM); }
+      .badge { font-size: 10px; font-weight: 700; fill: #ffffff; }
+    </style>
+  </defs>
+<rect x="0" y="0" width="1240" height="990" fill="#ffffff"/>
+<text x="30" y="40" class="title">Silicon Copilot: system overview</text>
+<text x="30" y="62" class="sub">Three independent agents under one orchestrator. Specifications stay authoritative for intended behavior;</text>
+<text x="30" y="79" class="sub">RTL contributes only wiring facts to code and review-required observations to the plan.</text>
+<text x="30" y="104" class="lane">INPUTS</text>
+<rect x="30" y="114" width="270" height="90" rx="8" class="art"/>
+<text x="44" y="136" class="h">Request and owner</text>
+<text x="44" y="158" class="t">One-sentence ask to the terminal;</text>
+<text x="44" y="175" class="t">reviews and approvals later</text>
+<rect x="30" y="300" width="270" height="90" rx="8" class="art"/>
+<text x="44" y="322" class="h">Specification documents</text>
+<text x="44" y="344" class="t">PDF, DOCX, HTML, MD, text</text>
+<text x="44" y="361" class="t">Feed dv_agent</text>
+<rect x="30" y="406" width="270" height="90" rx="8" class="art"/>
+<text x="44" y="428" class="h">RTL sources</text>
+<text x="44" y="450" class="t">Explicit files, includes, defines</text>
+<text x="44" y="467" class="t">Feed rtl_agent</text>
+<path d="M302,160 L328,160" class="thin"/>
+<text x="330" y="104" class="lane">ORCHESTRATOR</text>
+<rect x="330" y="114" width="880" height="120" rx="8" class="human"/>
+<text x="344" y="136" class="h">orchestrator_agent</text>
+<text x="1144" y="136" class="m" text-anchor="end">tools.py guards.py runner.py</text>
+<rect x="1154" y="123" width="44" height="18" rx="9" fill="#5e35b1"/><text x="1164" y="136" class="badge">LLM</text>
+<text x="344" y="158" class="t">Scans the named repository (read-only), picks a flow, shows the steps in English, then runs them one at a time</text>
+<text x="344" y="175" class="t">Flow JSON fixes the order, budgets and never-do list; a bounded model decider may revisit, skip optional, or stop</text>
+<text x="344" y="192" class="t">Any budget stop, timeout, guard violation or review gate returns to the owner with a review file and resume command</text>
+<text x="344" y="209" class="t">Terminal commands: /plan  /code  /run  /regress, with live stage dashboard</text>
+<text x="330" y="262" class="lane">AGENTS (each independent, one-way data flow)</text>
+<rect x="330" y="272" width="270" height="222" rx="8" class="stage"/>
+<text x="344" y="294" class="h">dv_agent</text>
+<rect x="544" y="281" width="44" height="18" rx="9" fill="#5e35b1"/><text x="554" y="294" class="badge">LLM</text>
+<text x="344" y="316" class="t">Ingest and chunk</text>
+<text x="344" y="333" class="t">3-layer evidence graph</text>
+<text x="344" y="350" class="t">Hybrid Graph-RAG retrieval</text>
+<text x="344" y="367" class="t">Interfaces, registers, strategy</text>
+<text x="344" y="384" class="t">Template-driven test plan</text>
+<text x="344" y="401" class="t">Every statement cited and tagged</text>
+<text x="344" y="418" class="t">Opt-in: RTL observations</text>
+<rect x="640" y="272" width="270" height="222" rx="8" class="stage"/>
+<text x="654" y="294" class="h">rtl_agent</text>
+<text x="654" y="316" class="t">Port and parameter extraction</text>
+<text x="654" y="333" class="t">Interface JSON (+ optional SV)</text>
+<text x="654" y="350" class="t">Instance-qualified RTL graph</text>
+<text x="654" y="367" class="t">Clock/reset inferred; crossings</text>
+<text x="654" y="384" class="t">flagged for review</text>
+<text x="654" y="401" class="t">Cited graph retrieval</text>
+<text x="654" y="418" class="t">RTL-derived spec draft (INFERRED)</text>
+<rect x="950" y="272" width="260" height="222" rx="8" class="stage"/>
+<text x="964" y="294" class="h">UVM builder</text>
+<rect x="1154" y="281" width="44" height="18" rx="9" fill="#5e35b1"/><text x="1164" y="294" class="badge">LLM</text>
+<text x="964" y="316" class="t">Extendable UVM package</text>
+<text x="964" y="333" class="t">One class per file</text>
+<text x="964" y="350" class="t">Common clock and reset UVCs</text>
+<text x="964" y="367" class="t">Scoreboard disabled until a</text>
+<text x="964" y="384" class="t">reviewed predictor exists</text>
+<text x="964" y="401" class="t">Optional sequence controls</text>
+<text x="964" y="418" class="t">All output NEEDS_REVIEW</text>
+<path d="M302,345 L328,345" class="thin"/>
+<path d="M302,451 L315,451 L315,380 L328,380" class="thin"/>
+<path d="M465,234 L465,270" class="flow"/>
+<path d="M775,234 L775,270" class="flow"/>
+<path d="M1080,234 L1080,270" class="flow"/>
+<path d="M638,383 L602,383" class="thin"/>
+<path d="M908,383 L948,383" class="thin"/>
+<text x="440" y="512" class="ts"></text>
+<rect x="330" y="534" width="270" height="100" rx="8" class="trace"/>
+<text x="344" y="556" class="h">Test-plan report</text>
+<text x="344" y="578" class="t">testplan_doc.json (provenance)</text>
+<text x="344" y="595" class="t">Markdown (editable) and HTML</text>
+<text x="344" y="612" class="t">Selector viewer, evidence</text>
+<rect x="640" y="534" width="270" height="100" rx="8" class="art"/>
+<text x="654" y="556" class="h">Interface and RTL graph</text>
+<text x="654" y="578" class="t">interface_definition.json</text>
+<text x="654" y="595" class="t">rtl_graph.json</text>
+<text x="654" y="612" class="t">rtl_derived_spec.json / .md</text>
+<rect x="950" y="534" width="260" height="100" rx="8" class="art"/>
+<text x="964" y="556" class="h">Generated testbench</text>
+<text x="964" y="578" class="t">uvm/, common_uvc/, interface</text>
+<text x="964" y="595" class="t">smoke test + tests.json</text>
+<path d="M465,494 L465,532" class="flow"/>
+<path d="M775,494 L775,532" class="flow"/>
+<path d="M1080,494 L1080,532" class="flow"/>
+<text x="330" y="668" class="lane">EXECUTION</text>
+<rect x="330" y="678" width="580" height="100" rx="8" class="stage"/>
+<text x="344" y="700" class="h">Xezim (local simulator)</text>
+<text x="898" y="700" class="m" text-anchor="end">actions.py</text>
+<text x="344" y="722" class="t">Runs the smoke test (compile, clock, reset); /regress runs every manifest test</text>
+<text x="344" y="739" class="t">Result files saved; a missing simulator is BLOCKED, never PASS</text>
+<rect x="950" y="678" width="260" height="100" rx="8" class="stage"/>
+<text x="964" y="700" class="h">E2E ephemeral node</text>
+<text x="964" y="722" class="t">Optional larger machine per run</text>
+<text x="964" y="739" class="t">then stopped so billing ends</text>
+<path d="M1080,634 L1080,676" class="flow"/>
+<path d="M1080,656 L620,656 L620,676" class="flow"/>
+<rect x="330" y="808" width="880" height="80" rx="8" class="human"/>
+<text x="344" y="830" class="h">Human review is authoritative</text>
+<text x="344" y="852" class="t">Designer questions, RTL-engineer observations, unvalidated drafts and generated code all stay NEEDS_REVIEW</text>
+<text x="344" y="869" class="t">No automatic approval path; simulation PASS is never a verification sign-off</text>
+<path d="M620,778 L620,806" class="flow"/>
+<path d="M1080,778 L1080,806" class="flow"/>
+<rect x="30" y="920" width="1180" height="44" rx="8" fill="#fafbfc" stroke="#d8dee9"/>
+<rect x="46" y="934" width="16" height="16" class="stage"/><text x="68" y="947" class="t">component / stage</text>
+<rect x="210" y="934" width="16" height="16" class="art"/><text x="232" y="947" class="t">artifact / data</text>
+<rect x="361" y="934" width="16" height="16" class="llm"/><text x="383" y="947" class="t">model API</text>
+<rect x="472" y="934" width="16" height="16" class="check"/><text x="494" y="947" class="t">check outside the model</text>
+<rect x="675" y="934" width="16" height="16" class="trace"/><text x="697" y="947" class="t">trace / viewer</text>
+<rect x="819" y="934" width="16" height="16" class="human"/><text x="841" y="947" class="t">owner / human decision</text>
+</svg>

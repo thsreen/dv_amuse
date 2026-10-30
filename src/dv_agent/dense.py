@@ -6,6 +6,7 @@ MetaEmbedder calls the Meta embeddings endpoint and is unverified until a key is
 import hashlib
 import json
 import os
+import time
 from pathlib import Path
 from typing import Protocol
 
@@ -64,7 +65,7 @@ class MetaEmbedder:
         if self._client is None:
             import openai
             self._client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url,
-                                         timeout=self.timeout, max_retries=1)
+                                         timeout=self.timeout, max_retries=0)
         return self._client
 
     def embed(self, texts: list[str]) -> np.ndarray:
@@ -78,7 +79,17 @@ class MetaEmbedder:
         emit(f"embedding {len(texts)} texts in {batches} batches with {self.model}")
         for num, i in enumerate(range(0, len(texts), self.batch), 1):
             emit(f"embedding batch [{num}/{batches}]")
-            resp = client.embeddings.create(model=self.model, input=texts[i:i + self.batch])
+            import openai
+            for attempt in range(1, 6):
+                try:
+                    resp = client.embeddings.create(model=self.model, input=texts[i:i + self.batch])
+                    break
+                except (openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError,
+                        openai.InternalServerError):
+                    if attempt == 5:
+                        raise
+                    emit(f"embedding batch [{num}/{batches}] retry {attempt + 1}/5")
+                    time.sleep(2 ** attempt)
             rows += [d.embedding for d in sorted(resp.data, key=lambda d: d.index)]
         arr = np.asarray(rows, dtype=np.float32)
         self.dim = arr.shape[1]

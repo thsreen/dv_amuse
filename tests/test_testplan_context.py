@@ -9,7 +9,8 @@ from dv_agent.llm import FakeLLM
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_context, run_features, run_ingest, run_test_plan
 from dv_agent.planning import PlanConfig
 from dv_agent.retrieval import RetrievalConfig
-from dv_agent.testplan_context import BUNDLE_SCHEMA_VERSION, feature_index, fetch_context, requirement_context
+from dv_agent.testplan_context import (BUNDLE_SCHEMA_VERSION, feature_index, fetch_context, fetch_context_slim,
+                                         requirement_context)
 from dv_agent.trace import read_trace
 
 
@@ -107,3 +108,19 @@ def test_planner_offers_dependency_preconditions_for_citation(built):
     run_test_plan(out, [reload_id], _llm(test_plan_items=capture), PlanConfig(retrieval=RetrievalConfig()))
     assert enable_id in {r["req_id"] for r in seen["requirements"]}
     assert seen["dependencies"][0]["dst"] == enable_id and seen["dependencies"][0]["status"] == "INFERRED"
+
+
+def test_fetch_context_slim_matches_full_bundle_shape(built):
+    from dv_agent.slim_index import build_index, load_index
+
+    out, G = built
+    index = build_index(out)
+    assert load_index(out) is not None
+    full = fetch_context(G, "counter reload value when it reaches zero", max_requirements=1)
+    slim = fetch_context_slim(index, "counter reload value when it reaches zero")
+    assert set(slim) == set(full)
+    assert set(slim["retrieval"]) == set(full["retrieval"])
+    assert set(slim["graph"]) == set(full["graph"])
+    assert slim["evidence"] and set(slim["evidence"][0]) == set(full["evidence"][0])
+    assert slim["requirements"] == [] and slim["dependencies"] == []
+    assert slim["evidence"][0]["via"] == "slim index"

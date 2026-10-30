@@ -1,0 +1,16 @@
+`timescale 1ns/1ps
+module verification_top;
+  import uvm_pkg::*;
+  import {{PACKAGE}}::*;
+  clock_if clock_bus();
+  reset_if reset_bus();
+{{DECLARATIONS}}
+  {{TOP}} dut ({{DUT_CONNECTIONS}});
+{{CHECKERS}}
+  initial begin
+    uvm_config_db #(virtual clock_if)::set(null,"uvm_test_top","clock_vif",clock_bus);
+    uvm_config_db #(virtual reset_if)::set(null,"uvm_test_top","reset_vif",reset_bus);
+{{CONFIG}}
+    run_test("{{DEFAULT_TEST}}");
+  end
+endmodule

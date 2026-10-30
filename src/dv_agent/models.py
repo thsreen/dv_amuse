@@ -15,6 +15,7 @@ class SourceDoc(BaseModel):
     pages: int | None = None
     text_path: str | None = None  # cleaned text artifact; chunk offsets index into it
     page_offsets: list[int] = []  # char offset where each page starts in the cleaned text
+    authority: Literal["DOCUMENTED", "RTL_INFERRED"] = "DOCUMENTED"
 
 
 class Chunk(BaseModel):
@@ -30,6 +31,7 @@ class Chunk(BaseModel):
     char_end: int
     text: str
     text_sha256: str
+    authority: Literal["DOCUMENTED", "RTL_INFERRED"] = "DOCUMENTED"
 
 
 class Manifest(BaseModel):
@@ -38,3 +40,4 @@ class Manifest(BaseModel):
     created_utc: str
     include: list[str] | None = None
     documents: list[SourceDoc]
+    source_authority: Literal["DOCUMENTED", "RTL_INFERRED"] = "DOCUMENTED"

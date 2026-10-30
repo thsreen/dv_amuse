@@ -93,9 +93,10 @@ def pre_tool_check(*, tool: str, args: dict, extra_prompt: str,
     return violations
 
 
-def post_testplan_check(*, doc_path: Path, rtl_used: bool) -> list[str]:
-    """After a passing testplan step: RTL observations must stay unapproved."""
-    if not rtl_used:
+def post_testplan_check(*, doc_path: Path, rtl_used: bool,
+                        expected_authority: str | None = None) -> list[str]:
+    """After a passing plan step, prevent RTL evidence from gaining spec authority."""
+    if not rtl_used and not expected_authority:
         return []
     try:
         doc = json.loads(doc_path.read_text(encoding="utf-8"))
@@ -103,6 +104,21 @@ def post_testplan_check(*, doc_path: Path, rtl_used: bool) -> list[str]:
         return ["NO_RTL_AS_SPEC_AUTHORITY: cannot verify the RTL observations "
                 f"section in {doc_path}; refusing to treat it as reviewed"]
     violations: list[str] = []
+    if expected_authority == "RTL_INFERRED":
+        if doc.get("source_authority") != "RTL_INFERRED":
+            violations.append("NO_RTL_AS_SPEC_AUTHORITY: RTL-derived plan lost its inferred source authority")
+        def check(value):
+            if isinstance(value, list):
+                for item in value:
+                    check(item)
+            elif isinstance(value, dict):
+                if value.get("provenance") == "DOCUMENTED":
+                    violations.append("NO_RTL_AS_SPEC_AUTHORITY: RTL-derived plan contains DOCUMENTED provenance")
+                for item in value.values():
+                    check(item)
+        check(doc.get("sections", []))
+        check(doc.get("registers"))
+        check(doc.get("interfaces"))
     for section in doc.get("sections", []):
         if section.get("generator") != "rtl_observations":
             continue

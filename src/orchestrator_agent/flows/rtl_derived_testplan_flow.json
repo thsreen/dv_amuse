@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "name": "rtl_to_inferred_spec_and_testplan",
+  "description": "Build an inferred, RTL-engineer-review-required specification draft before the verification plan.",
+  "steps": [
+    {"id": "rtl_ports", "tool": "rtl_extract", "agent": "rtl",
+     "description": "Extract the top-level JSON port interface.",
+     "args": {"files": "${rtl_files}", "top": "${rtl_top}", "out": "${out}/rtl", "build": true}},
+    {"id": "rtl_graph", "tool": "rtl_build_graph", "agent": "rtl",
+     "description": "Build the source-backed hierarchy, control, clock and reset graph.",
+     "args": {"files": "${rtl_graph_files}", "top": "${rtl_top}", "out": "${out}/rtl_graph"}},
+    {"id": "rtl_spec", "tool": "rtl_build_spec", "agent": "rtl",
+     "description": "Draft the UART-inspired specification from RTL; every claim is inferred and needs RTL engineer review.",
+     "args": {"graph": "${out}/rtl_graph/rtl_graph.json", "out": "${out}/rtl_spec"}},
+    {"id": "spec_ingest", "tool": "dv_ingest", "agent": "dv",
+     "description": "Ingest the inferred RTL-derived draft while preserving its source authority.",
+     "args": {"repo": "${out}/rtl_spec", "out": "${out}/dv", "include": ["doc/rtl_derived_spec.md"]}},
+    {"id": "spec_graph", "tool": "dv_build_graph", "agent": "dv",
+     "description": "Extract review-required requirements from the inferred draft.",
+     "args": {"out": "${out}/dv"}},
+    {"id": "testplan", "tool": "dv_testplan", "agent": "dv",
+     "description": "Create JSON, Markdown and HTML plans; all draft-derived checks remain inferred.",
+     "args": {"out": "${out}/dv", "scope": "${scope}", "template": "${template:-}",
+              "source_authority": "RTL_INFERRED",
+              "rtl_graph": "${out}/rtl_graph/rtl_graph.json", "rtl_scope": ""}}
+  ],
+  "policy": {"max_attempts_per_step": 2, "max_revisits_per_step": 1,
+             "max_overrides": 3, "max_total_tool_calls": 32,
+             "default_step_timeout_s": 600, "global_timeout_s": 3600,
+             "max_extra_prompt_chars": 2000},
+  "forbidden": [
+    {"id": "NO_RTL_INTO_UVM", "title": "No direct RTL behaviour in UVM", "description": "Use only reviewed plan input for verification code."},
+    {"id": "NO_RTL_AS_SPEC_AUTHORITY", "title": "RTL draft remains inferred", "description": "Unvalidated RTL-derived claims and checks must stay INFERRED and NEEDS_REVIEW."},
+    {"id": "NO_DESIGN_MUTATION", "title": "Read-only RTL inputs", "description": "Write outputs only beneath the run directory."},
+    {"id": "NO_SPEC_FLOW_CONTAMINATION", "title": "Inferred source stays identified", "description": "Spec steps consume the tagged draft, not raw RTL."},
+    {"id": "NO_NEW_TOOLS", "title": "Use named tools only", "description": "The model cannot invent steps."},
+    {"id": "NO_MANDATORY_SKIP", "title": "Do not skip mandatory steps", "description": "All steps run unless owner intervenes."}
+  ]
+}

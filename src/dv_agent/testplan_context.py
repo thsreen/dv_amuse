@@ -174,6 +174,29 @@ def fetch_context(G: nx.MultiDiGraph, topic: str, *, cfg: RetrievalConfig | None
     return bundle
 
 
+def fetch_context_slim(index, topic: str, *, top_k: int = 8,
+                       tracer: Tracer | None = None) -> dict:
+    """Evidence bundle from the deterministic slim index: same keys as _bundle, chunk-only.
+
+    No requirements, dependencies, entities, or communities exist yet in fast mode;
+    requirements materialize per section from verified cited quotes instead.
+    """
+    ranked = index.search(topic, top_k=top_k)
+    evidence = [dict(index.chunks[cid], score=score, source="slim", sources=["slim"],
+                     via="slim index", components={"slim": score},
+                     explanation=f"slim: lexical+mention match for {topic!r}")
+                for cid, score in ranked]
+    bundle = dict(schema_version=BUNDLE_SCHEMA_VERSION, kind="topic", query=topic,
+                  authority="specification", requirements=[], dependency_requirements=[],
+                  dependencies=[], entities=[], evidence=evidence, navigation=[],
+                  open_items=_open_items([], []),
+                  retrieval=dict(seeds={}, dense="NOT_RUN"),
+                  graph=dict(anchors=[], parts=[], owners=[], global_communities=[],
+                             paths=[], path_targets=[], coverage_targets=[], selection="slim"))
+    _trace(tracer, "fetch_context_slim", {"topic": topic}, bundle)
+    return bundle
+
+
 def requirement_context(G: nx.MultiDiGraph, req_id: str, *, cfg: RetrievalConfig | None = None,
                         H: nx.Graph | None = None, dense: dict[str, float] | None = None,
                         max_requirements: int = MAX_REQUIREMENTS, tracer: Tracer | None = None,

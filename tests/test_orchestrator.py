@@ -143,6 +143,48 @@ def test_total_tool_call_budget_bounds_loops(tmp_path):
     assert len(calls) == 1
 
 
+@pytest.mark.parametrize("tool", ["dv_build_graph", "dv_testplan"])
+def test_checkpointed_model_stage_never_starts_timeout_worker(tmp_path, monkeypatch, tool):
+    calls = []
+    def invoke(args, ctx):
+        calls.append(tool)
+        return dict(status="FAIL", summary="bounded API recovery exhausted", files=[])
+    def forbidden_timeout(*args):
+        pytest.fail("checkpointed model stages must not leave a background writer")
+    monkeypatch.setattr(runner, "call_with_timeout", forbidden_timeout)
+    flow = base_flow(steps=[dict(id="model", tool=tool, agent="dv", args={}, max_attempts=1)])
+    result = runner.run_flow(write_flow(tmp_path, flow), out_dir=tmp_path / "run",
+                             variables={}, registry={tool: ToolSpec("dv", SPEC, False, invoke)})
+    assert calls == [tool]
+    assert result["status"] == "NEEDS_REVIEW"
+
+
+def test_basic_mode_uses_150_second_model_timeout(monkeypatch):
+    from orchestrator_agent.cli import _models_for
+    monkeypatch.setenv('MODEL_API_KEY','offline-fixture')
+    monkeypatch.setenv('DV_AGENT_MODE','basic')
+    monkeypatch.delenv('META_REQUEST_TIMEOUT_SECONDS',raising=False)
+    llm,embedder=_models_for('on')
+    assert llm.timeout==150 and llm.max_attempts==2 and embedder is None
+
+
+def test_model_interruption_records_final_result_and_progress_without_dashboard(tmp_path):
+    from dv_agent.progress import emit
+    def interrupted(args,ctx):
+        emit('request diagnostic persisted without dashboard')
+        raise KeyboardInterrupt()
+    flow=base_flow(steps=[dict(id='model',tool='dv_testplan',agent='dv',args={},max_attempts=1)])
+    result=runner.run_flow(write_flow(tmp_path,flow),out_dir=tmp_path/'run',variables={},
+                          registry={'dv_testplan':ToolSpec('dv',SPEC,False,interrupted)})
+    assert result['status']=='NEEDS_REVIEW' and result['steps'][0]['status']=='INTERRUPTED'
+    saved=json.loads((tmp_path/'run/orchestrator_result.json').read_text())
+    assert 'interrupted' in saved['reason']
+    records=[json.loads(line) for line in (tmp_path/'run/orchestrator_trace.jsonl').read_text().splitlines()]
+    assert any(r['event']=='task_progress' for r in records)
+    assert any(r['event']=='tool_interrupted' and r['elapsed_s']>=0 for r in records)
+    assert records[-1]['event']=='run_finish'
+
+
 def test_step_timeout_reverts_to_owner(tmp_path):
     calls = []
     flow = base_flow()
@@ -363,7 +405,7 @@ def test_repl_prompt_previews_english_steps_and_only_four_commands(tmp_path, mon
     assert "--- testplan preview ---" in text
     assert "Read specification files" in text and "Recover registers" in text
     assert "RTL top: chip_top" in text and "ready: yes" in text
-    assert terminal.HELP == "Commands: /plan  /code  /run  /regress  (Ctrl-D to leave)"
+    assert terminal.HELP == "Commands: /plan  /code  /run  /regress  /fresh  (Ctrl-D to leave)"
 
 
 def test_repl_four_commands_run_in_order_without_manual_variables(tmp_path, monkeypatch):
@@ -377,7 +419,7 @@ def test_repl_four_commands_run_in_order_without_manual_variables(tmp_path, monk
         (out_dir / "dv").mkdir(parents=True)
         (out_dir / "dv" / "testplan_doc.json").write_text("{}")
         return dict(status="PASS", reason="done")
-    def fake_code(out_dir, variables):
+    def fake_code(out_dir, variables, **kwargs):
         calls.append(("code", variables))
         return dict(code_dir=str(out_dir / "code"), policy=dict(kept=1, skipped=2),
                     tests=[dict(name="basic_smoke")])
@@ -407,7 +449,7 @@ def test_repl_code_generates_plan_first(tmp_path, monkeypatch):
         (out_dir / "dv" / "testplan_doc.json").write_text("{}")
         return dict(status="PASS", reason="done")
     monkeypatch.setattr(terminal, "run_flow", fake_flow)
-    monkeypatch.setattr(terminal, "build_code", lambda out_dir, variables: called.append("code") or
+    monkeypatch.setattr(terminal, "build_code", lambda out_dir, variables, **kwargs: called.append("code") or
                         dict(code_dir="code", policy=dict(kept=0, skipped=0), tests=[dict(name="basic_smoke")]))
     assert terminal.repl(input_fn=scripted([f"Verify {repo}", "/code"]),
                          output_fn=lambda text: None, llm=object()) == 0
@@ -556,3 +598,210 @@ def test_scan_tokens_counts_usage_and_ignores_deep_trees(tmp_path):
     deep.parent.mkdir(parents=True)
     deep.write_text('{"usage": {"input": 9999, "output": 9999}}\n')
     assert scan_tokens(tmp_path) == {"calls": 1, "input": 10, "output": 3, "cached_input": 0}
+
+
+def _seed_run(out: Path, *, status="NEEDS_REVIEW", reason="step 'testplan' ended FAIL: boom"):
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "orchestrator_result.json").write_text(json.dumps(
+        dict(status=status, reason=reason,
+             steps=[dict(id="spec_ingest", tool="dv_ingest", status="PASS",
+                         attempts=1, revisits=0, summary="ingested 3 chunks"),
+                    dict(id="testplan", tool="dv_testplan", status="FAIL",
+                         attempts=2, revisits=0, summary="boom")])), encoding="utf-8")
+    (out / "orchestrator_review.json").write_text(json.dumps(
+        dict(status="NEEDS_REVIEW", reason=reason, question="Fix the cause, then approve.",
+             pending_step="testplan", violations=["testplan: boom"])), encoding="utf-8")
+
+
+def test_repl_fresh_command_resets_session_to_new_out_dir(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    repo = _prompt_repo(tmp_path)
+    dirs = iter([tmp_path / "run1", tmp_path / "run2"])
+    monkeypatch.setattr(terminal, "_default_out", lambda: next(dirs))
+    shown = []
+    assert terminal.repl(input_fn=scripted([f"Verify {repo}", "/fresh", "/plan"]),
+                         output_fn=shown.append, llm_mode="off") == 0
+    text = "\n".join(shown)
+    assert "Fresh session" in text and str(tmp_path / "run2") in text
+    assert "Name a local repository" in text  # scan/variables were reset
+
+
+def test_repl_fresh_phrase_without_command(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    repo = _prompt_repo(tmp_path)
+    dirs = iter([tmp_path / "run1", tmp_path / "run2"])
+    monkeypatch.setattr(terminal, "_default_out", lambda: next(dirs))
+    shown = []
+    assert terminal.repl(input_fn=scripted([f"Verify {repo}", "start fresh"]),
+                         output_fn=shown.append, llm_mode="off") == 0
+    assert "Fresh session" in "\n".join(shown)
+
+
+def test_repl_explain_summarizes_review(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    out = tmp_path / "run"
+    _seed_run(out)
+    monkeypatch.setattr(terminal, "_default_out", lambda: out)
+    shown = []
+    assert terminal.repl(input_fn=scripted(["why did it fail?"]),
+                         output_fn=shown.append, llm_mode="off") == 0
+    text = "\n".join(shown)
+    assert "boom" in text and "NEEDS_REVIEW" in text and "testplan" in text
+
+
+def test_repl_show_artifact_summarizes_or_points_to_plan(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    out = tmp_path / "run"
+    (out / "dv").mkdir(parents=True)
+    (out / "dv" / "interfaces.json").write_text(json.dumps(
+        dict(groups=[dict(name="bus", signals=[dict(name="clk"), dict(name="rst")])])), encoding="utf-8")
+    monkeypatch.setattr(terminal, "_default_out", lambda: out)
+    shown = []
+    assert terminal.repl(input_fn=scripted(["show interfaces", "show registers"]),
+                         output_fn=shown.append, llm_mode="off") == 0
+    text = "\n".join(shown)
+    assert "bus" in text and "clk" in text
+    assert "not found" in text and "/plan" in text
+
+
+def test_repl_validate_flow_reports_pass_or_problems(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    repo_root = Path(__file__).resolve().parents[1]
+    good = repo_root / "src/orchestrator_agent/flows/default_flow.json"
+    bad = tmp_path / "bad_flow.json"
+    bad.write_text(json.dumps(base_flow(steps=[dict(id="x", tool="nope", agent="dv", args={})])),
+                   encoding="utf-8")
+    monkeypatch.setattr(terminal, "_default_out", lambda: tmp_path / "run")
+    shown = []
+    assert terminal.repl(input_fn=scripted([f"validate {good}", f"validate {bad}", "validate"]),
+                         output_fn=shown.append, llm_mode="off") == 0
+    text = "\n".join(shown)
+    assert "PASS" in text and "unknown tool 'nope'" in text and "usage" in text.lower()
+
+
+def test_repl_status_reports_run_or_missing_result(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    out = tmp_path / "run"
+    _seed_run(out)
+    monkeypatch.setattr(terminal, "_default_out", lambda: out)
+    shown = []
+    assert terminal.repl(input_fn=scripted(["status"]), output_fn=shown.append, llm_mode="off") == 0
+    assert "boom" in "\n".join(shown)
+    shown.clear()
+    assert terminal.repl(input_fn=scripted([f"status of {tmp_path / 'empty'}"]),
+                         output_fn=shown.append, llm_mode="off") == 0
+    assert "no orchestrator result" in "\n".join(shown)
+
+
+def test_repl_rerun_executes_guarded_tool(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    from orchestrator_agent.tools import SPEC, ToolSpec
+    repo = _prompt_repo(tmp_path)
+    out = tmp_path / "run"
+    monkeypatch.setattr(terminal, "_default_out", lambda: out)
+    calls = []
+    def run_registers(args, ctx):
+        calls.append(dict(args))
+        return dict(status="PASS", summary="registers ok", files=[])
+    registry = {"dv_registers": ToolSpec("dv", SPEC, True, run_registers)}
+    shown = []
+    assert terminal.repl(input_fn=scripted([f"Verify {repo}", "rerun registers", "rerun frobnicate"]),
+                         output_fn=shown.append, llm=object(), registry=registry) == 0
+    assert len(calls) == 1 and calls[0]["out"] == str(out / "dv")
+    text = "\n".join(shown)
+    assert "registers ok" in text and "supported reruns" in text
+
+
+def test_run_single_tool_enforces_guards(tmp_path):
+    from orchestrator_agent.runner import run_single_tool
+    from orchestrator_agent.tools import SPEC, ToolSpec
+    out = tmp_path / "run"
+    calls = []
+    def make(name):
+        def stub(args, ctx):
+            calls.append(name)
+            return dict(status="PASS", summary="ok", files=[])
+        return stub
+    registry = {name: ToolSpec("dv", SPEC, False, make(name))
+                for name in ("stub_a", "dv_ingest", "uvm_build")}
+    refused = run_single_tool("nope", {}, out_dir=out, registry=registry)
+    assert refused["status"] == "BLOCKED" and "NO_NEW_TOOLS" in refused["summary"]
+    escaped = run_single_tool("stub_a", {"out": str(tmp_path / "evil")}, out_dir=out, registry=registry)
+    assert escaped["status"] == "BLOCKED" and "NO_DESIGN_MUTATION" in escaped["summary"]
+    dirty = run_single_tool("dv_ingest", {"out": str(out), "rtl_graph": "x"}, out_dir=out, registry=registry)
+    assert dirty["status"] == "BLOCKED" and "NO_SPEC_FLOW_CONTAMINATION" in dirty["summary"]
+    leak = run_single_tool("uvm_build", {"out": str(out), "rtl_excerpts": ["x"]}, out_dir=out,
+                           registry=registry)
+    assert leak["status"] == "BLOCKED" and "NO_RTL_INTO_UVM" in leak["summary"]
+    assert calls == []
+    ok = run_single_tool("stub_a", {"out": str(out)}, out_dir=out, registry=registry)
+    assert ok["status"] == "PASS" and calls == ["stub_a"]
+    trace = (out / "orchestrator_trace.jsonl").read_text(encoding="utf-8")
+    assert "single_tool_start" in trace and "guard_block" in trace
+
+
+def test_reset_out_dir_clears_run_state_and_refuses_foreign_dirs(tmp_path):
+    from orchestrator_agent.runner import reset_out_dir
+    fresh = tmp_path / "new"
+    assert reset_out_dir(fresh) == [] and fresh.is_dir()
+    run = tmp_path / "run"
+    (run / "dv" / "llm_cache").mkdir(parents=True)
+    (run / "dv" / "graph.json").write_text("{}")
+    (run / "orchestrator_result.json").write_text("{}")
+    cleared = reset_out_dir(run)
+    assert run.is_dir() and list(run.iterdir()) == []
+    assert sorted(cleared) == ["dv", "orchestrator_result.json"]
+    foreign = tmp_path / "repo"
+    (foreign / "src").mkdir(parents=True)
+    (foreign / "top.sv").write_text("module top; endmodule")
+    with pytest.raises(ValueError, match="refusing to clear"):
+        reset_out_dir(foreign)
+    assert (foreign / "top.sv").is_file()
+
+
+def test_cli_run_fresh_clears_out_dir_and_forces(tmp_path, monkeypatch, capsys):
+    import orchestrator_agent.runner as runner_mod
+    out = tmp_path / "run"
+    (out / "dv" / "llm_cache").mkdir(parents=True)
+    (out / "orchestrator_review.json").write_text("{}")
+    seen = {}
+    def fake_flow(flow_path, *, out_dir, variables, force=False, **kwargs):
+        seen.update(force=force, out=str(out_dir))
+        return dict(status="PASS", reason="fresh ok")
+    monkeypatch.setattr(runner_mod, "run_flow", fake_flow)
+    code = cli_main(["run", "--flow", str(write_flow(tmp_path, base_flow())),
+                     "--out", str(out), "--fresh", "--llm", "off"])
+    assert code == 0 and seen == {"force": True, "out": str(out)}
+    assert list(out.iterdir()) == []
+    assert "fresh" in capsys.readouterr().err.lower()
+
+
+def test_interpret_routes_intents_and_ignores_repo_lines():
+    from orchestrator_agent.assist import interpret
+    assert interpret("start fresh")["intent"] == "fresh"
+    assert interpret("be fresh.")["intent"] == "fresh"
+    assert interpret("why did the plan fail")["intent"] == "explain"
+    assert interpret("what are the registers?") == dict(intent="show", target="registers")
+    assert interpret("rerun the registers step") == dict(intent="rerun", target="registers")
+    assert interpret("run registers again") == dict(intent="rerun", target="registers")
+    assert interpret("validate /tmp/flow.json") == dict(intent="validate", path="/tmp/flow.json")
+    assert interpret("status") == dict(intent="status", path="")
+    # Repository descriptions and paths fall through to the scan path.
+    assert interpret("Verify /tmp/chip") is None
+    assert interpret("Plan tests for /tmp/chip") is None
+    assert interpret("Make a plan") is None
+    assert interpret("Verify /tmp/run") is None
+    assert interpret("refresh the plan") is None
+    assert interpret("/fresh") is None
+
+
+def test_repl_fresh_twice_same_second_yields_distinct_dirs(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    same = tmp_path / "run"
+    monkeypatch.setattr(terminal, "_default_out", lambda: same)
+    shown = []
+    assert terminal.repl(input_fn=scripted(["start fresh", "start fresh"]),
+                         output_fn=shown.append, llm_mode="off") == 0
+    text = "\n".join(shown)
+    assert f"Fresh session in {same}-2" in text
+    assert f"Fresh session in {same}-3" in text
