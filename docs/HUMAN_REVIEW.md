@@ -204,3 +204,24 @@ DV_AGENT_NOTIFICATION_TRANSPORT=telegram .venv/bin/python -m dv_agent.core.notif
 Only `SENT` with `message_id` confirms Telegram acceptance; it does not prove the
 human read the message. A DNS error means the request did not reach Telegram.
 The test sends one diagnostic message and does not approve or resume generation.
+
+## Receiving the generated testplan on Telegram
+
+When a testplan finishes generating (`/plan`, `dv-agent testplan`, or `dv-agent pipeline --testplan`, with a PASS
+result), `testplan_doc.html` is uploaded as a document to the chat in `DV_HITL_HERMES_TARGET`. The caption names the run
+and states that the plan is generated, not signed off.
+
+- **Opt-out:** `DV_AGENT_SEND_TESTPLAN=0`. Nothing is sent without a configured target.
+- **Confidentiality:** the plan can contain specification excerpts. It goes only to the configured chat; check that chat
+  before enabling it for a confidential design.
+- **Transport:** the Telegram Bot API with the token Hermes already holds (`auto` or `telegram`). The Hermes CLI has no
+  verified file option, so transport `hermes` refuses to send documents rather than guess.
+- **No duplicates:** the delivery is recorded in `dv/notification_testplan.json` with the file's SHA-256. The same content
+  is not sent twice; a revised plan is sent again. An unconfirmed result (`DELIVERY_UNCERTAIN`, for example a timeout) is
+  never retried automatically, because the file may already have arrived. A failure that provably did not reach Telegram
+  is retried the next time the plan is generated.
+- **Failure never affects the run.** The status is only recorded.
+- **Resend on request:** `python -m dv_agent.core.notifications --send-testplan runs/<run>/dv` (exit code 1 unless `SENT`).
+- Only `SENT` with a message ID confirms Telegram accepted the file; it does not prove anyone read it. Files up to 50 MB
+  (Telegram's bot limit) are supported. Delivery has not been exercised against the real Telegram API from this
+  environment; the tests use a mocked transport.

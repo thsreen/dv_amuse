@@ -1,6 +1,7 @@
 """Notification transport is always mocked; no real bot is contacted by tests."""
 import json
 import subprocess
+from pathlib import Path
 import pytest
 from types import SimpleNamespace
 
@@ -149,3 +150,110 @@ def test_fresh_preserves_pending_outbox_and_can_be_repeated(tmp_path):
     (tmp_path/'notification_pipeline.json').write_text('{"status":"QUEUED"}')
     assert clear_run(tmp_path)==['notification_pipeline.json']
     assert clear_run(tmp_path)==[] and (queue/'queued.json').exists()
+
+
+# --- sending the generated testplan HTML ---------------------------------------------------------
+
+def _document_env(monkeypatch, tmp_path, html='<html>plan</html>'):
+    monkeypatch.setenv('DV_HITL_HERMES_TARGET','telegram:123')
+    monkeypatch.setenv('DV_AGENT_SEND_TESTPLAN','1')
+    monkeypatch.setenv('DV_AGENT_NOTIFICATION_TRANSPORT','auto')
+    monkeypatch.setenv('TELEGRAM_BOT_TOKEN','test_private_token')
+    plan=tmp_path/'run'/'dv';plan.mkdir(parents=True)
+    (plan/'testplan_doc.html').write_text(html)
+    return plan
+
+
+def _fake_telegram(monkeypatch,sent,reply=None):
+    class Reply:
+        def __enter__(self): return self
+        def __exit__(self,*a): return False
+        def read(self): return json.dumps(reply or {'ok':True,'result':{'message_id':77}}).encode()
+    def urlopen(request,timeout):
+        sent.append((request.full_url,request.get_header('Content-type'),request.data,timeout));return Reply()
+    monkeypatch.setattr(notifications.urllib.request,'urlopen',urlopen)
+
+
+def test_testplan_html_is_uploaded_as_a_document_with_a_confirmed_message_id(monkeypatch,tmp_path):
+    plan=_document_env(monkeypatch,tmp_path);sent=[]
+    _fake_telegram(monkeypatch,sent)
+    result=notifications.notify_testplan(plan)
+    assert result['status']=='SENT' and result['message_id']==77 and result['file']=='testplan_doc.html'
+    url,content_type,body,timeout=sent[0]
+    assert url=='https://api.telegram.org/bottest_private_token/sendDocument' and content_type.startswith('multipart/form-data; boundary=')
+    assert b'name="chat_id"\r\n\r\n123' in body and b'filename="testplan_doc.html"' in body and b'<html>plan</html>' in body
+    assert b'not signed off' in body and b'Run: run' in body
+    saved=json.loads((plan/'notification_testplan.json').read_text())
+    assert saved['status']=='SENT' and 'token' not in json.dumps(saved) and 'test_private_token' not in json.dumps(saved)
+
+
+def test_same_testplan_is_not_sent_twice_but_a_changed_one_is(monkeypatch,tmp_path):
+    plan=_document_env(monkeypatch,tmp_path);sent=[]
+    _fake_telegram(monkeypatch,sent)
+    assert notifications.notify_testplan(plan)['status']=='SENT'
+    again=notifications.notify_testplan(plan)
+    assert again['status']=='SKIPPED' and 'already delivered' in again['reason'] and len(sent)==1
+    (plan/'testplan_doc.html').write_text('<html>revised</html>')
+    assert notifications.notify_testplan(plan)['status']=='SENT' and len(sent)==2
+
+
+def test_document_delivery_is_off_unconfigured_or_unsafe_by_default_rules(monkeypatch,tmp_path):
+    plan=_document_env(monkeypatch,tmp_path)
+    monkeypatch.setattr(notifications.urllib.request,'urlopen',lambda *a,**k:pytest.fail('must not send'))
+    monkeypatch.setenv('DV_AGENT_SEND_TESTPLAN','0')
+    assert notifications.notify_testplan(plan)['reason']=='testplan delivery disabled'
+    monkeypatch.setenv('DV_AGENT_SEND_TESTPLAN','1');monkeypatch.delenv('DV_HITL_HERMES_TARGET')
+    assert notifications.notify_testplan(plan)['reason']=='no Telegram target configured'
+    monkeypatch.setenv('DV_HITL_HERMES_TARGET','1234:example_secret_token')  # a token is never a destination
+    assert notifications.send_document(plan/'testplan_doc.html')['status']=='CONFIG_ERROR'
+    monkeypatch.setenv('DV_HITL_HERMES_TARGET','telegram:123');monkeypatch.setenv('DV_AGENT_NOTIFICATION_TRANSPORT','hermes')
+    assert 'unverified' in notifications.send_document(plan/'testplan_doc.html')['reason']
+    monkeypatch.setenv('DV_AGENT_NOTIFICATION_TRANSPORT','auto')
+    assert notifications.send_document(plan/'missing.html')['status']=='DELIVERY_FAILED'
+    (plan/'empty.html').write_text('')
+    assert notifications.send_document(plan/'empty.html')['status']=='SKIPPED'
+    (plan/'testplan_doc.html').unlink()
+    assert notifications.notify_testplan(plan)['reason']=='no testplan HTML to send'
+
+
+def test_failed_or_unconfirmed_upload_is_reported_and_only_a_failure_is_retried(monkeypatch,tmp_path):
+    plan=_document_env(monkeypatch,tmp_path)
+    monkeypatch.setattr(notifications.urllib.request,'urlopen',lambda *a,**k:(_ for _ in ()).throw(TimeoutError()))
+    first=notifications.notify_testplan(plan)
+    assert first['status']=='DELIVERY_UNCERTAIN'  # it may have arrived: not resent automatically
+    assert notifications.notify_testplan(plan)['status']=='SKIPPED'
+    import socket,urllib.error
+    (plan/'notification_testplan.json').unlink()
+    monkeypatch.setattr(notifications.urllib.request,'urlopen',lambda *a,**k:(_ for _ in ()).throw(urllib.error.URLError(socket.gaierror())))
+    failed=notifications.notify_testplan(plan)
+    assert failed['status']=='DELIVERY_FAILED' and failed['retry_safe'] is True
+    sent=[];_fake_telegram(monkeypatch,sent)
+    assert notifications.notify_testplan(plan)['status']=='SENT'  # a safe failure is retried on the next run
+
+
+def test_plan_step_and_cli_send_the_html_only_after_a_passing_generation(monkeypatch,tmp_path):
+    from dv_agent.cli import _notify_plan
+    plan=_document_env(monkeypatch,tmp_path);sent=[]
+    _fake_telegram(monkeypatch,sent)
+    blocked={'status':'BLOCKED'}
+    _notify_plan(plan,blocked)
+    assert not sent and 'testplan_notification' not in blocked
+    ok={'status':'PASS'}
+    _notify_plan(plan,ok)
+    assert ok['testplan_notification']=='SENT' and len(sent)==1
+
+
+def test_orchestrator_sends_the_plan_when_the_testplan_step_passes(monkeypatch,tmp_path):
+    from orchestrator_agent import runner
+    from orchestrator_agent.tools import SPEC, ToolSpec
+    plan=tmp_path/'run'/'dv';plan.mkdir(parents=True)
+    (plan/'testplan_doc.json').write_text('{}');(plan/'testplan_doc.html').write_text('<html/>')
+    calls=[]
+    monkeypatch.setattr('dv_agent.core.notifications.notify_testplan',lambda directory,event=None:calls.append(Path(directory)) or {})
+    monkeypatch.setattr(runner.guards,'post_testplan_check',lambda **k:[])
+    flow={'version':1,'name':'t','steps':[{'id':'plan','tool':'dv_testplan','agent':'dv','args':{}}],'policy':{},
+          'forbidden':[{'id':r,'title':t} for r,t in runner.guards.KNOWN_FORBIDDEN.items()]}
+    flow_path=tmp_path/'flow.json';flow_path.write_text(json.dumps(flow))
+    result=runner.run_flow(flow_path,out_dir=tmp_path/'run',variables={},registry={'dv_testplan':ToolSpec(
+        'dv',SPEC,False,lambda args,ctx:dict(status='PASS',summary='ok',files=[str(plan/'testplan_doc.json')]))})
+    assert result['status']=='PASS' and calls==[plan]

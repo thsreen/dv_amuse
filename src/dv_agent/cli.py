@@ -97,6 +97,17 @@ def _save_and_print(obj, save: Path | None) -> None:
     _print(obj)
 
 
+def _notify_plan(out: Path, result: dict) -> None:
+    """Send the generated testplan HTML to Telegram when one is configured; a failure never affects the command."""
+    if result.get("status") != "PASS":
+        return
+    from .core.notifications import notify_testplan
+    sent = notify_testplan(out)
+    result["testplan_notification"] = sent["status"]
+    if sent["status"] != "SKIPPED":
+        emit(f"testplan notification: {sent['status']}")
+
+
 def _print(obj) -> None:
     json.dump(obj, sys.stdout, indent=2, default=str)
     sys.stdout.write("\n")
@@ -430,6 +441,7 @@ def _main(argv: list[str] | None) -> int:
                                   rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope,
                                   mode=_mode(args.mode),
                                   methodology_rules_path=args.methodology_rules)
+        _notify_plan(args.out, result)
         if result.get("reused"):
             emit("testplan done: reused cached document")
         else:
@@ -477,6 +489,7 @@ def _main(argv: list[str] | None) -> int:
                                                   mode=_mode(args.mode),
                                                   methodology_rules_path=args.methodology_rules)
         if args.testplan:
+            _notify_plan(out, result["testplan"])
             result["status"] = result["testplan"]["status"]
             emit(f"pipeline {result['status']}")
         else:

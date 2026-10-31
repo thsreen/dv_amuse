@@ -420,6 +420,9 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
                     pending=step_id, approvals_needed=[step_id],
                     question="RTL observations must stay INFERRED and NEEDS_REVIEW. "
                              "Fix the plan output, then approve the step to run again.")
+            if doc:
+                from dv_agent.core.notifications import notify_testplan
+                notify_testplan(Path(doc).parent, emit)
         if status in ("PASS", "NOT_RUN"):
             if not is_revisit:
                 completed.add(step_id)
