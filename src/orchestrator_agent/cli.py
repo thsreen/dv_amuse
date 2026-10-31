@@ -101,6 +101,8 @@ def _main(argv: list[str] | None) -> int:
                         help="basic (default): lexical RAG demo; graph: model-built knowledge graph")
     parser.add_argument('--quick-testing-auto-approve-inferences',action='store_true',
                         help='QUICK TESTING ONLY: evaluate and auto approve infrastructure inferences in an isolated run; never human sign-off')
+    parser.add_argument('--hitl-demo-pause-seconds',type=float,default=None,
+                        help='Keep review question/response visible before continuing (default 2; 0 disables)')
     sub = parser.add_subparsers(dest="cmd", required=False)
 
     pr = sub.add_parser("run", help="execute a flow file step by step")
@@ -135,6 +137,11 @@ def _main(argv: list[str] | None) -> int:
     ps.add_argument("--out", type=Path, required=True)
 
     args = parser.parse_args(args_list)
+    if args.hitl_demo_pause_seconds is not None:
+        import math
+        if not math.isfinite(args.hitl_demo_pause_seconds) or not 0<=args.hitl_demo_pause_seconds<=60:
+            raise UsageError('--hitl-demo-pause-seconds must be between 0 and 60')
+        os.environ['DV_HITL_DEMO_PAUSE_SECONDS']=str(args.hitl_demo_pause_seconds)
     os.environ['DV_AGENT_QUICK_TEST_AUTO_APPROVE']='1' if args.quick_testing_auto_approve_inferences else '0'
     if args.mode:
         os.environ["DV_AGENT_MODE"] = args.mode

@@ -175,7 +175,12 @@ class ReviewClient:
     def __call__(self, folder, request):
         from .quick_testing import enabled, QuickTestApprover
         if enabled():
-            return QuickTestApprover(self.llm,self.show)(folder,request)
+            return QuickTestApprover(self.llm,self.show,sleep=self.sleep)(folder,request)
+        from .review_display import presentation
+        with presentation():
+            return self._human_review(folder,request)
+
+    def _human_review(self, folder, request):
         timeout=_seconds('DV_HITL_USER_TIMEOUT_SECONDS',120)
         from .human_dialogue import format_review, respond
         self.show(format_review(request))
@@ -192,7 +197,10 @@ class ReviewClient:
                                       channel='terminal',reference='terminal:'+utc(),llm=self.llm))
                 except (ValueError,TypeError) as exc:
                     self.show('Clarification needed: '+str(exc))
-                if (folder/'approval.json').exists(): return
+                if (folder/'approval.json').exists():
+                    from .review_display import pause
+                    pause(self.show,sleep=self.sleep)
+                    return
         self.escalate(folder,request)
         deadline=self.clock()+_seconds('DV_HITL_TELEGRAM_WAIT_SECONDS',0)
         while not (folder/'approval.json').exists() and self.clock()<deadline:

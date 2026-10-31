@@ -115,6 +115,7 @@ class Dashboard:
         self._retry_counts = {}
         self._retry_active = set()
         self.active_substep = None
+        self.review_presenting = False
         self._restore_retries()
 
     def _restore_retries(self):
@@ -174,6 +175,14 @@ class Dashboard:
 
     def _handle(self, event: dict) -> None:
         kind = event.get("event")
+        if kind=='review_presentation_start':
+            self.review_presenting=True
+            if self.ansi: self.show('\x1b[2J\x1b[H')
+            return
+        if kind=='review_presentation_end':
+            self.review_presenting=False
+            self.redraw()
+            return
         if kind in ("substep_done", "tool_done", "run_finish"):
             self.elapsed_s = max(0, int(time.monotonic() - self.started))
         if kind=='notification_start':
@@ -297,6 +306,7 @@ class Dashboard:
             self._redraw(kind, event)
 
     def _redraw(self, kind: str | None = None, event: dict | None = None) -> None:
+        if self.review_presenting: return
         if not self.ansi:
             if kind:
                 self.show(self._plain(kind, event or {}))

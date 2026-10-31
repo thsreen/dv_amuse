@@ -322,7 +322,7 @@ test plus plan-named sequences from the interface JSON and optional
 `testplan_doc.json`. Clock is explicit and required; reset needs
 `--reset` + `--reset-active` together (polarity never inferred).
 `write_uvm()` writes the output and copies
-`templates/common_uvc/{clock,reset}/` on every build with a
+`uvc/{clock,reset}/` (fixed UVC library source) on every build with a
 project-specific wiring guide. Optional `--llm on` translates bounded plan
 strategy/configuration/stimulus into constant DUT-input controls only —
 checked against widths, direction and plan citations, manifest stays

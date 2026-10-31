@@ -2,6 +2,7 @@
 import json
 import os
 import shutil
+import time
 from pathlib import Path
 
 ENV = 'DV_AGENT_QUICK_TEST_AUTO_APPROVE'
@@ -42,17 +43,27 @@ def test_item_allowed(plan, item):
 
 
 class QuickTestApprover:
-    def __init__(self, llm, show=print):
+    def __init__(self, llm, show=print, *, sleep=time.sleep):
         self.llm, self.show = llm, show
+        self.sleep=sleep
 
     def __call__(self, folder, request):
+        from .review_display import presentation, pause_seconds
+        pause_seconds()  # reject invalid demo settings before evaluating or recording decisions
+        with presentation():
+            return self._evaluate(folder,request)
+
+    def _evaluate(self, folder, request):
         from .human_review import sha, utc, write, validate_bindings
+        from .human_dialogue import format_review
+        from .review_display import pause, show_response
         from ..core.llm import LLMError
         if not enabled() or not (folder.parents[1]/'quick_testing.json').is_file():
             raise ValueError('Quick-testing auto approval requires an isolated quick-testing run')
         if self.llm is None:
             raise ValueError('Quick-testing inference evaluation requires a configured model')
         self.show(WARNING)
+        self.show(format_review(request))
         schema = dict(type='object', additionalProperties=False,
                       required=['bindings_json', 'reason', 'assumptions'], properties={
                           'bindings_json': dict(type='string'), 'reason': dict(type='string'),
@@ -78,15 +89,22 @@ class QuickTestApprover:
             write(folder/'auto_evaluation.json',dict(status='BLOCKED', test_only=True,
                                                    reason='Inference evaluator returned no valid scoped decision'))
             self.show('Quick-testing evaluation could not resolve this request; it remains pending.')
+            show_response(self.show,request,{},'No valid scoped response was produced.',[],valid=False)
+            pause(self.show,sleep=self.sleep)
             return
         receipt = dict(request_id=request['id'], request_hash=sha(request), nonce=request['nonce'],
                        status='TEST_AUTO_APPROVED', test_only=True, actor='quick-testing-inference-evaluator',
                        channel='quick_testing', reference='quick-testing:'+request['id'], approved_at=utc(),
                        bindings=bindings, reason=data['reason'], assumptions=data['assumptions'], model=self.llm.model)
-        write(folder/'auto_evaluation.json',receipt)
+        response=show_response(self.show,request,bindings,data['reason'],data['assumptions'])
+        from ..core.fsutil import atomic_write_text
+        atomic_write_text(folder/'review_transcript.md',format_review(request,markdown=True)+'\n\n## Generated response (test-only)\n\n'+response+'\n')
+        write(folder/'auto_evaluation.json',dict(receipt,status='EVALUATED_NOT_YET_APPROVED'))
+        pause(self.show,sleep=self.sleep)
         # A distinct status/channel prevents this receipt from impersonating a person.
         import fcntl
         with (folder/'approval.lock').open('a') as handle:
             fcntl.flock(handle,fcntl.LOCK_EX)
             if not (folder/'approval.json').exists(): write(folder/'approval.json',receipt)
+        write(folder/'auto_evaluation.json',receipt)
         self.show('Quick-testing auto approval: '+request['unit']+' — '+data['reason'])

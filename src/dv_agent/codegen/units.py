@@ -139,9 +139,9 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
         if clock.clock==reset.reset: raise ValueError('Clock and reset must differ')
     if render_units:
         with stage('code_common'):
-            for kind in ('clock','reset','common'):
-                for p in sorted((ROOT.parent/'common_uvc'/kind).iterdir()):
-                    if p.suffix in ('.sv','.svh'): save(f'units/{kind}/'+p.name,p.read_text())
+            from ..uvc import COMMON_UVCS, sources
+            for kind in COMMON_UVCS:
+                for p in sources(kind): save(f'units/{kind}/'+p.name,p.read_text())
     else: skip('code_common')
 
     remaining=set(ports)-{clock.clock,reset.reset}

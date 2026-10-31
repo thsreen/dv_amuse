@@ -179,6 +179,10 @@ def _main(argv: list[str] | None) -> int:
     pr.add_argument("--out", type=Path, help="run or runs directory (default with --serve: runs/)")
     pr.add_argument("--serve", action="store_true", help="start a local viewer with a Render testplan button")
     pr.add_argument("--port", type=int, default=8765, help="local viewer port with --serve (default: 8765)")
+    pf=sub.add_parser('review-feedback',help='Apply edited Markdown feedback; report-review completion only')
+    pf.add_argument('--out',type=Path,required=True,help='directory containing testplan_doc.json (usually run/dv)')
+    pf.add_argument('--file',type=Path,required=True,help='edited testplan Markdown')
+    pf.add_argument('--reviewer',required=True,help='human reviewer name')
 
     pa = sub.add_parser("pipeline", help="ingest, build the graph and (optionally) plan in one command")
     pa.add_argument("repo", type=Path)
@@ -412,6 +416,9 @@ def _main(argv: list[str] | None) -> int:
                         mode=_mode(args.mode))
         emit(f"{args.cmd} done: {result['status']}" + (" (reused cached output)" if result.get("reused") else ""))
         _print(result | {"cache_cleared": removed})
+    elif args.cmd == 'review-feedback':
+        from .plan.human_feedback import apply
+        _print(apply(args.out,args.file,args.reviewer))
     elif args.cmd == "render-testplan":
         if args.serve:
             from .report.testplan_viewer import create_report_server

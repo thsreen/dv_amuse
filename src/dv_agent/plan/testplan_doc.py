@@ -1313,7 +1313,8 @@ def render_markdown(doc: dict) -> str:
     from ..report.provenance_badge import source_summaries, source_tip_summaries
     markdown = source_summaries(markdown, doc.get("evidence_index", {}))
     markdown = source_tip_summaries(markdown, doc.get("evidence_index", {}))
-    return markdown + _render_references(markdown, doc.get("evidence_index", {}))
+    from .human_feedback import render as render_feedback
+    return markdown + _render_references(markdown, doc.get("evidence_index", {})) + render_feedback(doc)
 
 
 def _section_provenance(markdown: str, per_item: set[str] = frozenset()) -> str:

@@ -2,7 +2,7 @@
 
 The testbench supplies the clock and the reset. All that generated code needs from the plan is a correct
 binding: which scalar DUT input is the clock, which is the reset, and the reset's active level. Everything
-else comes from the reusable `common_uvc` templates (clock UVC, reset UVC, and the common agent and
+else comes from the reusable UVCs in `dv_agent/uvc/` (clock UVC, reset UVC, and the common agent and
 environment that instantiate both).
 
 Earlier this was two model-driven units per run. Each request carried retrieved evidence, repair feedback

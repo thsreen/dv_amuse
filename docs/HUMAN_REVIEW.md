@@ -225,3 +225,26 @@ and states that the plan is generated, not signed off.
 - Only `SENT` with a message ID confirms Telegram accepted the file; it does not prove anyone read it. Files up to 50 MB
   (Telegram's bot limit) are supported. Delivery has not been exercised against the real Telegram API from this
   environment; the tests use a mocked transport.
+
+## Recording a review demo
+
+Both the generated question and evaluated response (bindings, reasoning and
+assumptions) are printed in the terminal. Dashboard repainting is suspended while
+review is displayed. A static two-second pause follows the response, then generation
+continues if a valid decision exists. The delay is presentation only: it never grants
+human approval. Quick-test responses remain explicitly automated/test-only. Normal
+human review still waits for a real confirmation.
+
+```bash
+.venv/bin/python -m orchestrator_agent \
+  --quick-testing-auto-approve-inferences --hitl-demo-pause-seconds 2
+```
+
+Enter `/code`. Set the pause to 0 to disable it or a value up to 60 seconds to give
+more reading time. `DV_HITL_DEMO_PAUSE_SECONDS` also configures the default. A
+`review_transcript.md` is saved beside an automatic evaluation. Interrupting the
+pause leaves it evaluated but not approved. Cached decisions are reused rather than
+creating artificial new questions. Recorded video can be sped up during model calls
+and left at normal speed for the review; the tool itself does not alter playback.
+
+For editable report completion feedback, see [Markdown feedback](REPORT_FEEDBACK.md).

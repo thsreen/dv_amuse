@@ -1,7 +1,7 @@
 # Common clock and reset: step-by-step flow
 
 Every testbench needs a clock and a reset, and the specification says little about them beyond which input
-is which. The generated testbench therefore reuses fixed templates and needs only a **binding**: the clock
+is which. The generated testbench therefore reuses fixed UVC library sources and needs only a **binding**: the clock
 port, the reset port and its active level. No model call is involved.
 
 ## Why the old flow failed
@@ -22,17 +22,20 @@ repairs that added still more text.
 | 2 | **Clock** | The clock group and the port names | The clock port | only if no port name matches exactly, or several clocks exist |
 | 3 | **Reset** | The reset group, port names and its documented active level | The reset port and `high` or `low` | only if the port is ambiguous or the active level is not documented |
 | 4 | **Timing** | Recorded decisions, if any | Period (default 10 ns), reset duration (default 8 cycles), approved bands (none unless decided) | never; these are testbench settings, not DUT limits |
-| 5 | **Render** | `templates/common_uvc/{clock,reset,common}` | Files copied into `units/` and the generated project | never |
+| 5 | **Copy** | `src/dv_agent/uvc/{clock,reset,common}` (fixed source, not templates) | Files copied unchanged into `units/` and the project's `common_uvc/` | never |
 | 6 | **Validate** | Bindings, facts, plan | Scalar inputs, clock differs from reset, every binding cites a documented plan item or a recorded decision | never |
 
 A missing decision becomes **one question** that names the affected port and lists the candidate ports. Its
 input is a single source quote, so it does not grow. Once answered, the answer is stored in the plan and read
 back; it is never asked again. The dashboard shows two steps for this: *Clock and reset: bind* and *Common UVC*.
 
-## What is generated from templates
+## What is copied from the UVC library
+
+These are fixed SystemVerilog sources with no placeholders. They are copied unchanged; a project changes their
+behavior only through the configuration objects and UVM factory overrides.
 
 ```
-templates/common_uvc/
+src/dv_agent/uvc/
   clock/    clock_if, clock_cfg, clock_driver, clock_monitor, clock_agent, clock_tick, clock_pkg
   reset/    reset_if, reset_cfg, reset_item, reset_sequencer, reset_driver, reset_monitor, reset_agent,
             reset_pulse_seq, reset_pkg
@@ -51,7 +54,7 @@ design's interfaces and package.
 ## Extending it later
 
 Custom UVCs that a testplan needs can be added to `common_agent` (or siblings in `common_env`) without touching
-a test: add the UVC under `templates/common_uvc/`, create it in `common_agent.build_phase` with its own cfg
+a test: add the UVC under `src/dv_agent/uvc/` (and to `COMMON_UVCS` in `uvc/__init__.py`), create it in `common_agent.build_phase` with its own cfg
 object, and include its package from `common_pkg`. The binding step grows by one step per UVC, each with a small
 fixed input.
 

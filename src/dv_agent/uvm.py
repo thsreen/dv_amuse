@@ -475,7 +475,8 @@ def build_uvm(definition: dict, *, prefix: str | None, clock: str, reset: str | 
     for source in template_files:
         if source.is_file() and source.suffix in (".json", ".tmpl", ".md"):
             artifacts[f"uvm_agent_template/{source.name}"] = source.read_text(encoding="utf-8")
-    common_dir = Path(__file__).resolve().parent / "templates" / "common_uvc"
+    from .uvc import UVC_ROOT
+    common_dir = UVC_ROOT
     for kind in ("clock", "reset"):
         for source in sorted((common_dir / kind).glob("*")):
             if source.suffix not in (".sv", ".svh"):
