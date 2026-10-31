@@ -1,0 +1,53 @@
+`timescale 1ns/1ps
+module verification_top;
+  import uvm_pkg::*;
+  import uart_top_verification_pkg::*;
+  clock_if clock_bus();
+  reset_if reset_bus();
+  wire [0:0] dut_wb_clk_i;
+  wire [0:0] dut_wb_rst_i;
+  wire [2:0] dut_wb_adr_i;
+  wire [7:0] dut_wb_dat_i;
+  wire [7:0] dut_wb_dat_o;
+  wire [0:0] dut_wb_we_i;
+  wire [0:0] dut_wb_stb_i;
+  wire [0:0] dut_wb_cyc_i;
+  wire [0:0] dut_wb_ack_o;
+  wire [3:0] dut_wb_sel_i;
+  wire [0:0] dut_int_o;
+  wire [0:0] dut_stx_pad_o;
+  wire [0:0] dut_srx_pad_i;
+  wire [0:0] dut_rts_pad_o;
+  wire [0:0] dut_cts_pad_i;
+  wire [0:0] dut_dtr_pad_o;
+  wire [0:0] dut_dsr_pad_i;
+  wire [0:0] dut_ri_pad_i;
+  wire [0:0] dut_dcd_pad_i;
+  register_bus_if register_bus_bus(clock_bus.clk, reset_bus.reset);
+  assign dut_wb_adr_i = register_bus_bus.addr;
+  assign dut_wb_dat_i = register_bus_bus.wdata;
+  assign register_bus_bus.rdata = dut_wb_dat_o;
+  assign dut_wb_we_i = register_bus_bus.we;
+  assign dut_wb_stb_i = register_bus_bus.stb;
+  assign dut_wb_cyc_i = register_bus_bus.cyc;
+  assign register_bus_bus.ack = dut_wb_ack_o;
+  serial_link_if serial_link_bus(clock_bus.clk, reset_bus.reset);
+  assign dut_srx_pad_i = serial_link_bus.rx;
+  assign serial_link_bus.tx = dut_stx_pad_o;
+  assign dut_wb_clk_i=clock_bus.clk;
+  assign dut_wb_rst_i=reset_bus.reset;
+  assign dut_wb_sel_i=64'h0;
+  assign dut_cts_pad_i=64'h0;
+  assign dut_dsr_pad_i=64'h0;
+  assign dut_ri_pad_i=64'h0;
+  assign dut_dcd_pad_i=64'h0;
+  uart_top dut (.wb_clk_i(dut_wb_clk_i), .wb_rst_i(dut_wb_rst_i), .wb_adr_i(dut_wb_adr_i), .wb_dat_i(dut_wb_dat_i), .wb_dat_o(dut_wb_dat_o), .wb_we_i(dut_wb_we_i), .wb_stb_i(dut_wb_stb_i), .wb_cyc_i(dut_wb_cyc_i), .wb_ack_o(dut_wb_ack_o), .wb_sel_i(dut_wb_sel_i), .int_o(dut_int_o), .stx_pad_o(dut_stx_pad_o), .srx_pad_i(dut_srx_pad_i), .rts_pad_o(dut_rts_pad_o), .cts_pad_i(dut_cts_pad_i), .dtr_pad_o(dut_dtr_pad_o), .dsr_pad_i(dut_dsr_pad_i), .ri_pad_i(dut_ri_pad_i), .dcd_pad_i(dut_dcd_pad_i));
+  register_bus_assertions register_bus_checks(register_bus_bus);
+  initial begin
+    uvm_config_db #(virtual clock_if)::set(null,"uvm_test_top","clock_vif",clock_bus);
+    uvm_config_db #(virtual reset_if)::set(null,"uvm_test_top","reset_vif",reset_bus);
+    uvm_config_db #(virtual register_bus_if)::set(null,"uvm_test_top","register_bus_vif",register_bus_bus);
+    uvm_config_db #(virtual serial_link_if)::set(null,"uvm_test_top","serial_link_vif",serial_link_bus);
+    run_test("basic_functional");
+  end
+endmodule
