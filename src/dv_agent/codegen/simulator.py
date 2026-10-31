@@ -52,7 +52,7 @@ def command(manifest, capabilities, *, simulate=False, test=None):
     code=Path(manifest['code_dir']).resolve()
     rtl=[str(Path(p).resolve()) for p in manifest['rtl_files']]
     library=Path(capabilities['uvm'])
-    directories={code,code/'common_uvc'/'clock',code/'common_uvc'/'reset',library.parent}
+    directories={code,code/'common_uvc'/'clock',code/'common_uvc'/'reset',code/'common_uvc'/'common',library.parent}
     directories.update(Path(p).parent for p in rtl)
     cmd=[capabilities['binary'],'--simulate' if simulate else '--compile','-s','verification_top']
     for directory in sorted(directories): cmd+=['-I',str(directory)]

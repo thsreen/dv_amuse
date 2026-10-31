@@ -5,8 +5,8 @@ from ..core.progress import emit_event
 
 STEPS=[
     ('code_selection','Select saved plan and RTL interface'),
-    ('code_clock','Clock: retrieve, pseudocode, implement and validate'),
-    ('code_reset','Reset: retrieve, pseudocode, implement and validate'),
+    ('code_binding','Clock and reset: bind ports, reset level and timing (no model call)'),
+    ('code_common','Common UVC: copy the clock and reset UVCs and the common agent and environment'),
     ('code_interfaces','Identify interface groups'),
     ('code_interface','Each interface: scaffold, assess needs, then build selected infrastructure'),
     ('code_grouping','Group small tasks by interface or feature'),
@@ -46,13 +46,17 @@ def feature_steps(waves,tasks,unit_rows=()):
     for row in unit_rows:
         tid=row['id']
         if not tid.startswith(('foundation_','interface_','collateral_','assessment_')): continue
+        if tid.startswith('foundation_'):
+            # Clock and reset are two fixed steps shared by every design, not one model-driven unit each.
+            if not any(sid=='code_binding' for sid,_ in steps): steps += [STEPS[1],STEPS[2]]
+            continue
         if tid.startswith('interface_') and not any(sid=='code_interfaces' for sid,_ in steps):
             steps.append(('code_interfaces','Identify interface groups'))
         if tid.startswith('assessment_'):
             steps.append(('code_interface_needs:'+tid.removeprefix('assessment_'),'Assess '+row['title']))
             continue
         steps.append(('code_infrastructure:'+tid,'Plan infrastructure '+row['title']))
-        sid='code_clock' if tid=='foundation_clock' else 'code_reset' if tid=='foundation_reset' else ('code_interface_base:' if tid.startswith('interface_') else 'code_interface:')+tid
+        sid=('code_interface_base:' if tid.startswith('interface_') else 'code_interface:')+tid
         steps.append((sid,'Implement and validate '+row['title']))
     if not unit_rows: steps+=STEPS[1:5]
     elif not any(sid=='code_interfaces' for sid,_ in steps): steps.append(('code_interfaces','Identify interface groups'))

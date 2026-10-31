@@ -64,7 +64,7 @@ Basic lexical RAG is the default. Start:
 ```
 
 Then enter `Generate verification collateral for ../baseline_repos/uart16550` and `/plan`.
-Afterward type `/code`. It runs clock, reset, each interface, then individual feature tasks.
+Afterward type `/code`. It binds clock and reset (no model call), then each interface, then individual feature tasks.
 Every unit repeats retrieve → understand/pseudocode → implement → validate → checkpoint.
 After all interface scaffolds, a per-interface assessment selects scaffold-only, utility configuration,
 passive monitoring or a full agent; only the chosen components are built. Decisions and reasons are

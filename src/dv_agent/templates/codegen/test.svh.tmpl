@@ -1,6 +1,8 @@
 class {{TEST}} extends uvm_test;
   `uvm_component_utils({{TEST}})
   cg_env env;
+  common_cfg common_control;
+  common_env common_infra;
   clock_agent clock_uvc;
   reset_agent reset_uvc;
   clock_cfg clock_control;
@@ -10,34 +12,30 @@ class {{TEST}} extends uvm_test;
   function new(string name, uvm_component parent); super.new(name,parent); endfunction
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
-    clock_control=clock_cfg::type_id::create("clock_control");
+    // Clock and reset come from the common environment; only their bindings are project specific.
+    common_control=common_cfg::type_id::create("common_control");
+    clock_control=common_control.clock; reset_control=common_control.reset;
     if(!uvm_config_db #(virtual clock_if)::get(this,"","clock_vif",clock_control.vif)) `uvm_fatal("CLOCK", "clock_vif missing")
     clock_control.period={{CLOCK_PERIOD}}ns;
 {{CLOCK_TIMING_SETUP}}
-    uvm_config_db #(clock_cfg)::set(this,"clock_uvc","cfg",clock_control);
-    clock_uvc=clock_agent::type_id::create("clock_uvc",this);
-    reset_control=reset_cfg::type_id::create("reset_control");
     if(!uvm_config_db #(virtual reset_if)::get(this,"","reset_vif",reset_control.vif)) `uvm_fatal("RESET", "reset_vif missing")
-    reset_control.polarity_set=1; reset_control.active_level={{RESET_ACTIVE}};
-    reset_control.assert_time=clock_control.period * {{RESET_CYCLES}}; reset_control.auto_pulse=0;
-    uvm_config_db #(reset_cfg)::set(this,"reset_uvc","cfg",reset_control);
-    reset_uvc=reset_agent::type_id::create("reset_uvc",this);
+    common_control.bind_reset(reset_control.vif,{{RESET_ACTIVE}},clock_control.period * {{RESET_CYCLES}},0);
+    uvm_config_db #(common_cfg)::set(this,"common_infra","cfg",common_control);
+    common_infra=common_env::type_id::create("common_infra",this);
     env=cg_env::type_id::create("env",this);
 {{BUILD}}
   endfunction
   function void connect_phase(uvm_phase phase);
+    clock_uvc=common_infra.agent.clock_uvc; reset_uvc=common_infra.agent.reset_uvc;
 {{CLOCK_COVERAGE_CONNECT}}
     env.sb.reset_vif=reset_control.vif; env.sb.reset_active={{RESET_ACTIVE}};
     env.sb.minimum_comparisons={{MIN_COMPARISONS}};
 {{SYSTEM_COVERAGE_RESET}}
   endfunction
   task run_phase(uvm_phase phase);
-    reset_pulse_seq reset_seq;
     {{TEST}}_vseq seq;
     phase.raise_objection(this);
-    reset_seq=reset_pulse_seq::type_id::create("reset_seq");
-    reset_seq.cfg=reset_control;
-    reset_seq.start(reset_uvc.sqr);
+    common_infra.agent.apply_reset();
     seq={{TEST}}_vseq::type_id::create("seq");
 {{SEQUENCERS}}
     seq.start(null);

@@ -223,7 +223,8 @@ Live model-generated code from the latest production plan is still unvalidated;
 these results apply to the explicit acceptance contract.
 
 
-The current orchestrator coding flow is ordered and incremental: clock, reset, one interface
+The current orchestrator coding flow is ordered and incremental: clock and reset binding (no model call, see
+[COMMON_UVC_FLOW.md](COMMON_UVC_FLOW.md)), one interface
 at a time, dedicated dependency analysis, then one feature at a time. Each unit repeats
 retrieval, pseudocode, implementation, validation and checkpointing. See
 [the execution and dependency plan](CODE_WORK_PACKAGES.md). `/code` and standalone

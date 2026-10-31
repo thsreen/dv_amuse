@@ -125,9 +125,9 @@ def compact_items(items, plan):
     return packed
 
 
-def design(llm, plan, definition, sources, directory, *, previous=None, feedback=None):
+def design(llm, plan, definition, sources, directory, *, previous=None, feedback=None, top=None):
     from .workplan import design as scoped_design
-    return scoped_design(llm,plan,definition,sources,directory,previous=previous,feedback=feedback)
+    return scoped_design(llm,plan,definition,sources,directory,previous=previous,feedback=feedback,top=top)
 
 
 def review(llm, plan, directory):

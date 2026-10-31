@@ -262,12 +262,13 @@ def render(plan, ports, hooks=None):
         CHECKERS='\n'.join(checker_instances), DEFAULT_TEST=plan.tests[0].id if plan.tests else '',
         CONFIG='\n'.join(f'    uvm_config_db #(virtual {a.id}_if)::set(null,"uvm_test_top","{a.id}_vif",{a.id}_bus);' for a in plan.agents))
     common = ROOT.parent / 'common_uvc'
-    for kind in ('clock', 'reset'):
+    for kind in ('clock', 'reset', 'common'):
         for p in sorted((common/kind).iterdir()):
             if p.suffix in ('.sv', '.svh'):
                 artifacts[f'common_uvc/{kind}/{p.name}'] = p.read_text()
     compile_files = ['common_uvc/clock/clock_if.sv', 'common_uvc/reset/reset_if.sv',
-                     'common_uvc/clock/clock_pkg.sv', 'common_uvc/reset/reset_pkg.sv']
+                     'common_uvc/clock/clock_pkg.sv', 'common_uvc/reset/reset_pkg.sv',
+                     'common_uvc/common/common_pkg.sv']
     compile_files += [f'interfaces/{a.id}_if.sv' for a in plan.agents]
     compile_files += [f'{package}.sv'] + [f'checks/{a.id}_assertions.sv' for a in plan.agents if any(c.agent==a.id for c in plan.checks)] + ['verification_top.sv']
     artifacts['compile.f'] = '\n'.join(compile_files)+'\n'

@@ -89,7 +89,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
         skip(*(sid for sid,label in STEPS[1:8]))
         plan=CodePlan.model_validate(json.loads(Path(contract_path).read_text()))
     elif llm:
-        plan=design(llm,specification,definition,sources,directory)
+        plan=design(llm,specification,definition,sources,directory,top=expected_top)
     else:
         raise ValueError('Functional generation requires an explicit code contract or an enabled model')
     if expected_top and plan.top!=expected_top:
@@ -112,7 +112,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
             if contract_path or not llm or attempt==1: raise
             atomic_write_text(directory/'contract_repair.json',json.dumps(
                 dict(attempt=1,feedback=str(exc),previous_contract=plan.model_dump()),indent=2)+'\n')
-            plan=design(llm,specification,definition,sources,directory,previous=plan.model_dump(),feedback=str(exc))
+            plan=design(llm,specification,definition,sources,directory,previous=plan.model_dump(),feedback=str(exc),top=expected_top)
             if expected_top and plan.top!=expected_top:
                 raise ValueError('Repaired code contract top does not match the selected design')
     if not plan.tests:

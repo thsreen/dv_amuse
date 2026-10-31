@@ -8,6 +8,9 @@ boundaries, seeds, reset duration and monitor-based timing coverage. Both sectio
 retain source citations and inference status. Clock timing is explicitly retrieved
 when generating strategy, implementation plan, stimulus and coverage.
 
+Code generation no longer extracts operating bands with a model; the clock binding step uses a default testbench
+period and takes bands only from an approved review (see [COMMON_UVC_FLOW.md](COMMON_UVC_FLOW.md)).
+
 A clock review can resolve the port, nominal `clock_period_ns` (including fractional
 nanoseconds), or `clock_period_ranges`. The dedicated approval revision now updates
 both strategy and verification plan as well as the audit addendum. Human decisions

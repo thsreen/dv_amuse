@@ -308,7 +308,7 @@ def _document(task, pseudo, independent):
     return '\n'.join(lines)
 
 
-def design(llm, plan, definition, sources, directory, *, previous=None, feedback=None,pseudocode_only=False):
+def design(llm, plan, definition, sources, directory, *, previous=None, feedback=None,pseudocode_only=False,top=None):
     """Generate one foundation and feature fragments, not a whole-document request."""
     if plan.get('source_authority')=='RTL_INFERRED': raise ValueError('Unvalidated RTL-derived expectations are not executable')
     intentions,strategy=inventory(plan)
@@ -524,10 +524,47 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             _facts_in_context(facts,context);validate_facts(facts,plan,sources)
         def save_unit(name,text):
             path=work/name;path.parent.mkdir(parents=True,exist_ok=True);_artifact(path,text)
+        def bind_common():
+            """Clock and reset: small fixed steps, no model call, one owner decision if a binding is missing."""
+            from .common_binding import resolve
+            from .clock_timing import validate_ranges
+            from ..quality.quick_testing import enabled
+            rows=[unit_row('foundation_clock','Clock'),unit_row('foundation_reset','Reset')]
+            for row in rows: row.update(status='RUN',phase='bind');save_execution()
+            try:
+                result=resolve(definition,plan,sources,top=top)
+                _write(work/'common_binding.json',dict(steps=result['steps'],questions=[q['text'] for q in result['questions']]))
+                if result['questions']:
+                    unit=result['questions'][0]['unit']
+                    pending=[q for q in result['questions'] if q['unit']==unit]
+                    kind='clock' if unit=='foundation_clock' else 'reset'
+                    for row in rows:
+                        if row['id']!=unit: row.update(status='PENDING',phase='retrieve');save_execution()
+                    request,receipt=request_review(directory,plan,definition,unit,[q['text'] for q in pending],
+                        dict(source_excerpts=[w for q in pending for w in q['excerpts']],documented_items=[]),
+                        context=dict(understanding=f'The testbench supplies the {kind}; only its binding'+(' and active level' if kind=='reset' else '')+
+                                     ' is needed to generate it from the common UVC templates.',profile=infrastructure_profile(kind)))
+                    from ..plan.approved_clarifications import apply_approval
+                    apply_approval(current_plan_path(directory),request,receipt)
+                    raise PlanUpdated('Approved clarification saved; reload updated plan and resume generation')
+                clock,reset=result['clock'],result['reset']
+                identifier(clock.top)
+                if abs(clock.clock_period_ns*1000-round(clock.clock_period_ns*1000))>1e-6:
+                    raise ValueError('Clock period must be representable at 1ps resolution')
+                for unit in (clock,reset): validate_facts(unit.facts,plan,sources)
+                validate_ranges(clock.clock_period_ranges,clock.facts,test_only=enabled())
+                for row,unit in zip(rows,(clock,reset)):
+                    _write(work/(row['id']+'.implementation.json'),unit.model_dump())
+                    row.update(phase='checkpoint',status='PLANNED' if pseudocode_only else 'PASS');save_execution()
+                return clock,reset
+            except (Exception,KeyboardInterrupt) as exc:
+                for row in rows:
+                    if row['status']=='RUN': row.update(status=getattr(exc,'status','BLOCKED'))
+                save_execution();raise
         try:
             foundation=build_foundation(run_unit,call,definition,evidence,unit_facts,save_unit,
                                        lambda candidate,scope:validate(candidate,plan,scope,sources),
-                                       render_units=not pseudocode_only)
+                                       render_units=not pseudocode_only,bind=bind_common)
         except (Exception,KeyboardInterrupt) as exc:
             execution['status']=getattr(exc,'status','BLOCKED');save_execution()
             work_manifest.update(status=getattr(exc,'status','BLOCKED'),reason=str(exc) if isinstance(exc,ValueError) else type(exc).__name__)

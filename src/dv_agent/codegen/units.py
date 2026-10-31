@@ -118,7 +118,7 @@ class InterfaceUnit(Model):
     questions: list[str] = Field(default_factory=list)
 
 
-def foundation(run_unit, call, definition, evidence, check_facts, save, validate_unit, *, render_units=True):
+def foundation(run_unit, call, definition, evidence, check_facts, save, validate_unit, *, render_units=True, bind):
     """A unit is saved and validated before its successor can start."""
     ports={p['name']:dict(p) for p in definition['ports']}
     for port in ports.values():
@@ -131,31 +131,18 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
         if p.get('direction')!='input' or p.get('width')!=1:
             raise ValueError('Clock/reset must bind an explicit scalar DUT input')
 
-    def clock_check(unit, context):
-        identifier(unit.top);scalar(unit.clock);check_facts(unit.facts,context)
-        if abs(unit.clock_period_ns*1000-round(unit.clock_period_ns*1000))>1e-6:
-            raise ValueError('Clock period must be representable at 1ps resolution')
-        from .clock_timing import validate_ranges
-        from ..quality.quick_testing import enabled
-        validate_ranges(unit.clock_period_ranges,unit.facts,test_only=enabled())
-    clock=run_unit('foundation_clock','Clock','clock port binding and testbench clock source',
-                   ['clock input port clock source'],ClockUnit,clock_check,{},
-                   'Select only the documented DUT clock and top. The generated period is a testbench operational setting.')
+    # Clock and reset are bound deterministically (common_binding), not by two model-driven units.
+    from .events import skip, stage
+    with stage('code_binding'):
+        clock,reset=bind()
+        scalar(clock.clock);scalar(reset.reset)
+        if clock.clock==reset.reset: raise ValueError('Clock and reset must differ')
     if render_units:
-        for p in sorted((ROOT.parent/'common_uvc/clock').iterdir()):
-            if p.suffix in ('.sv','.svh'): save('units/clock/'+p.name,p.read_text())
-
-    def reset_check(unit, context):
-        scalar(unit.reset);check_facts(unit.facts,context)
-        if unit.reset==clock.clock: raise ValueError('Clock and reset must differ')
-    reset=run_unit('foundation_reset','Reset','reset polarity, assertion, release and bounded completion',
-                   ['reset polarity assertion deassertion'],ResetUnit,reset_check,
-                   dict(clock=clock.model_dump(exclude={'facts'})),
-                   'Resolve only reset from its documented contract. Do not infer polarity from its name. '
-                   'Reset cycles are a testbench operational setting; preserve any documented minimum.')
-    if render_units:
-        for p in sorted((ROOT.parent/'common_uvc/reset').iterdir()):
-            if p.suffix in ('.sv','.svh'): save('units/reset/'+p.name,p.read_text())
+        with stage('code_common'):
+            for kind in ('clock','reset','common'):
+                for p in sorted((ROOT.parent/'common_uvc'/kind).iterdir()):
+                    if p.suffix in ('.sv','.svh'): save(f'units/{kind}/'+p.name,p.read_text())
+    else: skip('code_common')
 
     remaining=set(ports)-{clock.clock,reset.reset}
     def inventory_check(result):

@@ -2,8 +2,8 @@
 
 `/code` executes small units in this order:
 
-1. Clock: retrieve its contract, understand it, write pseudocode, create configuration and clock UVC sources, validate and checkpoint.
-2. Reset: repeat that same cycle using the completed clock configuration.
+1. Clock and reset: bound deterministically in small fixed steps (inventory, clock, reset, timing, render, validate) with no model call; the common clock and reset UVCs and the common agent and environment are copied from templates. See [Common clock and reset flow](COMMON_UVC_FLOW.md).
+2. A missing binding (an unmatched clock port, an undocumented reset level) is one question to the owner, answered once.
 3. Identify physical interface groups and classify each as protocol or utility infrastructure. Finish **all interface bases first**: port names, widths, directions, documented roles and SV declarations. Then assess the minimum required infrastructure and build only the selected ownership/protocol configuration, one group at a time. Functional monitor/driver/coverage implementation follows these base checkpoints.
 4. Group remaining verification work by one interface or one feature, at most two related intention pointers per task.
 5. Run a **dedicated dependency analysis**, even for one grouping batch. Record whether each dependency requires execution ordering, extending a base sequence, or typed `p_sequencer` configuration.
@@ -39,7 +39,8 @@ Artifacts are under `<run>/code_work/<fingerprint>/`, indexed by
 | `<feature>.recovery.context.json` | Focused evidence fetch and feedback used for one incomplete-feature repair |
 | `COLLATED_PSEUDOCODE.md`, `.json` | Overall implementation approach, shared setup and ordered feature composition, after incremental implementation |
 | `foundation.json` | Shared bindings assembled from separately validated clock/reset/interface units |
-| `foundation_clock.*`, `foundation_reset.*`, `interface_<id>.*` | Per-unit context, pseudocode, implementation contract and explanation |
+| `common_binding.json`, `foundation_clock.implementation.json`, `foundation_reset.implementation.json` | The binding steps and the resulting clock and reset bindings with their cited facts |
+| `interface_<id>.*` | Per-unit context, pseudocode, implementation contract and explanation |
 | `units/clock/`, `units/reset/`, `units/<interface>/` | Checkpointed reusable UVC/interface sources during generation |
 | `dependency_handling.json` | Dedicated pass: ordering, sequence extension or sequencer controls, with reasons and control names |
 | `execution_plan.json` | Mutable execution queue, common cycle and unit progress |
@@ -148,7 +149,7 @@ need explicit questions; all generated behavior still needs review and subsequen
 
 ## Infrastructure completion is separate from verification completion
 
-Clock, reset, interface declarations and utility/sideband signals use a dedicated prompt and
+Interface declarations and utility/sideband signals use a dedicated prompt and
 `InfrastructurePlan`: understanding, required actions, completion, documented facts, questions
 and essential blockers. This schema has no stimulus/check/coverage sections. It does not inherit
 the functional-contract requirement for a runnable test or scoreboard comparison.

@@ -19,6 +19,15 @@ def inputs(tmp_path):
             "Bus control signals are known during transfers and held stable until acknowledge.")
     item = dict(text=text,provenance='DOCUMENTED',cited_chunk_ids=['CH-spec'],details=[])
     plan = dict(sections=[dict(id='checks',entries=[item])],evidence_index={'CH-spec':dict(excerpt=text)})
+    # A phrase from the spec that feature retrieval does not rank, so these items do not crowd out feature evidence.
+    QUOTE='Acknowledge completes a transfer'
+    def infra(name,category,signal):
+        evidence=dict(provenance='DOCUMENTED',cited_chunk_ids=['CH-spec'],quote=QUOTE,inference_reason='')
+        return dict(name=name,category=category,function='Testbench '+name,cited_chunk_ids=['CH-spec'],property_evidence=dict(function=evidence),
+                    signals=[dict(name=signal,direction='input',active_level='high',active_level_documented=True,
+                                  quote=QUOTE,chunk_id='CH-spec')])
+    # The testbench-supplied clock and reset the binding step reads (names match the JSON ports exactly).
+    plan['interfaces']=dict(status='PASS',groups=[infra('timebase','clock','tick'),infra('initialisation','reset','clear')])
     names={'addr':'index','wdata':'push','rdata':'pull','sel':'lanes','we':'writing','stb':'request','cyc':'cycle','ack':'ready'}
     directions={r:'output' if r in ('rdata','ack') else 'input' for r in names}
     ports=[dict(name='tick',direction='input',width=1),dict(name='clear',direction='input',width=1)]
@@ -137,7 +146,7 @@ def test_model_design_and_review_checkpoint_without_extra_calls(inputs):
     llm=workflow_model(contract)
     for _ in range(2):
         build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[rtl],compile=False)
-    assert [name for name,_ in llm.calls]==['code_infrastructure','code_clock','code_infrastructure','code_reset',
+    assert [name for name,_ in llm.calls]==[
         'code_interfaces','code_infrastructure','code_interface_base','code_interface_needs','code_infrastructure','code_interface','code_grouping','code_dependencies',
         'code_pseudocode','code_feature','code_collation','code_integration','code_review']
     assert (root/'output/contract_review.json').is_file()
@@ -517,7 +526,7 @@ def test_real_uart_simulation_opt_in(tmp_path,monkeypatch):
         crosses=[dict(name='access_format',points=['access','word_length'])])]
     (tmp_path/'code_contract.json').write_text(json.dumps(contract))
     manifest=build_project(tmp_path/'testplan.json',tmp_path/'interface.json',tmp_path/'output',
-                           contract_path=tmp_path/'code_contract.json',rtl_files=list((repo/'rtl/verilog').glob('*.v')))
+                           contract_path=tmp_path/'code_contract.json',rtl_files=list((repo/'rtl/verilog').glob('*.v')),compile=True)  # generation defers compilation by default
     assert manifest['compile']['status']=='PASS'
     result=run_project(manifest,regress=True,timeout=60)
     assert result['status']=='PASS', [(t['name'],t['reason'],t['log']) for t in result['tests']]
@@ -536,8 +545,7 @@ def test_workflow_emits_real_feature_phases_in_execution_order(inputs):
         build_project(root/'plan.json', root/'interface.json', root/'output',
                       llm=workflow_model(contract), rtl_files=[rtl], compile=False)
     starts = [e['id'] for e in events if e['kind']=='substep_start']
-    assert starts == ['code_infrastructure:foundation_clock','code_clock',
-        'code_infrastructure:foundation_reset','code_reset','code_interfaces',
+    assert starts == ['code_binding','code_common','code_interfaces',
         'code_infrastructure:interface_control','code_interface_base:interface_control',
         'code_interface_needs:control','code_infrastructure:collateral_control','code_interface:collateral_control',
         'code_grouping','code_dependencies','code_pseudocode:storage_feature',
@@ -721,26 +729,34 @@ def test_clock_reset_and_two_interfaces_use_identical_sequential_cycle(inputs):
     assert all(r['cycle']==execution['cycle'] for r in execution['steps'] if not r['id'].startswith('assessment_'))
     assert (work/'units/clock/clock_if.sv').is_file()
     assert (work/'units/reset/reset_if.sv').is_file()
+    assert (work/'units/common/common_env.svh').is_file() and (work/'units/common/common_agent.svh').is_file()
     for agent in ('control','auxiliary'):
         assert (work/f'units/{agent}/uvm/{agent}_driver.svh').is_file()
         assert (work/f'units/{agent}/uvm/{agent}_monitor.svh').is_file()
     names=[n for n,p in llm.calls]
-    assert names.index('code_clock')<names.index('code_reset')<names.index('code_interface_base')<names.index('code_interface')<names.index('code_grouping')
+    assert 'code_clock' not in names and 'code_reset' not in names  # clock and reset are bound without the model
+    assert names.index('code_interface_base')<names.index('code_interface')<names.index('code_grouping')
     assert names.count('code_dependencies')==1
     assert (work/'dependency_handling.json').is_file()
 
 
-def test_clock_failure_stops_before_reset_and_preserves_execution_checkpoint(inputs):
+
+def test_missing_clock_binding_waits_for_one_decision_and_preserves_the_checkpoint(inputs):
     from dv_agent.codegen.workplan import design
+    from dv_agent.quality.human_review import HumanReviewPending
     root,spec,definition,contract,_=inputs
-    llm=workflow_model(contract,code_clock=lambda p:dict(top='peripheral',clock='not_a_port',facts=contract['facts']))
-    with pytest.raises(ValueError,match='scalar DUT input'):
+    spec.pop('interfaces')  # nothing says which input is the clock
+    llm=workflow_model(contract)
+    with pytest.raises(HumanReviewPending):
         design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
-    assert not any(n in ('code_reset','code_interfaces','code_grouping') for n,p in llm.calls)
+    assert llm.calls==[]  # no model call for clock/reset, and nothing after them started
     manifest=json.loads((root/'output/code_work_manifest.json').read_text())
     execution=json.loads((Path(manifest['work_dir'])/'execution_plan.json').read_text())
-    assert execution['status']=='BLOCKED' and execution['steps'][0]['status']=='BLOCKED'
+    assert execution['steps'][0]['id']=='foundation_clock' and execution['steps'][0]['status']=='WAITING_HUMAN'
     assert execution['steps'][1]['status']=='PENDING'
+    request=json.loads(next((root/'output/human_review').glob('*/request.json')).read_text())
+    assert request['unit']=='foundation_clock' and len(request['blockers'])==1
+    assert 'tick' in request['blockers'][0] and 'clear' in request['blockers'][0]  # the candidates, nothing else
 
 
 def test_code_build_defers_simulator_by_default(inputs,monkeypatch):
@@ -823,6 +839,7 @@ def test_dedicated_dependency_pass_drives_sequence_extension_and_controls(inputs
     assert calls.index(('code_feature','base_access')) < calls.index(('code_pseudocode','configured_access'))
 
 
+
 def test_infrastructure_prompt_and_schema_do_not_require_functional_verification(inputs):
     from dv_agent.codegen.workplan import design
     root,spec,definition,contract,_=inputs
@@ -830,7 +847,7 @@ def test_infrastructure_prompt_and_schema_do_not_require_functional_verification
     original=llm._call
     seen=[]
     def call(name,instructions,payload,schema):
-        if name in ('code_infrastructure','code_clock','code_reset','code_interface_base','code_interface'):
+        if name in ('code_infrastructure','code_interface_base','code_interface'):
             assert 'Each test must observe at least one scoreboard comparison' not in instructions
             assert 'current infrastructure unit' in instructions
             if name=='code_infrastructure':
@@ -839,17 +856,11 @@ def test_infrastructure_prompt_and_schema_do_not_require_functional_verification
                 seen.append(payload['profile'])
         return original(name,instructions,payload,schema)
     llm._call=call
-    original_plan=llm.handlers['code_infrastructure']
-    def minimal(payload):
-        result=original_plan(payload)
-        result['questions']=['DUT sampling edge is not documented; resolve before protocol monitoring']
-        return result
-    llm.handlers['code_infrastructure']=minimal
     result=design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
-    assert result.clock=='tick' and {p['kind'] for p in seen}>={'clock','reset','protocol','collateral'}
+    assert result.clock=='tick' and {p['kind'] for p in seen}>={'protocol','collateral'}
     work=Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])
-    clock=json.loads((work/'foundation_clock.pseudocode.json').read_text())
-    assert clock['actions'] and clock['questions'] and 'check_steps' not in clock
+    binding=json.loads((work/'common_binding.json').read_text())
+    assert [s['id'] for s in binding['steps']]==['inventory','clock','reset','timing'] and binding['questions']==[]
     assert (work/'base_interfaces/control_if.sv').is_file()
 
 
@@ -880,23 +891,22 @@ def test_all_interface_bases_precede_collateral_and_utility_does_not_need_monito
     assert not (work/'units/status_observation').exists()
 
 
-def test_clock_scoreboard_blocker_is_repaired_with_infrastructure_scope(inputs):
+
+def test_clock_and_reset_are_bound_without_any_model_call_from_small_fixed_steps(inputs):
     from dv_agent.codegen.workplan import design
     root,spec,definition,contract,_=inputs
-    llm=workflow_model(contract);normal=llm.handlers['code_infrastructure'];seen=[]
-    def answer(payload):
-        result=normal(payload)
-        if payload['task']['id']=='foundation_clock':
-            seen.append(payload)
-            if len(seen)==1: result['blockers']=['No runnable clock oracle or scoreboard route']
-            else:
-                assert 'no scoreboard' in payload['repair_feedback']
-                assert payload['profile']['kind']=='clock'
-                result['questions']=['Sampling edge deferred to protocol behavior']
-        return result
-    llm.handlers['code_infrastructure']=answer
+    llm=workflow_model(contract)
+    def forbidden(payload):
+        assert payload['task']['id'] not in ('foundation_clock','foundation_reset'),'clock/reset must not reach the model'
+        return normal(payload)
+    normal=llm.handlers['code_infrastructure'];llm.handlers['code_infrastructure']=forbidden
     result=design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
-    assert result.clock=='tick' and len(seen)==2
+    assert (result.clock,result.reset,result.reset_active,result.clock_period_ns,result.reset_cycles)==('tick','clear','high',10,8)
+    work=Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])
+    clock=json.loads((work/'foundation_clock.implementation.json').read_text())
+    assert clock['clock']=='tick' and clock['facts'][0]['plan_pointer']=='/interfaces/groups/0/property_evidence/function'
+    execution=json.loads((work/'execution_plan.json').read_text())
+    assert [r['status'] for r in execution['steps'][:2]]==['PASS','PASS']
 
 
 def test_interface_assessment_is_required_before_any_collateral(inputs):
@@ -983,59 +993,48 @@ def test_utility_configuration_builds_supported_tieoff_without_uvm_agent(inputs)
     assert not any(a.id=='enable_config' for a in result.agents)
 
 
-def test_basic_ambiguity_waits_for_human_instead_of_failing(inputs):
+
+def test_undocumented_reset_polarity_waits_for_human_instead_of_failing(inputs):
     from dv_agent.quality.human_review import HumanReviewPending
     root,spec,definition,contract,rtl=inputs
-    llm=workflow_model(contract);normal=llm.handlers['code_infrastructure']
-    def ambiguous(payload):
-        result=normal(payload)
-        if payload['task']['id']=='foundation_reset':
-            result['ambiguities']=[dict(kind='reset_polarity',question='Confirm reset active level')]
-        return result
-    llm.handlers['code_infrastructure']=ambiguous
+    spec['interfaces']['groups'][1]['signals'][0].update(active_level='unknown',active_level_documented=False)
+    (root/'plan.json').write_text(json.dumps(spec))
+    llm=workflow_model(contract)
     with pytest.raises(HumanReviewPending):
         build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[rtl])
     state=json.loads((root/'output/code_generation_state.json').read_text())
     assert state['status']=='WAITING_HUMAN'
     assert json.loads((root/'output/code_work_manifest.json').read_text())['status']=='WAITING_HUMAN'
     assert not any(n=='code_interfaces' for n,p in llm.calls)
+    request=json.loads(next((root/'output/human_review').glob('*/request.json')).read_text())
+    assert request['unit']=='foundation_reset' and request['allowed_fields']==['reset','reset_active','reset_cycles']
+    assert 'asserted high (1) or low (0)' in request['blockers'][0]
 
 
-@pytest.mark.parametrize('respect_approval',[True,False])
-def test_human_approval_revises_plan_then_automatically_resumes_code(inputs,respect_approval):
+
+def test_human_approval_revises_plan_then_resumes_and_is_never_asked_again(inputs):
     from dv_agent.quality.human_review import approve,review_handler
     root,spec,definition,contract,rtl=inputs
     spec['sections'][0].update(generator='entries',heading='Checks',status='PASS')
     spec['sections'][0]['entries'][0].update(kind='check',id='storage_check',validation=[],cited_req_ids=[])
+    spec['interfaces']['groups'][1]['signals'][0].update(active_level='unknown',active_level_documented=False)
     (root/'plan.json').write_text(json.dumps(spec))
-    llm=workflow_model(contract);normal=llm.handlers['code_infrastructure']
-    def ambiguous(payload):
-        result=normal(payload)
-        if payload['task']['id']=='foundation_reset' and 'HUMAN-' not in json.dumps(payload['evidence']):
-            result['ambiguities']=[dict(kind='reset_polarity',question='Confirm reset active level')]
-        return result
-    llm.handlers['code_infrastructure']=ambiguous
-    if not respect_approval:
-        original_reset=llm.handlers['code_reset']
-        llm.handlers['code_reset']=lambda p:original_reset(p)|dict(reset_active='low')
+    llm=workflow_model(contract)
     approvals=[]
     def human(folder,request):
         approvals.append(request['id'])
         approve(folder,request['id'],request['nonce'],{'reset_active':'high'},'Design engineer confirmed',
                 actor='designer',channel='terminal',reference='tty:confirmed')
     with review_handler(human):
-        if not respect_approval:
-            with pytest.raises(ValueError,match='honor human-approved'):
-                build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[rtl])
-            assert len(approvals)==1
-            return
         result=build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[rtl])
     assert any(s.startswith('HUMAN-') for s in json.loads((root/'plan.json').read_text())['evidence_index'])
-    assert result['contract']=='verification_codegen_v1' and len(approvals)==1
+    assert result['contract']=='verification_codegen_v1' and len(approvals)==1  # one question, one answer, no loop
     plan=json.loads((root/'plan.json').read_text())
     assert plan['human_approvals'][0]['bindings']=={'reset_active':'high'}
     assert 'Approved by user designer' in (root/'plan.md').read_text()
     assert 'Approved by user designer' in (root/'plan.html').read_text()
+    reset=json.loads(next((root/'output/code_work').glob('*/foundation_reset.implementation.json')).read_text())
+    assert reset['reset_active']=='high' and reset['facts'][-1]['source_id'].startswith('HUMAN-')
 
 
 def test_invalid_fact_ids_are_normalized_everywhere_and_references_follow():
@@ -1062,22 +1061,22 @@ def test_validate_facts_lists_every_bad_identifier_with_the_rule(inputs):
     assert "['A-1', 'C-3']" in str(caught.value) and 'underscores' in str(caught.value)
 
 
-def test_hyphenated_reset_fact_ids_need_no_repair_call_and_the_rename_is_recorded(inputs):
+
+def test_hyphenated_fact_ids_need_no_repair_call_and_the_rename_is_recorded(inputs):
     from dv_agent.codegen.workplan import design
     root,spec,definition,contract,_=inputs
-    llm=workflow_model(contract);normal=llm.handlers['code_infrastructure'];seen=[]
+    llm=workflow_model(contract);normal=llm.handlers['code_pseudocode'];seen=[]
     def answer(payload):
         result=normal(payload)
-        if payload['task']['id']=='foundation_reset':
-            seen.append(payload)
-            for number,fact in enumerate(result['facts'],1): fact['id']=f'F-RST-{number:02d}'
+        seen.append(payload)
+        for number,fact in enumerate(result['facts'],1): fact['id']=f'F-IF-{number:02d}'
         return result
-    llm.handlers['code_infrastructure']=answer
+    llm.handlers['code_pseudocode']=answer
     design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
     assert len(seen)==1 and 'repair_feedback' not in seen[0]  # one call: the ids were normalized, not refused
     context=json.loads((root/'output/code_context.json').read_text())
     renamed=[r['renamed_fact_ids'] for r in context['requests'] if r.get('renamed_fact_ids')]
-    assert renamed and all(new.startswith('F_RST_') for m in renamed for new in m.values())
+    assert renamed and all(new.startswith('F_IF_') for m in renamed for new in m.values())
 
 
 def test_a_refused_answer_returns_with_the_rule_and_its_own_previous_output(inputs):
@@ -1103,3 +1102,21 @@ def test_prompts_state_the_identifier_format_and_how_to_use_repair_feedback():
     from dv_agent.codegen.units import INFRASTRUCTURE_INSTRUCTIONS
     for text in (INSTRUCTIONS,INFRASTRUCTURE_INSTRUCTIONS):
         assert 'never hyphens' in text and 'repair_feedback' in text and 'previous_output' in text
+
+
+def test_generated_testbench_instantiates_the_common_environment_and_compiles_it_first(inputs):
+    result=build(inputs)
+    code=Path(result['code_dir'])
+    for name in ('common_cfg.svh','common_agent.svh','common_env.svh','common_pkg.sv'):
+        assert (code/'common_uvc/common'/name).is_file()
+    test=(code/'tests/basic_functional.svh').read_text()
+    assert 'common_env::type_id::create("common_infra",this)' in test and 'common_control.bind_reset(' in test
+    assert 'clock_agent::type_id::create' not in test and 'reset_agent::type_id::create' not in test  # the common agent owns them
+    assert 'common_infra.agent.apply_reset();' in test and 'reset_pulse_seq::type_id::create' not in test
+    files=(code/'compile.f').read_text().split()
+    assert files.index('common_uvc/reset/reset_pkg.sv')<files.index('common_uvc/common/common_pkg.sv')<files.index(next(f for f in files if f.endswith('verification_top.sv')))
+    assert 'import common_pkg::*;' in (code/'peripheral_verification_pkg.sv').read_text()
+    env=(code/'common_uvc/common/common_env.svh').read_text()
+    assert 'class common_env extends uvm_env' in env and 'common_agent::type_id::create' in env
+    agent=(code/'common_uvc/common/common_agent.svh').read_text()
+    assert 'clock_agent::type_id::create("clock_uvc"' in agent and 'reset_agent::type_id::create("reset_uvc"' in agent
