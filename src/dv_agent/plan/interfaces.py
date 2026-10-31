@@ -17,6 +17,7 @@ from ..core.llm import LLM, LLMError
 from ..core.progress import emit
 from ..quality.repair import default_max_repairs, render_repairs, structured_with_repair
 from ..retrieval.retrieval import RetrievalConfig
+from .interface_roles import INFRASTRUCTURE, group_role
 from .testplan_context import chunk_record, fetch_context, fetch_context_slim
 from ..core.trace import Tracer
 from ..report.provenance_badge import badge, cite_marker
@@ -288,6 +289,10 @@ def interface_questions(interfaces: dict) -> list[dict]:
             if g["category"] in ("reset", "interrupt") and not s["active_level_documented"]:
                 qs.append(f"What is the active level of {s['name']} ({g['name']})? The specification text cited "
                           "does not state whether it is active high or low.")
+            elif group_role(g) == INFRASTRUCTURE and g["category"] == "clock" and not s["active_level_documented"]:
+                # The testbench must supply this clock, so the code stage needs its active edge.
+                qs.append(f"What is the active edge of {s['name']} ({g['name']})? The specification text cited does not "
+                          "state which clock edge the design samples on; the testbench clock source needs it.")
         if g["name"] == UNGROUPED:
             qs.append(f"Which interface do these signals belong to: {', '.join(s['name'] for s in g['signals'])}?")
     return [dict(text=q, kind="question", provenance="INFERRED", cited_req_ids=[], cited_chunk_ids=[],

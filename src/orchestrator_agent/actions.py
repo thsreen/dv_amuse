@@ -150,7 +150,7 @@ def build_code(out: Path, variables: dict, *, llm=None) -> dict:
 
 def run_tests(out: Path, *, regress: bool = False) -> dict:
     state_path=out/'code_generation_state.json'
-    if state_path.is_file() and json.loads(state_path.read_text()).get('status') in ('BLOCKED','BUILDING'):
+    if state_path.is_file() and json.loads(state_path.read_text()).get('status') in ('BLOCKED','BUILDING','WAITING_HUMAN'):
         return dict(status='BLOCKED',reason='Latest code generation did not complete; run /code successfully first',tests=[])
     path = out / CODE_MANIFEST
     if not path.is_file():

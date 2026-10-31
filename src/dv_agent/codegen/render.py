@@ -53,6 +53,16 @@ def render(plan, ports, hooks=None):
     def hook(target, slot):
         return '\n'.join(hooks[h.id] for h in plan.hooks if h.target == target and h.slot == slot and h.id in hooks)
     add("uvm/cg_item.svh", template("item.svh"))
+    if plan.clock_period_ranges:
+        bins=[]
+        for r in plan.clock_period_ranges:
+            bins += [f'      bins {r.name}_min={{{r.min_ps}}};',f'      bins {r.name}_max={{{r.max_ps}}};']
+            if r.nominal_ps is not None: bins += [f'      bins {r.name}_nominal={{{r.nominal_ps}}};']
+            count=r.max_ps-r.min_ps+1
+            for i in range(min(3,count)):
+                lo=r.min_ps+i*count//min(3,count);hi=r.min_ps+(i+1)*count//min(3,count)-1
+                bins += [f'      bins {r.name}_stratum_{i}={{[{lo}:{hi}]}};']
+        add('uvm/cg_clock_coverage.svh',template('clock_coverage.svh',PERIOD_BINS='\n'.join(bins)))
     for a in plan.agents:
         widths = {role: ports[name]['width'] for role, name in a.bindings.items()}
         if a.protocol=='wishbone' and 'sel' not in widths:
@@ -194,6 +204,16 @@ def render(plan, ports, hooks=None):
             SEQUENCER=f'  `uvm_declare_p_sequencer({seq.agent}_sequencer)' if seq.controls else '', OPERATIONS='\n'.join(operations)))
     # Per-test virtual sequences hold typed sequencer handles. They spawn only agent sequences.
     sequences = {s.id: s for s in plan.sequences}
+    timing=[]
+    if plan.clock_period_ranges:
+        first=plan.clock_period_ranges[0]
+        default_ps=first.nominal_ps if first.nominal_ps is not None else (first.min_ps+first.max_ps)//2
+        allowed=' || '.join(f'(cg_clock_period_ps>={r.min_ps} && cg_clock_period_ps<={r.max_ps})' for r in plan.clock_period_ranges)
+        timing=[f'    cg_clock_period_ps={default_ps};',
+                '    void\'($value$plusargs("CLOCK_PERIOD_PS=%d",cg_clock_period_ps));',
+                f'    if(!({allowed})) `uvm_fatal("CLOCK_RANGE", "Selected period is outside approved bands")',
+                '    clock_control.period=real\'(cg_clock_period_ps) * 1ps;',
+                '    $display("CLOCK_PERIOD_SELECTED_PS %0d",cg_clock_period_ps);']
     for test in plan.tests:
         members = [f"  {a.id}_sequencer {a.id}_sqr;" for a in plan.agents if a.active]
         stages = []
@@ -222,7 +242,12 @@ def render(plan, ports, hooks=None):
         for setting in test.sequencer_settings:
             variable=next(v for v in plan.sequencer_variables if v.id==setting.variable)
             handles += [f'    env.{variable.agent}.sqr.{variable.id}={sv(setting.value)};']
+        if plan.clock_period_ranges:
+            test_members += ['  cg_clock_coverage clock_cov;']
         add(f"tests/{test.id}.svh", template('test.svh', TEST=test.id, DECLARATIONS='\n'.join(test_members), BUILD='\n'.join(test_build),
+            CLOCK_TIMING_SETUP='\n'.join(timing+(['    clock_cov=cg_clock_coverage::type_id::create("clock_cov",this);',
+                '    clock_cov.expected_period_ps=cg_clock_period_ps;'] if plan.clock_period_ranges else [])), RESET_CYCLES=plan.reset_cycles,
+            CLOCK_COVERAGE_CONNECT='    clock_uvc.mon.ap.connect(clock_cov.analysis_export);' if plan.clock_period_ranges else '',
             CLOCK_PERIOD=plan.clock_period_ns, RESET_ACTIVE=int(plan.reset_active=='high'), RESET_TIME=plan.clock_period_ns*plan.reset_cycles,
             MIN_COMPARISONS=test.minimum_comparisons, SEQUENCERS='\n'.join(handles),
             SYSTEM_COVERAGE_RESET=(f'    env.system_cov.reset_vif=reset_control.vif; env.system_cov.reset_active={int(plan.reset_active=="high")}; env.system_cov.flush();' if plan.routes else '')))

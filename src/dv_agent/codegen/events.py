@@ -32,7 +32,7 @@ def stage(stage_id,label=None):
         yield result
     except BaseException as exc:
         emit_event('substep_done',id=stage_id,label=label,
-                   status='INTERRUPTED' if isinstance(exc,KeyboardInterrupt) else 'FAIL',error_type=type(exc).__name__)
+                   status=getattr(exc,'status','INTERRUPTED' if isinstance(exc,KeyboardInterrupt) else 'FAIL'),error_type=type(exc).__name__)
         raise
     else: emit_event('substep_done',id=stage_id,label=label,**result)
 

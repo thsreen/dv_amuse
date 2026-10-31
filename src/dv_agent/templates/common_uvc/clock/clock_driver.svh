@@ -7,8 +7,8 @@
     endfunction
 
     virtual task drive_clock();
-      time high_time;
-      time low_time;
+      realtime high_time;
+      realtime low_time;
       cfg.validate();
       cfg.vif.clk = cfg.idle_level;
       forever begin
@@ -17,7 +17,7 @@
           cfg.vif.clk = cfg.idle_level;
           #(cfg.period);
         end else begin
-          high_time = (cfg.period * cfg.duty_cycle_pct) / 100;
+          high_time = $floor((cfg.period / 1ps) * cfg.duty_cycle_pct / 100.0) * 1ps;
           low_time = cfg.period - high_time;
           cfg.vif.clk = 1'b1;
           #(high_time);

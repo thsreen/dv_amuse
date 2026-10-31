@@ -5,6 +5,7 @@ class {{TEST}} extends uvm_test;
   reset_agent reset_uvc;
   clock_cfg clock_control;
   reset_cfg reset_control;
+  longint unsigned cg_clock_period_ps;
 {{DECLARATIONS}}
   function new(string name, uvm_component parent); super.new(name,parent); endfunction
   function void build_phase(uvm_phase phase);
@@ -12,18 +13,20 @@ class {{TEST}} extends uvm_test;
     clock_control=clock_cfg::type_id::create("clock_control");
     if(!uvm_config_db #(virtual clock_if)::get(this,"","clock_vif",clock_control.vif)) `uvm_fatal("CLOCK", "clock_vif missing")
     clock_control.period={{CLOCK_PERIOD}}ns;
+{{CLOCK_TIMING_SETUP}}
     uvm_config_db #(clock_cfg)::set(this,"clock_uvc","cfg",clock_control);
     clock_uvc=clock_agent::type_id::create("clock_uvc",this);
     reset_control=reset_cfg::type_id::create("reset_control");
     if(!uvm_config_db #(virtual reset_if)::get(this,"","reset_vif",reset_control.vif)) `uvm_fatal("RESET", "reset_vif missing")
     reset_control.polarity_set=1; reset_control.active_level={{RESET_ACTIVE}};
-    reset_control.assert_time={{RESET_TIME}}ns; reset_control.auto_pulse=0;
+    reset_control.assert_time=clock_control.period * {{RESET_CYCLES}}; reset_control.auto_pulse=0;
     uvm_config_db #(reset_cfg)::set(this,"reset_uvc","cfg",reset_control);
     reset_uvc=reset_agent::type_id::create("reset_uvc",this);
     env=cg_env::type_id::create("env",this);
 {{BUILD}}
   endfunction
   function void connect_phase(uvm_phase phase);
+{{CLOCK_COVERAGE_CONNECT}}
     env.sb.reset_vif=reset_control.vif; env.sb.reset_active={{RESET_ACTIVE}};
     env.sb.minimum_comparisons={{MIN_COMPARISONS}};
 {{SYSTEM_COVERAGE_RESET}}

@@ -16,10 +16,11 @@ from ..graph.graph_checkpoint import CheckpointLLM
 from ..core.progress import emit, emit_event
 from ..retrieval.retrieval import BM25, tokenize
 from ..core.trace import Tracer
-from .contracts import Model, CodePlan, Fact, Sequence, Route, Check, Hook, Test, CoverageGoal, Register, SequencerVariable, digest, identifier, pointer
+from .contracts import Model, CodePlan, Fact, Sequence, Route, Check, Hook, Test, CoverageGoal, Register, SequencerVariable, digest, identifier, normalize_fact_ids, IDENTIFIER_RULE, pointer
 from .reasoning import INSTRUCTIONS, compact_items, eligible_items, strict_schema
 from .validate import validate,validate_facts
 from .events import stage, skip, feature_steps
+from ..quality.human_review import HumanReviewPending, PlanUpdated, request_review, current_plan_path
 
 
 class Dependency(Model):
@@ -333,8 +334,12 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 emit(f'code work: {name}, {len(json.dumps(payload))} characters'+(' (repair)' if attempt else ''))
                 result=client.structured(name=name,instructions=(INFRASTRUCTURE_INSTRUCTIONS if name in {'code_infrastructure','code_clock','code_reset','code_interfaces','code_interface_base','code_interface','code_interface_needs'} else INSTRUCTIONS)+'\n'+rules,payload=payload,
                                          schema=strict_schema(model),tracer=tracer)
+                renamed=normalize_fact_ids(result.data)
+                if renamed: emit(f'code work: {name}: renamed {len(renamed)} fact id(s) to valid identifiers')
                 try:
                     typed=model.model_validate(result.data);check(typed)
+                except (HumanReviewPending,PlanUpdated):
+                    raise
                 except ValueError as exc:
                     issue=dict(stage=name,attempt=attempt+1,status='BLOCKED' if attempt else 'REPAIR_PENDING',
                                task_id=payload.get('task',{}).get('id'),reason=str(exc),rejected_output=result.data)
@@ -344,10 +349,14 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                     if name in ('code_infrastructure','code_pseudocode'): sid+=':'+payload['task']['id']
                     elif name in ('code_interface','code_interface_base','code_interface_needs','code_feature'): sid+=':'+payload['task_id']
                     emit_event('substep_retry',id=sid,status='FAIL',attempt=attempt+2)
-                    payload=payload|dict(repair_feedback=str(exc))
+                    # The model sees the rule, the refusal and its own refused answer, not just the first bad value.
+                    refused=result.data if len(json.dumps(result.data))<=12000 else None
+                    payload=payload|dict(repair_feedback=str(exc),repair_rules=dict(identifiers=IDENTIFIER_RULE),
+                                         **({'previous_output':refused} if refused is not None else {}))
                     if recover is not None: payload=recover(payload,result.data,str(exc))
                     continue
-                records.append(dict(stage=name,input_chars=len(json.dumps(payload)),cached=result.cached))
+                records.append(dict(stage=name,input_chars=len(json.dumps(payload)),cached=result.cached,
+                                    **({'renamed_fact_ids':renamed} if renamed else {})))
                 if issue:
                     _write(directory/'code_planning_issue.json',issue|dict(status='RECOVERED'))
                 _write(directory/'code_context.json',dict(mode='feature_work_packages',requests=records,
@@ -374,14 +383,14 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                     result=request(name,payload,model,rules,check,recover)
                 except (Exception,KeyboardInterrupt) as exc:
                     if work_manifest is not None:
-                        work_manifest.update(status='BLOCKED',blocked_stage=sid,
+                        work_manifest.update(status=getattr(exc,'status','BLOCKED'),blocked_stage=sid,
                                              reason=str(exc) if isinstance(exc,ValueError) else type(exc).__name__)
                         _write(directory/'code_work_manifest.json',work_manifest)
                     # Unit/feature rows are persisted independently of API checkpoints.
                     if execution:
-                        execution['status']='BLOCKED'
+                        execution['status']=getattr(exc,'status','BLOCKED')
                         for row in execution['steps']:
-                            if row['status']=='RUN': row['status']='BLOCKED'
+                            if row['status']=='RUN': row['status']=getattr(exc,'status','BLOCKED')
                         save_execution()
                     raise
                 if assessment is not None:
@@ -411,7 +420,27 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             return row
         def run_unit(tid,title,goal,queries,model,check,dependencies,rules,scoped=None):
             row=unit_row(tid,title)
-            selected=evidence.fetch(queries,item_limit=8,focus=True)
+            def fetch_unit(queries):
+                context=evidence.fetch(queries,item_limit=8,focus=True)
+                # Human decisions are exact scoped inputs, not merely lexical hints.
+                for approval in plan.get('human_approvals',[])+plan.get('quick_test_approvals',[]):
+                    if approval['unit']!=tid: continue
+                    sid=approval.get('source_id','HUMAN-'+approval['request_id'])
+                    items=[i for i in evidence.items if sid in i['source_ids']]
+                    context['documented_items']=(items+[i for i in context['documented_items'] if i not in items])[:16]
+                    if sid in sources:
+                        text=sources[sid][:1600]
+                        window=dict(source_id=sid,start=0,end=len(text),text=text)
+                        context['source_excerpts']=([window]+[w for w in context['source_excerpts'] if w['source_id']!=sid])[:8]
+                return context
+            selected=fetch_unit(queries)
+            approvals=[a for a in plan.get('human_approvals',[])+plan.get('quick_test_approvals',[]) if a['unit']==tid]
+            approved_bindings={key:value for a in approvals for key,value in a['bindings'].items()}
+            for approval in approvals:
+                if approval['bindings'].get('clock_period_ranges'):
+                    from .clock_timing import reviewed_ranges
+                    approved_bindings['clock_period_ranges']=reviewed_ranges(approval['bindings']['clock_period_ranges'],
+                        approval.get('source_id','HUMAN-'+approval['request_id']),test=approval.get('test_only',False),reason=approval['reason'])
             scope=scoped or definition
             profile=dependencies.get('infrastructure_profile') or infrastructure_profile('clock' if tid=='foundation_clock' else 'reset' if tid=='foundation_reset' else 'utility')
             if tid.startswith('collateral_'):
@@ -419,7 +448,8 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                              deferred=['scoreboard','functional tests','full register map'])
             row['profile']=profile
             task=dict(id=tid,title=title,goal=goal,category='infrastructure',plan_pointers=[],depends_on=[],queries=queries)
-            payload=dict(task=task,evidence=selected,interface=scope,dependencies=dependencies,profile=profile)
+            payload=dict(task=task,evidence=selected,interface=scope,dependencies=dependencies,profile=profile,
+                         approved_bindings=approved_bindings)
             _write(work/(tid+'.context.json'),payload)
             try:
                 row.update(status='RUN',phase='understand_and_pseudocode');save_execution()
@@ -427,15 +457,26 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                     _facts_in_context(p.facts,selected);validate_facts(p.facts,plan,sources)
                     if any(not text.strip() for text in p.actions+p.completion):
                         raise ValueError('Infrastructure needs nonblank actions and bounded completion')
+                    if p.ambiguities:
+                        permitted={'port_binding','clock_timing'} if tid=='foundation_clock' else {'port_binding','reset_polarity'} if tid=='foundation_reset' else {'interface_roles','idle_value','port_binding'}
+                        if any(a.kind not in permitted for a in p.ambiguities):
+                            raise ValueError('Ambiguity type does not belong to this infrastructure unit')
+                        request,receipt=request_review(directory,plan,scope,tid,[a.question for a in p.ambiguities],selected,
+                                                       context=dict(understanding=p.understanding, profile=profile))
+                        from ..plan.approved_clarifications import apply_approval
+                        apply_approval(current_plan_path(directory),request,receipt)
+                        raise PlanUpdated('Approved clarification saved; reload updated plan and resume generation')
+                    if not p.facts:
+                        raise ValueError('Infrastructure actions need supported facts or an explicit human ambiguity')
                     if p.blockers:
-                        raise ValueError('Infrastructure blockers must concern this profile only; no scoreboard, runnable test, '
-                                         'coverage or missing DUT sampling edge is required for clock generation: '+'; '.join(p.blockers))
+                        raise ValueError('Infrastructure blockers must concern this profile only; no scoreboard or functional '
+                                         'test is required. Use typed ambiguities for human clarification of basic bindings: '+'; '.join(p.blockers))
                 def recovery(retry,rejected,reason):
                     nonlocal selected
                     data=rejected if isinstance(rejected,dict) else {}
                     gaps=[q for key in ('questions','blockers') for q in
                           (data.get(key,[]) if isinstance(data.get(key,[]),list) else []) if isinstance(q,str)]
-                    selected=evidence.fetch(gaps[:8]+queries,item_limit=8,focus=True)
+                    selected=fetch_unit(gaps[:8]+queries)
                     return retry|dict(evidence=selected)
                 pseudo=call('code_infrastructure',payload,InfrastructurePlan,
                     'Plan ONLY this unit, using supported facts. Repeat the common execution cycle. '
@@ -450,17 +491,35 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 row.update(phase='implement');save_execution()
                 def validate_unit(result):
                     row.update(phase='validate');save_execution()
+                    for key,value in approved_bindings.items():
+                        if not hasattr(result,key): continue
+                        actual=getattr(result,key)
+                        if key=='clock_period_ranges': actual=[r.model_dump() for r in actual]
+                        if key=='tie_offs':
+                            actual={t.signal:t.value for t in actual}
+                            matches=all(actual.get(n)==v for n,v in value.items())
+                        elif key=='roles': matches=all(actual.get(n)==v for n,v in value.items())
+                        else: matches=actual==value
+                        if not matches: raise ValueError('Generated infrastructure must honor human-approved '+key)
+                    for approval in approvals:
+                        sid=approval.get('source_id','HUMAN-'+approval['request_id'])
+                        item=next(i for i in selected['documented_items'] if sid in i['source_ids'])
+                        if not any(f.source_id==sid for f in result.facts):
+                            quote=next(w['text'] for w in selected['source_excerpts'] if w['source_id']==sid)
+                            result.facts.append(Fact(id=('test_' if approval.get('test_only') else 'human_')+approval['request_id'],statement='Quick-testing inferred binding' if approval.get('test_only') else 'Human-approved infrastructure binding',
+                                source_id=sid,quote=quote,plan_pointer=item['plan_pointer']))
                     check(result,selected)
                 unit=call('code_'+('clock' if tid=='foundation_clock' else 'reset' if tid=='foundation_reset' else 'interface_base' if model is InterfaceBase else 'interface'),
                           dict(task_id=tid,task_title=title,interface=scope,evidence=selected,
-                               pseudocode=pseudo.model_dump(),dependencies=dependencies,profile=profile),model,rules,
+                               pseudocode=pseudo.model_dump(),dependencies=dependencies,profile=profile,
+                               approved_bindings=approved_bindings),model,rules,
                           validate_unit)
                 row.update(phase='validate');save_execution()
                 _write(work/(tid+'.implementation.json'),unit.model_dump())
                 row.update(phase='checkpoint',status='PLANNED' if pseudocode_only else 'PASS');save_execution()
                 return unit
-            except (Exception,KeyboardInterrupt):
-                row.update(status='BLOCKED');execution['status']='BLOCKED';save_execution();raise
+            except (Exception,KeyboardInterrupt) as exc:
+                row.update(status=getattr(exc,'status','BLOCKED'));execution['status']=getattr(exc,'status','BLOCKED');save_execution();raise
         def unit_facts(facts,context):
             _facts_in_context(facts,context);validate_facts(facts,plan,sources)
         def save_unit(name,text):
@@ -470,8 +529,8 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                                        lambda candidate,scope:validate(candidate,plan,scope,sources),
                                        render_units=not pseudocode_only)
         except (Exception,KeyboardInterrupt) as exc:
-            execution['status']='BLOCKED';save_execution()
-            work_manifest.update(status='BLOCKED',reason=str(exc) if isinstance(exc,ValueError) else type(exc).__name__)
+            execution['status']=getattr(exc,'status','BLOCKED');save_execution()
+            work_manifest.update(status=getattr(exc,'status','BLOCKED'),reason=str(exc) if isinstance(exc,ValueError) else type(exc).__name__)
             _write(directory/'code_work_manifest.json',work_manifest)
             raise
         foundation.questions=list(dict.fromkeys(foundation.questions+[

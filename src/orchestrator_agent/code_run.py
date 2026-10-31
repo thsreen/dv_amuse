@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from dv_agent.codegen.events import STEPS, stage, skip
 from dv_agent.core.fsutil import atomic_write_text
 from dv_agent.core.progress import reporting
+from dv_agent.quality.human_review import HumanReviewPending, ReviewClient, review_handler
 
 from .tui import Dashboard
 
@@ -44,7 +45,7 @@ def execute(build, out, variables, *, llm, show, dashboard=False, ansi=False):
     notify_start(out,'code',event)
     event('tool_start', step='code', tool='dv_agent.codegen', attempt=1)
     try:
-        with reporting(sink=lambda message: event('task_progress', step='code', message=message),
+        with review_handler(ReviewClient(show=show,interactive=ansi,llm=llm)), reporting(sink=lambda message: event('task_progress', step='code', message=message),
                        event_sink=lambda detail: event(detail['kind'], **{k:v for k,v in detail.items() if k!='kind'})):
             with stage('code_selection'):
                 if not (out / 'dv/testplan_doc.json').is_file():
@@ -59,6 +60,9 @@ def execute(build, out, variables, *, llm, show, dashboard=False, ansi=False):
         status = 'PASS' if compile_status in ('PASS', 'NOT_RUN') else 'BLOCKED'
         finish(status, f'Code saved; compile {compile_status}. Generated expectations require review.')
         return result
+    except HumanReviewPending as exc:
+        finish('WAITING_HUMAN',str(exc))
+        return dict(status='WAITING_HUMAN',reason=str(exc))
     except BaseException as exc:
         reason = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
         finish('INTERRUPTED' if isinstance(exc, KeyboardInterrupt) else 'BLOCKED', reason)

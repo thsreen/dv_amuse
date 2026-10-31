@@ -8,7 +8,54 @@ question, skip an optional step, or stop. Every budget exhaustion, timeout,
 rule violation and review gate reverts to the owner with a review file and a
 resume command.
 
+## Quick-testing auto approval
+
+For a demo or short development check, start:
+
+```bash
+.venv/bin/python -m orchestrator_agent --quick-testing-auto-approve-inferences
+```
+
+Enter `/code`. Infrastructure review requests are evaluated and automatically
+approved in a separate test-only run. Reasoning and assumptions are recorded as
+inferred; the original plan remains unchanged. This is **quick testing only**, not
+human/RTL-engineer sign-off. Without the flag, normal human review applies.
+See [review workflow and limits](HUMAN_REVIEW.md#quick-testing-auto-approver-explicit-opt-in).
+
 ## Interactive testplan flow
+
+The current-task panel wraps task names, detailed messages and retry status instead
+of truncating them. Below 80 terminal columns the dashboard stacks its panels,
+with current progress last so it remains visible when the display scrolls.
+
+Test-plan sections declare their prerequisites through `depends_on` in
+`src/dv_agent/templates/testplan_quick_v0.json`. Interface extraction precedes
+strategy; register extraction precedes configuration and implementation planning;
+stimulus depends on the implementation plan and configuration, checks depend on
+stimulus, and coverage depends on stimulus and checks. Dependencies must reference
+earlier sections or the extraction steps `@interfaces` and `@registers`.
+
+An unresolved prerequisite blocks its dependent section before any model call.
+Execution is strictly sequential: every section also requires successful completion
+of the immediately preceding section, including integration, assumptions and designer
+questions. Failed interface extraction also prevents register extraction. This rule
+applies to custom templates even when they omit `depends_on`. Only a genuinely
+inapplicable step (such as RTL observations without an RTL graph) may be skipped.
+Register extraction, Feature Description and Register Map are absolute prerequisites.
+Disabling register extraction, omitting these sections or reordering downstream work
+cannot bypass the gate. Missing or incomplete foundations keep the final plan blocked.
+Blocker reports and checkpoints are still written without further model calls.
+JSON records each
+dependency's status, reason and satisfaction, plus `blocked_by` links. Downstream
+calls receive actual register/field and configuration context. A successfully extracted empty register
+map does not require a configuration section.
+
+The JSON and both report views show generation readiness separately from engineer
+review. Any required blocked or unfinished section makes final readiness `BLOCKED`
+and generation `PARTIAL`; interrupted generation also remains blocked. The
+orchestrator uses the same aggregate status. Standalone `testplan` and
+`pipeline --testplan` return exit code 1 for blocked plans. Restart an existing
+orchestrator process to load these changes; previous run artifacts are retained.
 
 Basic lexical RAG is the default. Start:
 
@@ -293,3 +340,22 @@ approval grants a fresh budget round.
   permission to run again.
 - Live behaviour (model decider, LLM-backed DV steps, embeddings) needs
   `MODEL_API_KEY` and is NOT_RUN in offline tests.
+
+
+During a retry the progress display retains the previous failure, for example
+`BLOCKED/RETRY(1)`, `FAIL/RETRY(2)` or `TRANSIENT/RETRY(1)`. This appears beside
+the task and in the current-task panel; plain terminals receive the same label.
+Retrying tasks remain incomplete for percentage calculations. Completion replaces
+the temporary retry label with the actual result. Tool retries, model transport
+retries and code-planning repairs report this state. On reopening the same run,
+saved progress traces restore failure/retry history. A successful task revisit
+is displayed as a normal run rather than as a failed-task retry.
+
+Basic binding ambiguities now enter **WAITING_HUMAN** through an explicit
+[human-in-the-loop workflow](HUMAN_REVIEW.md). After a configurable terminal wait,
+Hermes requests a human Telegram acknowledgement. Only explicit human approval
+updates the versioned testplan, with visible approval comments, before code resumes.
+Timeouts and Hermes advice never authorize a binding. Telegram target, allowed user
+IDs and the supplied gateway plugin must be configured for remote escalation.
+
+Clock frequency/period planning, reviewed settings and seeded per-band campaigns are documented in [Clock timing](CLOCK_TIMING.md).

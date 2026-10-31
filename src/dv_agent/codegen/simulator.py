@@ -14,7 +14,7 @@ from .contracts import digest
 def run_saved_project(directory, *, regress=False, timeout=180):
     directory=Path(directory)
     state=directory/'code_generation_state.json'
-    if state.is_file() and json.loads(state.read_text()).get('status') in ('BLOCKED','BUILDING'):
+    if state.is_file() and json.loads(state.read_text()).get('status') in ('BLOCKED','BUILDING','WAITING_HUMAN'):
         return dict(status='BLOCKED',reason='Latest code generation is incomplete; rebuild before execution',tests=[])
     path=directory/'code_manifest.json'
     if not path.is_file(): raise ValueError('No code manifest; run /code or build-code first')
@@ -61,7 +61,8 @@ def command(manifest, capabilities, *, simulate=False, test=None):
     if capabilities.get('error_exit'): cmd+=['--error-exit']
     cmd+=[str(library)]+rtl+[str(code/p) for p in manifest['compile_files']]
     if test:
-        cmd += ['+UVM_TESTNAME='+test['name'], '+seed='+str(test['seed'])]
+        cmd += ['+UVM_TESTNAME='+test.get('uvm_testname',test['name']), '+seed='+str(test['seed'])]
+        if 'clock_period_ps' in test: cmd+=['+CLOCK_PERIOD_PS='+str(test['clock_period_ps'])]
     return cmd
 
 
@@ -111,13 +112,14 @@ def run_project(manifest, *, regress=False, timeout=180):
         directory.mkdir(parents=True,exist_ok=True)
         env=dict(os.environ,XEZIM_COV_DB=str(directory/'coverage.json'))
         comparisons=[]
+        observed_periods=[]
         uvm_counts={}
         try:
             completed=subprocess.run(command(manifest,compile_result,simulate=True,test=test),cwd=directory,env=env,
                                      text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=timeout,check=False)
             log=completed.stdout
-            marker='FUNCTIONAL_TEST_PASS '+test['name']
-            errors=bool(re.search(r'UVM_(?:ERROR|FATAL)\s+(?!: *0\b)|\b(?:DATA_MISMATCH|REGISTER_MISMATCH|UNDRAINED|NO_COMPARISON|MON_X)\b',log))
+            marker='FUNCTIONAL_TEST_PASS '+test.get('uvm_testname',test['name'])
+            errors=bool(re.search(r'UVM_(?:ERROR|FATAL)\s+(?!: *0\b)|\b(?:CLOCK_PERIOD_MISMATCH|DATA_MISMATCH|REGISTER_MISMATCH|UNDRAINED|NO_COMPARISON|MON_X)\b',log))
             status='PASS' if completed.returncode==0 and marker in log and not errors else 'FAIL'
             reason=(f'Xezim exit {completed.returncode}' if completed.returncode else
                     'UVM or scoreboard/monitor errors reported' if errors else
@@ -126,6 +128,12 @@ def run_project(manifest, *, regress=False, timeout=180):
             uvm_counts={kind:int(count) for kind,count in re.findall(r'^UVM_(INFO|WARNING|ERROR|FATAL)\s*:\s*(\d+)',log,re.M)}
             if status=='PASS' and (not comparisons or sum(comparisons)<test['minimum_comparisons']):
                 status,reason='BLOCKED','Scoreboard comparison evidence missing or below required minimum'
+            observed_periods=[int(n) for n in re.findall(r'CLOCK_PERIOD_OBSERVED_PS\s+(\d+)',log)]
+            if status=='PASS' and 'clock_period_ps' in test:
+                if not observed_periods:
+                    status,reason='BLOCKED','Monitor-confirmed clock period evidence is missing'
+                elif any(n!=test['clock_period_ps'] for n in observed_periods):
+                    status,reason='FAIL','Observed clock period differs from the selected campaign setting'
         except subprocess.TimeoutExpired as exc:
             log=exc.stdout or ''; log=log.decode(errors='replace') if isinstance(log,bytes) else log
             status,reason='TIMEOUT','Simulation deadline exceeded'
@@ -156,6 +164,7 @@ def run_project(manifest, *, regress=False, timeout=180):
                 group.get('samples',0)>0 for group in coverage.get('data',{}).get('covergroups',[]))):
             status,reason='BLOCKED','No sampled functional coverage evidence was produced'
         results.append(dict(name=test['name'],status=status,reason=reason,seed=test['seed'],
+                            clock_case=test.get('clock_case'),observed_clock_periods_ps=observed_periods,
                             scoreboard_comparisons=sum(comparisons),uvm_counts=uvm_counts,
                             log=str(directory/'simulation.log'),coverage=coverage,assertion_results=assertion_results))
     report=dict(status='PASS' if results and all(r['status']=='PASS' for r in results) else

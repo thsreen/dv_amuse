@@ -304,6 +304,11 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                 show("Code blocked: no testplan was generated.")
                 continue
             try:
+                from dv_agent.quality.quick_testing import enabled, prepare_run, WARNING
+                if enabled():
+                    out = prepare_run(out)
+                    show(WARNING)
+                    show(f'Isolated quick-testing output: {out}')
                 for notice in code_notice(json.loads((out / "dv" / "testplan_doc.json").read_text(encoding="utf-8"))):
                     show(notice)
                 if abort_requested(interactive=input_fn is None):
@@ -313,6 +318,9 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                 code_llm, _ = models()
                 result = execute_code(build_code, out, variables, llm=code_llm, show=show,
                                       dashboard=use_dashboard, ansi=interactive)
+                if result.get('status')=='WAITING_HUMAN':
+                    show(result['reason'])
+                    continue
                 policy = result["policy"]
                 if result.get('contract'):
                     show(f"Code: {result['code_dir']} ({policy['kept']} cited documented facts used for behavior; "

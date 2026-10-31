@@ -324,11 +324,159 @@ def test_blocked_section_is_reported_and_not_reused(run):
     assert run_testplan_doc(run, _llm(), mode="graph")["reused"] is False
 
 
+def test_blocked_registers_prevent_dependent_calls_and_propagate_status(run, monkeypatch):
+    from dv_agent.plan import testplan_doc
+    original = testplan_doc._registers_step
+
+    def partial(*args, **kwargs):
+        result = original(*args, **kwargs)
+        return result | {"status": "BLOCKED", "validation": ["Initialization extraction incomplete"]}
+
+    monkeypatch.setattr(testplan_doc, "_registers_step", partial)
+    llm = _llm()
+    summary = run_testplan_doc(run, llm, mode="graph")
+    doc = _doc(run)
+    sections = {s["id"]: s for s in doc["sections"]}
+    for name in ("verification_plan", "configurations", "stimulus", "checks", "coverage", "callouts"):
+        assert sections[name]["status"] == "BLOCKED"
+        assert sections[name]["blocked_by"]
+        assert sections[name]["dependencies"]
+    assert set(sections["configurations"]["blocked_by"]) == {"@registers", "feature_description", "register_map", "verification_plan"}
+    assert {"@registers", "feature_description", "register_map"} <= set(sections["stimulus"]["blocked_by"])
+    assert all(s["status"] == "BLOCKED" for s in sections.values())
+    generated = [payload["section"]["id"] for name, payload in llm.calls if name == "testplan_entries"]
+    assert not set(generated) & {"verification_plan", "stimulus", "checks", "coverage", "callouts"}
+    assert not any(name == "testplan_configurations" for name, _ in llm.calls)
+    assert not generated
+    assert not any(name == "testplan_strategy" for name, _ in llm.calls)
+    assert summary["status"] == doc["status"] == "BLOCKED"
+    assert summary["generation_status"] == doc["generation_status"] == "PARTIAL"
+    for name in ("testplan_doc.md", "testplan_doc.html"):
+        rendered = (run / name).read_text()
+        assert "Generation readiness:" in rendered and "Unresolved prerequisites:" in rendered
+        assert "Initialization extraction incomplete" not in rendered or "BLOCKED" in rendered
+
+
+def test_failed_stimulus_blocks_all_remaining_sections(run):
+    def failed(payload):
+        if payload["section"]["id"] == "stimulus":
+            raise LLMError("transient", "stimulated failure")
+        return entries_handler(payload)
+
+    llm = _llm(testplan_entries=failed)
+    summary = run_testplan_doc(run, llm, mode="graph")
+    sections = {s["id"]: s for s in _doc(run)["sections"]}
+    assert sections["checks"]["blocked_by"] == ["stimulus"]
+    assert sections["coverage"]["blocked_by"] == ["stimulus", "checks"]
+    assert sections["questions"]["status"] == "BLOCKED"
+    assert summary["status"] == "BLOCKED"
+    assert not any(n == "testplan_entries" and p["section"]["id"] in ("checks", "coverage") for n, p in llm.calls)
+
+
+@pytest.mark.parametrize("failed_section", ["feature_description", "strategy", "verification_plan", "configurations", "stimulus", "checks", "coverage", "callouts", "assumptions"])
+def test_every_section_waits_for_previous_success(run, failed_section):
+    def failed(payload):
+        if payload["section"]["id"] == failed_section:
+            raise LLMError("transient", "simulated failure")
+        return entries_handler(payload)
+
+    def fail_step(payload):
+        raise LLMError("transient", "simulated failure")
+
+    overrides = {"testplan_entries": failed}
+    if failed_section in ("strategy", "configurations"):
+        overrides["testplan_" + failed_section] = fail_step
+    llm = _llm(**overrides)
+    summary = run_testplan_doc(run, llm, mode="graph")
+    sections = _doc(run)["sections"]
+    index = next(i for i, s in enumerate(sections) if s["id"] == failed_section)
+    assert sections[index]["status"] == "BLOCKED"
+    for previous, current in zip(sections[index:], sections[index + 1:]):
+        assert current["status"] == "BLOCKED"
+        assert previous["id"] in current["blocked_by"]
+        assert not current.get("entries")
+        assert not any(n == "testplan_entries" and p["section"]["id"] == current["id"] for n, p in llm.calls)
+    assert summary["status"] == "BLOCKED" and summary["generation_status"] == "PARTIAL"
+
+
+def test_custom_template_cannot_bypass_sequential_gates(run, tmp_path):
+    from dv_agent.plan.testplan_doc import DEFAULT_TEMPLATE
+    template = json.loads(DEFAULT_TEMPLATE.read_text())
+    template.pop("execution_policy", None)
+    for section in template["sections"]:
+        section.pop("depends_on", None)
+    path = tmp_path / "custom.json"
+    path.write_text(json.dumps(template))
+
+    def fail(payload):
+        if payload["section"]["id"] == "checks":
+            raise LLMError("transient", "simulated failure")
+        return entries_handler(payload)
+
+    llm = _llm(testplan_entries=fail)
+    run_testplan_doc(run, llm, template_path=path, mode="graph")
+    doc = _doc(run)
+    sections = {s["id"]: s for s in doc["sections"]}
+    assert sections["coverage"]["blocked_by"] == ["checks"]
+    assert sections["questions"]["status"] == "BLOCKED"
+    assert doc["execution_policy"] == "strict_sequence"
+    assert not any(n == "testplan_entries" and p["section"]["id"] == "coverage" for n, p in llm.calls)
+
+
+@pytest.mark.parametrize("bypass", ["disabled_registers", "missing_feature", "missing_map", "reordered_checks"])
+def test_required_foundations_cannot_be_bypassed(run, tmp_path, bypass):
+    from dv_agent.plan.testplan_doc import DEFAULT_TEMPLATE
+    template = json.loads(DEFAULT_TEMPLATE.read_text())
+    for section in template["sections"]:
+        section.pop("depends_on", None)
+    if bypass == "disabled_registers":
+        template["registers"] = {"enabled": False}
+    elif bypass in ("missing_feature", "missing_map"):
+        omitted = "feature_description" if bypass == "missing_feature" else "register_map"
+        template["sections"] = [s for s in template["sections"] if s["id"] != omitted]
+    else:
+        checks = next(s for s in template["sections"] if s["id"] == "checks")
+        template["sections"].remove(checks)
+        template["sections"].insert(1, checks)
+    path = tmp_path / "bypass.json"
+    path.write_text(json.dumps(template))
+    llm = _llm()
+    summary = run_testplan_doc(run, llm, template_path=path, mode="graph")
+    assert summary["status"] == "BLOCKED" and summary["generation_status"] == "PARTIAL"
+    assert not any(n == "testplan_entries" and p["section"]["id"] in ("checks", "stimulus", "coverage") for n, p in llm.calls)
+    assert not any(n == "testplan_strategy" for n, p in llm.calls)
+    blocked = {b["id"] for b in summary["blocking_dependencies"]}
+    assert blocked & {"@registers", "feature_description", "register_map"}
+
+
+def test_dependency_contract_and_register_context_reach_model(run):
+    llm = _llm()
+    summary = run_testplan_doc(run, llm, mode="graph")
+    stimulus = next(p for n, p in llm.calls if n == "testplan_entries" and p["section"]["id"] == "stimulus")
+    assert all(d["satisfied"] for d in stimulus["section_dependencies"])
+    assert stimulus["register_context"]["registers"]
+    assert stimulus["register_context"]["configurable_fields"]
+    assert stimulus["configuration_context"]["status"] == "PASS"
+    checks = next(p for n, p in llm.calls if n == "testplan_entries" and p["section"]["id"] == "checks")
+    assert next(s for s in checks["prerequisite_sections"] if s["id"] == "stimulus")["entries"]
+    assert summary["status"] == "PASS" and summary["generation_status"] == "COMPLETE"
+
+
+@pytest.mark.parametrize("dependencies", [["missing"], ["a"], "a"])
+def test_invalid_section_dependencies_rejected(tmp_path, dependencies):
+    path = tmp_path / "dependencies.json"
+    path.write_text(json.dumps({"template_id": "custom", "sections": [
+        {"id": "a", "heading": "A", "generator": "entries", "depends_on": dependencies}]}))
+    with pytest.raises(ValueError, match="depend"):
+        load_template(path)
+
+
 def test_interrupted_generation_saves_partial_json_markdown_html_and_can_resume(run):
     def interrupted(payload): raise KeyboardInterrupt()
     with pytest.raises(KeyboardInterrupt): run_testplan_doc(run,_llm(testplan_entries=interrupted), mode="graph")
     partial=json.loads((run/'testplan_doc.json').read_text())
     assert partial['generation_status']=='INTERRUPTED' and partial['interruption_type']=='KeyboardInterrupt'
+    assert partial['status'] == 'BLOCKED'
     assert partial['completed_sections']==['title']
     assert partial['sections'][0]['status']=='PASS'
     assert all(s['status']=='NOT_RUN' for s in partial['sections'][1:])
@@ -359,6 +507,22 @@ def test_pipeline_testplan_flag(spec_repo, tmp_path, capsys, monkeypatch):
     assert main(["pipeline", str(spec_repo), "--out", str(out), "--fresh", "--testplan"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["testplan"]["reused"] is False and (out / "testplan_doc.md").exists()
+
+
+@pytest.mark.parametrize("command", ["testplan", "pipeline"])
+def test_cli_returns_failure_for_blocked_plan(run, spec_repo, capsys, monkeypatch, command):
+    from dv_agent import cli
+
+    def fail(payload):
+        if payload["section"]["id"] == "stimulus":
+            raise LLMError("transient", "simulated")
+        return entries_handler(payload)
+
+    monkeypatch.setattr(cli, "_llm", lambda: _llm(testplan_entries=fail))
+    args = (["pipeline", str(spec_repo), "--testplan"] if command == "pipeline" else ["testplan"])
+    assert main(args + ["--out", str(run)]) == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "BLOCKED"
 
 
 def test_coverage_observation_entries_render_as_subsection():

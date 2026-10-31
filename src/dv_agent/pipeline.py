@@ -333,7 +333,9 @@ def run_test_plan(out: Path, requirement_ids: list[str], llm: LLM, cfg: PlanConf
 
 
 def _doc_summary(doc: dict, out: Path) -> dict:
+    from .plan.section_dependencies import document_status
     return dict(json=str(out / TESTPLAN_DOC), markdown=str(out / TESTPLAN_MD), html=str(out / TESTPLAN_HTML), template_id=doc["template_id"],
+                **document_status(doc), generation_status=doc.get("generation_status", "COMPLETE"),
                 scope=doc["scope"], model=doc["model"], review_status=doc["review_status"],
                 doc_trace_id=doc["trace_id"],
                 token_usage={k: {x: v["totals"][x] for x in ("calls", "api_calls", "local_cache_hits", "repair_calls",
@@ -394,6 +396,8 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
         except json.JSONDecodeError:
             prev = {}
         if (prev.get("provenance_policy") == POLICY_VERSION
+                and prev.get("execution_policy") == "strict_sequence"
+                and prev.get("required_foundations") == ["@registers", "feature_description", "register_map"]
                 and prev.get("template_hash") == template["template_hash"]
                 and prev.get("methodology_fingerprint") == meth_fingerprint
                 and prev.get("scope") == scope.strip()
@@ -423,6 +427,8 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
             # Copy before applying authority/presentation metadata to avoid mutating
             # the builder's active sections. Persist lineage alongside partial views.
             snapshot = json.loads(json.dumps(snapshot, default=str))
+            from .plan.section_dependencies import document_status
+            snapshot.update(document_status(snapshot))
             from .plan.testplan_doc import enforce_source_authority
             enforce_source_authority(snapshot, G.graph.get('source_authority','DOCUMENTED'))
             snapshot.update(mode=mode, rtl_input=rtl_input, provenance_policy=POLICY_VERSION)
@@ -447,8 +453,9 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
                     except Exception as save_error:
                         emit(f"partial report update failed: {type(save_error).__name__}; original failure preserved")
             raise
-        doc['generation_status'] = ('COMPLETE' if all(s['status']=='PASS' or
-            (s.get('generator')=='rtl_observations' and s['status']=='NOT_RUN') for s in doc['sections']) else 'PARTIAL')
+        from .plan.section_dependencies import document_status
+        doc.update(document_status(doc))
+        doc['generation_status'] = 'COMPLETE' if doc['status'] == 'PASS' else 'PARTIAL'
         doc["mode"] = mode
         if mode == "basic":
             doc["analysis_scope"] = ("Basic RAG demo draft: lexical source-chunk retrieval; no extracted requirement/dependency graph "

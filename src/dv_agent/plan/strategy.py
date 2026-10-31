@@ -28,6 +28,13 @@ The reader-facing overview is 4–7 concise bullet points, one or two sentences 
 verification scope and boundaries, stimulus philosophy (directed bring-up then constrained-random exploration),
 checking philosophy (protocol checks plus end-to-end comparison), configuration/reset/error priorities,
 coverage and completion criteria, and review-dependent RTL risks where supplied. Tailor these to source facts.
+Include a high-level clock-timing approach: nominal frequency/period, all documented operating bands,
+boundary plus seeded random period tests, and whether changes are allowed during operation or only
+between tests/reset. Do not assume jitter or dynamic clock switching is legal. Put precise numbers,
+units, range provenance and unresolved limits in clock_timing and the Verification Plan.
+clock_timing: one entry per clock; distinguish documented frequency limits from proposed testbench
+periods. Frequency and period are reciprocals: T_ps=1e6/f_MHz; frequency min maps to period max.
+Missing nominal/min/max limits are explicit open_questions, never an invented operating envelope.
 Do not enumerate ports, register fields, class names, sequence APIs, monitor wiring, predictor queues,
 assertion syntax, state transitions, or every corner case in the overview. These belong in Verification Plan
 and the later Stimulus/Checks/Coverage sections. Do not repeat the register map. Each overview point has
@@ -84,14 +91,18 @@ def _schema(groups: list[str], signals: list[str], registers: list[str], chunk_i
         item["required"].append("support")
         item["properties"]["support"] = assessment_schema()
     return {"type": "object", "additionalProperties": False,
-            "required": ["overview", "environment", "environment_support", "agents", "scoreboards", "register_model", "virtual_sequences"],
+            "required": ["overview", "environment", "environment_support", "agents", "scoreboards", "register_model", "virtual_sequences", "clock_timing"],
             "properties": {"environment": t, "agents": arr(agent), "scoreboards": arr(sb),
                            "overview": {"type": "array", "minItems": 4, "maxItems": 7,
                                         "items": {"type": "object", "additionalProperties": False,
                                                   "required": ["text", "support"],
                                                   "properties": {"text": t, "support": assessment_schema()}}},
                            "environment_support": assessment_schema(),
-                           "register_model": regmodel, "virtual_sequences": arr(vseq)}}
+                           "register_model": regmodel, "virtual_sequences": arr(vseq),
+                           "clock_timing": arr(dict(type='object',additionalProperties=False,
+                               required=['clock','nominal','operating_ranges','randomization','change_policy','open_questions','support'],
+                               properties=dict(clock=t,nominal=t,operating_ranges=arr(t),randomization=t,
+                                               change_policy=t,open_questions=arr(t),support=assessment_schema())))}}
 
 
 def _register_summary(registers: dict | None) -> list[dict]:
@@ -143,6 +154,8 @@ def build_strategy(llm: LLM, tracer: Tracer, interfaces: dict | None, registers:
         for source in register["sources"]:
             sources.setdefault(source["chunk_id"], source.get("quote", ""))
     schema = _schema([g["name"] for g in groups], signals, reg_labels, chunk_ids)
+    if any(g.get('category')=='clock' for g in groups):
+        schema['properties']['clock_timing']['minItems']=1
     if observations:
         from .rtl_observations import compact as compact_rtl
         payload["rtl_observations"] = compact_rtl(rtl_observations)
@@ -174,6 +187,8 @@ def build_strategy(llm: LLM, tracer: Tracer, interfaces: dict | None, registers:
                     virtual_sequences=[], gaps=[], validation=[])
     result = dict(status="PASS", environment=out.data.get("environment", "").strip(),
                   **validate_strategy(out.data, groups, set(reg_labels), set(chunk_ids), sources), repair=out.summary())
+    result['clock_timing']=[{k:v for k,v in item.items() if k!='support'} | assessment(item.get('support',{}),sources)
+                            for item in out.data.get('clock_timing',[])]
     if "environment_support" in out.data:
         result["environment_support"] = assessment(out.data["environment_support"], sources)
     if out.data.get("overview"):
@@ -340,16 +355,26 @@ def render(strategy: dict, heading: str) -> list[str]:
         return point(text, item.get("cited_chunk_ids", cites),
                      item.get("inference_reason", reason), item.get("provenance", "INFERRED"))
 
+    timing_lines=[]
+    if strategy.get('clock_timing'):
+        timing_lines=['### Clock Timing and Randomization','']
+        for timing in strategy['clock_timing']:
+            timing_lines += [item_point(f"**{timing['clock']}** — {timing['nominal']}",timing,[],''),
+                             *[f"  - Operating band: {band}" for band in timing.get('operating_ranges',[])],
+                             '  - '+timing['randomization'],'  - '+timing['change_policy'],
+                             *['  - **Open question:** '+question for question in timing.get('open_questions',[])],'']
+
     if strategy.get("overview"):
         lines += ["### " + strategy.get("subsection_heading", "Verification Approach"), ""]
         lines += [item_point(item["text"], item, [], "Verification approach proposed from cited evidence.")
                   for item in strategy["overview"]]
         lines += [""] + [f"> Validation: {v}" for v in strategy["validation"]]
-        return lines + render_repairs(strategy.get("repair")) + [""]
+        return lines + timing_lines + render_repairs(strategy.get("repair")) + [""]
 
     if strategy.get("environment"):
         lines += [item_point(strategy["environment"], strategy.get("environment_support", {}), sources(strategy["agents"]),
                         "Proposed verification environment from the cited interface and register evidence."), ""]
+    lines += timing_lines
     lines += ["### Agents", ""]
     for a in strategy["agents"]:
         cites = a.get("cited_chunk_ids", [])

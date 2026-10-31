@@ -99,6 +99,8 @@ def _main(argv: list[str] | None) -> int:
                         help="model use for the interactive terminal (default: auto)")
     parser.add_argument("--mode", choices=("basic", "graph"),
                         help="basic (default): lexical RAG demo; graph: model-built knowledge graph")
+    parser.add_argument('--quick-testing-auto-approve-inferences',action='store_true',
+                        help='QUICK TESTING ONLY: evaluate and auto approve infrastructure inferences in an isolated run; never human sign-off')
     sub = parser.add_subparsers(dest="cmd", required=False)
 
     pr = sub.add_parser("run", help="execute a flow file step by step")
@@ -133,6 +135,7 @@ def _main(argv: list[str] | None) -> int:
     ps.add_argument("--out", type=Path, required=True)
 
     args = parser.parse_args(args_list)
+    os.environ['DV_AGENT_QUICK_TEST_AUTO_APPROVE']='1' if args.quick_testing_auto_approve_inferences else '0'
     if args.mode:
         os.environ["DV_AGENT_MODE"] = args.mode
     if args.cmd is None:

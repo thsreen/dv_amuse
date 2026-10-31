@@ -11,6 +11,36 @@ from orchestrator_agent.saved_runs import latest_successful
 from orchestrator_agent.tui import Dashboard
 
 
+@pytest.mark.parametrize('columns', [40, 60, 80, 120])
+def test_current_task_wraps_without_losing_status_or_details(tmp_path, monkeypatch, columns):
+    from orchestrator_agent import tui
+    monkeypatch.setattr(tui.shutil, 'get_terminal_size', lambda fallback: os.terminal_size((columns, 40)))
+    frames = []
+    dash = Dashboard(tmp_path, frames.append, ansi=True)
+    dash.task_name = 'code_interface_infrastructure_assessment_with_a_very_long_identifier'
+    dash.task_detail = ('Missing documented reset polarity; waiting for human acknowledgement.\n'
+                        'Reference: /a/very/long/path/to/the/interface_definition.json')
+    dash.current = {'step': 'testplan'}
+    dash._retry(('tool', 'testplan'), 'WAITING_HUMAN')
+    dash.task_fraction = (12345, 67890)
+    dash.redraw()
+    frame = tui.ANSI.sub('', frames[-1]).replace('\x1b[2J\x1b[H', '')
+    pane_width = columns - 4 if columns < 80 else max(28, columns // 3)
+    middle = dash._middle(pane_width)
+    assert all(len(line) <= pane_width for line in middle)
+    start, end = middle.index('current task') + 1, middle.index('task progress')
+    contents = ''.join(''.join(middle[start:end]).split())
+    for text in (dash.task_name, dash.task_detail, 'WAITING_HUMAN/RETRY(1)'):
+        assert ''.join(text.split()) in contents
+    assert '…' not in ''.join(middle)
+    assert all(len(line) <= columns for line in frame.splitlines())
+    # Check the actual rendered cells as well as the panel helper.
+    rendered = '\n'.join(line.split('|')[1 if columns < 80 else 2]
+                         for line in frame.splitlines() if line.startswith('|'))
+    assert dash.task_name in ''.join(rendered.split())
+    assert ''.join(dash.task_detail.split()) in ''.join(rendered.split())
+
+
 def saved(root, name, *, repo=None, status='PASS', authority='DOCUMENTED'):
     out = root / name
     repo = repo or root / 'design'
@@ -125,3 +155,49 @@ def test_code_dashboard_dynamic_steps_preserve_finished_status_without_heartbeat
     dash.handle(dict(event='substep_done', id='code_pseudocode:storage', status='PASS'))
     assert dash.elapsed_s == 15
     assert '100%' in '\n'.join(dash._middle(40))
+
+
+def test_retry_preserves_old_status_counts_each_attempt_and_finishes_cleanly(tmp_path):
+    flow=dict(steps=[dict(id='code')])
+    dash=Dashboard(tmp_path,lambda frame:None,flow=flow,substep_owner='code',substeps=[('clock','Clock')],ansi=True)
+    dash.handle(dict(event='tool_start',step='code',tool='code',attempt=1))
+    dash.handle(dict(event='substep_start',id='clock',label='Clock'))
+    dash.handle(dict(event='substep_done',id='clock',status='BLOCKED'))
+    dash.handle(dict(event='substep_start',id='clock',label='Clock'))
+    assert 'BLOCKED/RETRY(1)' in '\n'.join(dash._right(42))
+    assert 'BLOCKED/RETRY(1)' in '\n'.join(dash._middle(42))
+    assert dash.substatus['clock']=='RUN' and '0%' in '\n'.join(dash._middle(42))
+    dash.handle(dict(event='task_retry',status='TIMEOUT',attempt=3))
+    assert 'TIMEOUT/RETRY(2)' in '\n'.join(dash._right(42))
+    dash.handle(dict(event='substep_done',id='clock',status='PASS'))
+    assert '/RETRY' not in '\n'.join(dash._right(42))
+    assert '100%' in '\n'.join(dash._middle(42))
+
+
+def test_tool_retry_start_does_not_double_count_and_success_is_not_retry(tmp_path):
+    shown=[]
+    dash=Dashboard(tmp_path,shown.append,flow=dict(steps=[dict(id='build')]),ansi=False)
+    dash.handle(dict(event='tool_start',step='build',tool='build',attempt=1))
+    dash.handle(dict(event='tool_done',step='build',status='FAIL'))
+    dash.handle(dict(event='tool_retry',step='build',status='FAIL',next_attempt=2))
+    dash.handle(dict(event='tool_start',step='build',tool='build',attempt=2))
+    assert shown[-1]=='[FAIL/RETRY(1)] build: build'
+    assert 'FAIL/RETRY(1)' in '\n'.join(dash._right(40))
+    dash.handle(dict(event='tool_done',step='build',status='PASS'))
+    dash.handle(dict(event='tool_start',step='build',tool='build',attempt=3))
+    assert shown[-1]=='[run] build: build'
+
+
+def test_manual_retry_restores_failure_and_number_from_saved_trace(tmp_path):
+    events=[dict(event='tool_start',step='code'),dict(event='substep_start',id='clock'),
+            dict(event='substep_done',id='clock',status='FAIL'),dict(event='tool_done',step='code',status='BLOCKED'),
+            dict(event='tool_start',step='code'),dict(event='substep_start',id='clock'),
+            dict(event='substep_done',id='clock',status='TIMEOUT'),dict(event='tool_done',step='code',status='BLOCKED')]
+    (tmp_path/'code_trace.jsonl').write_text('\n'.join(json.dumps(e) for e in events)+'\nnot json\n')
+    dash=Dashboard(tmp_path,lambda frame:None,flow=dict(steps=[dict(id='code')]),
+                   substep_owner='code',substeps=[('clock','Clock')],ansi=True)
+    dash.handle(dict(event='run_start',steps=['code']))
+    dash.handle(dict(event='tool_start',step='code',tool='code',attempt=1))
+    dash.handle(dict(event='substep_start',id='clock',label='Clock'))
+    frame='\n'.join(dash._right(45))
+    assert 'BLOCKED/RETRY(2)' in frame and 'TIMEOUT/RETRY(2)' in frame

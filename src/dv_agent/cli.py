@@ -273,6 +273,7 @@ def _main(argv: list[str] | None) -> int:
     if args.cmd=='plan-code':
         from .codegen.build import load_sources,project_lock
         from .codegen.workplan import design as plan_work
+        from .quality.human_review import HumanReviewPending,PlanUpdated,ReviewClient,review_handler,plan_location
         from .core.llm import LLMError
         llm,_=_models_for(args.llm)
         if llm is None: raise UsageError('plan-code requires an enabled model')
@@ -280,8 +281,17 @@ def _main(argv: list[str] | None) -> int:
         try:
             plan=json.loads((args.out/'dv/testplan_doc.json').read_text())
             definition=json.loads((args.out/'rtl/interface_definition.json').read_text())
-            with project_lock(args.out):
-                result=plan_work(llm,plan,definition,load_sources(plan,args.out/'dv/graph.json'),args.out,pseudocode_only=True)
+            with project_lock(args.out), plan_location(args.out/'dv/testplan_doc.json'), review_handler(ReviewClient(llm=llm)):
+                for clarification in range(8):
+                    plan=json.loads((args.out/'dv/testplan_doc.json').read_text())
+                    try:
+                        result=plan_work(llm,plan,definition,load_sources(plan,args.out/'dv/graph.json'),args.out,pseudocode_only=True)
+                        break
+                    except PlanUpdated: continue
+                else: raise HumanReviewPending('Clarification revision limit reached; resume plan-code')
+        except HumanReviewPending as exc:
+            _print(dict(status='WAITING_HUMAN',reason=str(exc),out=str(args.out)))
+            return 0
         except LLMError as exc:
             raise UsageError('Code planning model call failed: '+exc.kind+'; rerun to reuse completed responses') from None
         except OSError as exc:
@@ -299,11 +309,16 @@ def _main(argv: list[str] | None) -> int:
         return 0 if result['status']=='PASS' else 1
     if args.cmd == "build-code":
         from .codegen import build_project
+        from .quality.human_review import HumanReviewPending,ReviewClient,review_handler
         set_global_sink(stderr_sink)
         llm, _ = _models_for(args.llm)
         try:
-            result = build_project(args.testplan,args.interface,args.out,llm=llm,contract_path=args.contract,
-                                   rtl_files=args.rtl_file,expected_top=args.top,compile=args.compile and not args.no_compile)
+            with review_handler(ReviewClient(llm=llm)):
+                result = build_project(args.testplan,args.interface,args.out,llm=llm,contract_path=args.contract,
+                                       rtl_files=args.rtl_file,expected_top=args.top,compile=args.compile and not args.no_compile)
+        except HumanReviewPending as exc:
+            _print(dict(status='WAITING_HUMAN',reason=str(exc),out=str(args.out)))
+            return 0
         except OSError as exc:
             raise UsageError(f"Code generation input/tool unavailable: {exc}") from None
         print(json.dumps(result,indent=2))
@@ -418,8 +433,10 @@ def _main(argv: list[str] | None) -> int:
         if result.get("reused"):
             emit("testplan done: reused cached document")
         else:
-            emit(f"testplan done: {len(result['sections'])} sections written")
+            emit(f"testplan {result['status']}: {len(result['sections'])} sections written")
         _print(result | {"cache_cleared": removed})
+        if result.get("status") == "BLOCKED":
+            return 1
     elif args.cmd == "pipeline":
         out = args.out or PACKAGE_ROOT / "runs" / args.repo.resolve().name
         llm, embedder = _models_for(_llm_mode(args.llm))
@@ -459,11 +476,17 @@ def _main(argv: list[str] | None) -> int:
                                                   rtl_graph_path=args.rtl_graph, rtl_scope=args.rtl_scope,
                                                   mode=_mode(args.mode),
                                                   methodology_rules_path=args.methodology_rules)
-        emit("pipeline done")
+        if args.testplan:
+            result["status"] = result["testplan"]["status"]
+            emit(f"pipeline {result['status']}")
+        else:
+            emit("pipeline done")
         ran = [r["trace_id"] for r in (result.get(k) for k in ("ingest", "build", "plan", "testplan"))
                if r and not r.get("reused") and r.get("trace_id")]
         result["usage"] = run_totals(out / "trace.jsonl", ran) if ran else None
         _print(result)
+        if result.get("status") == "BLOCKED":
+            return 1
     elif args.cmd == "evaluate":
         from dataclasses import replace
 

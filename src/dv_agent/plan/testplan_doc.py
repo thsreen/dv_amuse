@@ -63,6 +63,11 @@ reasoning from its cited evidence. Leave inference_reason empty for DOCUMENTED a
 Cite only IDs from the supplied lists. Keep each entry to one idea; put sub-points in details.
 Stay consistent with previous_sections (reuse agent and sequence names defined there) and with
 interfaces, the design's interface groups (signals grouped by functionality and connected module type).
+When register_context and configuration_context are supplied, use their supported register/field
+definitions and configuration prerequisites for register-driven sequences, checks and coverage.
+Identify the controls and setup required by each such proposal; never invent missing addresses,
+field encodings, legal values or initialization order. unresolved_prerequisites are explicit gaps,
+not evidence of supported behaviour; preserve them as designer questions rather than claiming readiness.
 When supplied: dependency_order lists requirements precondition-first (inferred, unreviewed links); use it for
 programming order and stimulus preconditions. uncovered_requirements are requirements no earlier section
 cites; cite each one in at least one entry.
@@ -129,6 +134,8 @@ def load_template(path: Path | None = None) -> dict:
     bad = [s["id"] for s in template["sections"] if s.get("generator") not in GENERATORS]
     if bad:
         raise ValueError(f"unknown generator in template sections: {bad}")
+    from .section_dependencies import validate_dependencies
+    validate_dependencies(template["sections"])
     rtl_positions = [i for i, s in enumerate(template["sections"]) if s["generator"] == "rtl_observations"]
     if len(rtl_positions) > 1 or (rtl_positions and any(i < rtl_positions[0] for i, s in enumerate(template["sections"]) if s["generator"] == "strategy")):
         raise ValueError("one RTL observations section is allowed, and it must precede strategy")
@@ -511,15 +518,21 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                        dense_fn: Callable[[str], dict] | None = None, *, rtl_graph=None, rtl_scope="",
                        slim=None, on_checkpoint: Callable[[dict], None] | None = None) -> dict:
     cfg = cfg or DocConfig()
+    from .section_dependencies import REQUIRED_FOUNDATIONS
     scope = scope.strip()
     meta = dict(template_id=template["template_id"], template_hash=template["template_hash"],
-                model=llm.model, generated_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+                model=llm.model, generated_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                execution_policy="strict_sequence")
+    meta["required_foundations"] = list(REQUIRED_FOUNDATIONS)
     meth_rules = load_methodology_rules(cfg.methodology_rules_path or None)
     meta["methodology_fingerprint"] = rules_fingerprint(meth_rules)
     meta["methodology_rules"] = [dict(id=r["id"], statement=r["statement"]) for r in meth_rules]
     sections: list[dict] = []
     conflicts: dict[tuple, dict] = {}
     def record_section(section: dict) -> None:
+        from .section_dependencies import dependency_state, document_status
+        definition = next(s for s in template["sections"] if s["id"] == section["id"])
+        section["dependencies"] = dependency_state(definition, sections, interfaces, registers)
         sections.append(section)
         if on_checkpoint:
             remaining = template['sections'][len(sections):]
@@ -530,8 +543,11 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                             sections=sections + [dict(id=s['id'], heading=s['heading'], generator=s['generator'],
                                                      status='NOT_RUN', error='Not generated yet', entries=[])
                                                  for s in remaining], coverage=_coverage(G,sections),
-                            generation_status='IN_PROGRESS', completed_sections=[s['id'] for s in sections],
+                            generation_status='IN_PROGRESS',
+                            completed_sections=[s['id'] for s in sections if s['status'] == 'PASS'],
+                            blocked_sections=[s['id'] for s in sections if s['status'] == 'BLOCKED'],
                             pending_sections=[s['id'] for s in remaining])
+            snapshot.update(document_status(snapshot))
             organize_document(snapshot, template)
             on_checkpoint(snapshot)
         emit_event("substep_done", id=section["id"], status=section["status"])
@@ -541,7 +557,12 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
         emit_event("substep_done", id="interfaces", status=interfaces["status"] if interfaces else "NOT_RUN")
         iface_compact = compact(interfaces) if interfaces and interfaces["status"] == "PASS" else []
         emit_event("substep_start", id="registers", label="Recover registers and configurable controls")
-        registers = _registers_step(G, H, llm, tracer, template, scope, cfg, dense_fn, slim)
+        if interfaces is not None and interfaces["status"] != "PASS":
+            registers = dict(status="BLOCKED", error="Unresolved prerequisite: @interfaces",
+                             blocked_by=["@interfaces"], registers=[], configurable=[], conflicts=[],
+                             failed_batches=[], validation=["Register extraction waits for interface extraction"])
+        else:
+            registers = _registers_step(G, H, llm, tracer, template, scope, cfg, dense_fn, slim)
         emit_event("substep_done", id="registers", status=registers["status"] if registers else "NOT_RUN")
         path_targets = step_targets(G, interfaces, registers)
         strategy = None
@@ -553,6 +574,16 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
             emit(f"[{pos}/{total}] section {sec['id']}: {sec.get('heading', '')} ({sec['generator']})")
             emit_event("substep_start", id=sec["id"], label=sec["heading"])
             with tracer.span(f"testplan_section:{sec['id']}", input={"section": sec["id"]}) as span:
+                from .section_dependencies import dependency_state
+                dependencies = dependency_state(sec, sections, interfaces, registers)
+                blocked = [d for d in dependencies if not d["satisfied"]]
+                if blocked:
+                    reason = "Unresolved prerequisites: " + ", ".join(f"{d['id']} ({d['status']})" for d in blocked)
+                    span.update(level="ERROR", status_message=reason)
+                    record_section(dict(id=sec["id"], heading=sec["heading"], generator=sec["generator"],
+                                        status="BLOCKED", error=reason, blocked_by=[d["id"] for d in blocked],
+                                        entries=[]))
+                    continue
                 if sec["generator"] == "title":
                     record_section(_title_section(G, sec, scope, meta))
                     continue
@@ -598,6 +629,22 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 out = dict(id=sec["id"], heading=sec["heading"], generator=sec["generator"],
                            context=dict(queries=ctx["queries"], requirement_ids=req_ids, chunk_ids=chunk_ids))
                 payload = _payload(sec, scope, ctx, _previous(sections, cfg.max_previous_entries), iface_compact, cfg)
+                payload["section_dependencies"] = dependencies
+                payload["prerequisite_sections"] = [
+                    s for s in sections if any(d["id"] == s["id"] and d["satisfied"] for d in dependencies)]
+                payload["unresolved_prerequisites"] = [
+                    dict(id=s["id"], status=s["status"], reason=s.get("error", ""),
+                         blocked_by=s.get("blocked_by", []))
+                    for s in sections if s["status"] not in ("PASS", "NOT_RUN")]
+                # Preserve the actual controls, not only previous-section prose summaries.
+                if sec.get("depends_on"):
+                    payload["register_context"] = None if registers is None else dict(
+                        status=registers["status"], registers=[
+                            {k: r[k] for k in ("name", "abbreviation", "address", "access", "width", "fields") if k in r}
+                            for r in registers.get("registers", [])],
+                        configurable_fields=registers.get("configurable", []))
+                    payload["configuration_context"] = next(
+                        (s for s in sections if s["generator"] == "configurations"), None)
                 emit(f"section {sec['id']}: retrieved {len(req_ids)} requirements / {len(chunk_ids)} chunks; "
                      f"previous context {len(payload.get('previous_sections',[]))} sections")
                 payload["source_authority"] = G.graph.get("source_authority", "DOCUMENTED")
@@ -736,6 +783,8 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 interfaces=interfaces, registers=registers, sections=sections, coverage=coverage,
                 rtl_observations=rtl_observations, rtl_observation_coverage=rtl_coverage)
     organize_document(document, template)
+    from .section_dependencies import document_status
+    document.update(document_status(document))
     return document
 
 
@@ -1191,7 +1240,16 @@ def render_markdown(doc: dict) -> str:
     lines = []
     for s in doc["sections"]:
         if s["generator"] == "title":
-            lines += [f"# {s['title']}", "", f"## {s.get('heading','Title')}", ""] + [f"- {d}" for d in s["details"]] + [""]
+            lines += [f"# {s.get('title', 'Verification Test Plan')}", "", f"## {s.get('heading','Title')}", ""] + [f"- {d}" for d in s.get("details", [])] + [""]
+            if s.get("status", "PASS") != "PASS":
+                lines += [f"**{s['status']}**: {s.get('error', '')}", ""]
+            if doc.get('test_only'):
+                lines += ['> **QUICK TESTING ONLY — inferred auto approvals; not human approval or design sign-off.**', '']
+            if doc.get("status"):
+                lines += [f"**Generation readiness: {doc['status']}** — Engineer review required.", ""]
+                if doc.get("blocking_dependencies"):
+                    lines += ["Unresolved prerequisites: " + ", ".join(
+                        f"{b['id']} ({b['status']})" for b in doc["blocking_dependencies"]), ""]
             if doc.get("analysis_scope"):
                 lines += ["> " + doc["analysis_scope"], ""]
             if doc.get('generation_status') in ('IN_PROGRESS','INTERRUPTED','ERROR'):
@@ -1203,6 +1261,9 @@ def render_markdown(doc: dict) -> str:
                           "> All checks and expected behaviour remain inferred until an RTL design engineer validates the source specification.", ""]
             if doc.get("interfaces"):
                 lines += render_interfaces(doc["interfaces"], doc["interfaces"]["heading"])
+            continue
+        if s.get("blocked_by"):
+            lines += [f"## {s['heading']}", "", f"**{s['status']}**: {s.get('error', '')}", ""]
             continue
         if s["generator"] == "register_map" and doc.get("registers"):
             lines += render_registers(doc["registers"], s["heading"])

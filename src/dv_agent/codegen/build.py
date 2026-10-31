@@ -13,6 +13,7 @@ from .render import render, template_hash
 from .simulator import compile_project
 from .validate import validate
 from .events import stage, skip, STEPS
+from ..quality.human_review import HumanReviewPending, PlanUpdated, plan_location
 
 
 @contextmanager
@@ -52,22 +53,33 @@ def build_project(plan_path, interface_path, directory, *, llm=None, contract_pa
     with project_lock(directory):
         atomic_write_text(directory/'code_generation_state.json',json.dumps(dict(status='BUILDING'))+'\n')
         try:
-            result=_build(plan_path,interface_path,directory,llm=llm,contract_path=contract_path,
-                          rtl_files=rtl_files,expected_top=expected_top,compile=compile)
+            with plan_location(plan_path):
+                for clarification in range(8):
+                    try:
+                        result=_build(plan_path,interface_path,directory,llm=llm,contract_path=contract_path,
+                                      rtl_files=rtl_files,expected_top=expected_top,compile=compile)
+                        break
+                    except PlanUpdated:
+                        continue
+                else: raise HumanReviewPending('Clarification revision limit reached; resume /code to continue')
             status='BUILT_NEEDS_REVIEW' if result['compile']['status'] in ('PASS','NOT_RUN') else 'BLOCKED'
             atomic_write_text(directory/'code_generation_state.json',json.dumps(dict(status=status,build_id=result['build_id']))+'\n')
             return result
         except (Exception, KeyboardInterrupt) as exc:
             # No credentials/provider exception bodies in the persistent issue artifact.
             reason=str(exc) if isinstance(exc,ValueError) else 'Model call failed: '+exc.kind if isinstance(exc,LLMError) else type(exc).__name__
-            atomic_write_text(directory/'code_questions.json',json.dumps(dict(status='BLOCKED',questions=[reason]),indent=2)+'\n')
-            atomic_write_text(directory/'code_generation_state.json',json.dumps(dict(status='BLOCKED',reason=reason))+'\n')
+            status=getattr(exc,'status','BLOCKED')
+            atomic_write_text(directory/'code_questions.json',json.dumps(dict(status=status,questions=[reason]),indent=2)+'\n')
+            atomic_write_text(directory/'code_generation_state.json',json.dumps(dict(status=status,reason=reason))+'\n')
             if isinstance(exc,LLMError): raise ValueError(reason+'; retry /code to reuse successful checkpoints') from None
             raise
 
 
 def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expected_top,compile,compiler_feedback=None):
     specification=json.loads(plan_path.read_text())
+    from ..quality.quick_testing import enabled, WARNING
+    if specification.get('test_only') and not enabled():
+        raise ValueError('Quick-testing plan requires --quick-testing-auto-approve-inferences; it is not a normal approved plan')
     if specification.get('source_authority')=='RTL_INFERRED':
         raise ValueError('RTL-derived specification requires RTL engineer validation before functional code generation')
     definition=json.loads(interface_path.read_text())
@@ -83,6 +95,9 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     if expected_top and plan.top!=expected_top:
         raise ValueError('Code contract top does not match the selected design')
     emit('code [2/5]: validate evidence, ownership, protocol bindings and comparisons')
+    if not plan.clock_period_ranges:
+        question='Clock-period randomization is not configured: confirm operating bands; the nominal testbench period does not establish DUT limits.'
+        if question not in plan.questions: plan.questions.append(question)
     # One semantic repair after deterministic/reviewer feedback. API transport retries
     # remain in the shared client; explicit operator contracts are never rewritten.
     for attempt in range(2):
@@ -131,6 +146,8 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     code=directory/'code'/fingerprint[:16]
     reused=code.is_dir() and (code/'tests.json').is_file()
     code.mkdir(parents=True,exist_ok=True)
+    if specification.get('test_only'):
+        artifacts={name:('// '+WARNING+'\n'+text if name.endswith(('.sv','.svh')) else text) for name,text in artifacts.items()}
     for name,text in artifacts.items():
         target=code/name
         if not target.resolve().is_relative_to(code): raise ValueError('Template output escapes project directory')
@@ -138,6 +155,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
             raise ValueError(f'Generated file edited; preserve extension files instead: {target.name}')
         if not target.exists(): atomic_write_text(target,text)
     manifest=dict(contract=plan.contract,status='BUILT_NEEDS_REVIEW',build_id=fingerprint,code_dir=str(code),
+                  test_only=bool(specification.get('test_only')),
                   source_plan=str(plan_path),interface=str(interface_path),template_hash=template_hash(),
                   input_hashes={str(path):digest(path.read_text()) for path in (plan_path,interface_path)},
                   rtl_files=[str(p) for p in rtl],rtl_hashes=hashes,top=plan.top,compile_files=compile_files,
@@ -154,6 +172,8 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
                   tests=[dict(name=t.id,kind='uvm_functional',top='verification_top',seed=t.seed,
                               minimum_comparisons=t.minimum_comparisons) for t in plan.tests],
                   policy=dict(source='documented expected behavior; template-owned infrastructure',
+                              test_only=bool(specification.get('test_only')),
+                              quick_testing_warning=WARNING if specification.get('test_only') else '',
                               guidance='Plan proposals guide implementation but are not expectation authority',
                               kept=len(plan.facts),skipped=max(0,len(eligible_items(specification,sources))-len({f.plan_pointer for f in plan.facts}))),
                   assertion_covers=[dict(check_id=c.id,assertion='a_'+c.id,cover='c_'+c.id,activation_cover='activation_'+c.id,
@@ -199,6 +219,17 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
                           expected_top=expected_top,compile=compile,compiler_feedback=feedback)
     manifest['reused']=reused
     emit('code [5/5]: publish code manifest, source lineage and test inventory')
+    from .clock_timing import expand_tests
+    manifest['clock_period_ranges']=[r.model_dump() for r in plan.clock_period_ranges]
+    if plan.clock_period_ranges:
+        manifest['coverage_collectors'].append(dict(id='clock_timing_coverage',source='clock monitor rising edges',
+            file='uvm/cg_clock_coverage.svh',sampling='observed complete clock periods',
+            fact_ids=[f.id for f in plan.facts if any(f.source_id in r.cited_chunk_ids for r in plan.clock_period_ranges)]))
+    manifest['tests']=expand_tests(manifest['tests'],plan.clock_period_ranges)
+    manifest['clock_randomization']=dict(change_policy='fixed_per_test_before_reset',
+        status='PLANNED' if plan.clock_period_ranges else 'NOT_CONFIGURED',
+        distribution='equal period-space strata in every band; directed endpoints and nominal/midpoint',
+        units='ps',resolution_ps=1,coverage_status='NOT_RUN')
     with stage('code_publish'):
         atomic_write_text(code/'tests.json',json.dumps(manifest,indent=2)+'\n')
         atomic_write_text(directory/'code_manifest.json',json.dumps(manifest,indent=2)+'\n')

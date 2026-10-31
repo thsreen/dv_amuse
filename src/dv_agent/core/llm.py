@@ -346,6 +346,7 @@ class MetaClient(_Base):
                 if (not exc.token_exhausted and exc.kind != "parse") or attempt == self.max_attempts:
                     exc.usage, exc.attempts = total_usage, attempts
                     raise
+                emit_event('task_retry',status=exc.kind.upper(),attempt=attempt+1)
                 emit(f"model call {name!r} retrying after {exc.kind} "
                      f"(attempt {attempt + 1}/{self.max_attempts})")
             except transient as exc:
@@ -358,7 +359,7 @@ class MetaClient(_Base):
                     error.attempts = attempts
                     raise error from None
                 delay = 2.0 * 2 ** (attempt - 1)
-                emit_event('task_retry',status=exc.kind.upper(),attempt=attempt+1)
+                emit_event('task_retry',status='TRANSIENT',attempt=attempt+1)
                 _request_event('retry_scheduled', **request_fields, attempt=attempt, next_attempt=attempt+1, backoff_s=delay)
                 emit(f"model call {name!r} hit {type(exc).__name__}; retrying in {delay:.0f}s "
                      f"(attempt {attempt}/{self.max_attempts})")

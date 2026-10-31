@@ -1,5 +1,11 @@
 {
   "template_id": "quick_reference_v0",
+  "execution_policy": "strict_sequence",
+  "required_foundations": [
+    "@registers",
+    "feature_description",
+    "register_map"
+  ],
   "description": "Quick-reference verification test plan (user template, 2026-10-28). To be replaced by a more comprehensive template.",
   "presentation": {
     "subsection_titles": {
@@ -13,7 +19,8 @@
       "agent_scoreboard": "Agent-Level Scoreboards",
       "top_level_scoreboard": "Top-Level Scoreboards",
       "rtl_observation_coverage": "Coverage from RTL observations (NEEDS_REVIEW; RTL design engineer)",
-      "verification_approach": "Verification Approach"
+      "verification_approach": "Verification Approach",
+      "clock_timing": "Clock Timing and Randomization"
     }
   },
   "interfaces": {
@@ -68,13 +75,17 @@
     },
     {
       "id": "strategy",
+      "depends_on": [
+        "@interfaces"
+      ],
       "heading": "5. High Level Verification Strategy",
       "generator": "strategy",
       "queries": [
         "{scope} bus interface signals",
         "{scope} external interface signals",
         "{scope} interrupts reset",
-        "{scope} test or loopback modes"
+        "{scope} test or loopback modes",
+        "{scope} clock frequency period minimum maximum operating range timing"
       ],
       "entry_kinds": [
         "environment",
@@ -84,23 +95,39 @@
         "agent_scoreboard",
         "top_level_scoreboard"
       ],
-      "instructions": "Present a high-level overview of how verification will be approached, using 4–7 short bullets with per-point provenance. Explain scope and boundaries, directed bring-up versus constrained-random exploration, protocol versus end-to-end checking, priorities for configuration/reset/errors, coverage/completion criteria, and review-dependent RTL risks where supplied. Focus on rationale and priorities, not every nuance. Keep the architecture outline compact for later planning. Put sequence implementation, monitor wiring, scoreboard/predictor algorithms, assertion details, state machines and corner-case inventories in Verification Plan and the later dedicated sections. Do not repeat interface signal lists or register fields. State machines are plan-only and outside hackathon code generation.",
+      "instructions": "Present a high-level overview of how verification will be approached, using 4\u20137 short bullets with per-point provenance. Explain scope and boundaries, directed bring-up versus constrained-random exploration, protocol versus end-to-end checking, priorities for configuration/reset/errors, coverage/completion criteria, and review-dependent RTL risks where supplied. Focus on rationale and priorities, not every nuance. Keep the architecture outline compact for later planning. Put sequence implementation, monitor wiring, scoreboard/predictor algorithms, assertion details, state machines and corner-case inventories in Verification Plan and the later dedicated sections. Do not repeat interface signal lists or register fields. State machines are plan-only and outside hackathon code generation. Clock timing must be explicit: record nominal frequency and period with units, every source-supported operating band, constraints and unresolved limits. Distinguish DUT limits from proposed testbench settings. Plan directed min/max/nominal tests plus reproducible seed-based random samples in low/middle/high strata of EACH band; never sample gaps or invent missing bounds. Keep period fixed per test and change only before reset/traffic unless dynamic switching is explicitly supported. Cover sampled period/frequency band, boundary and stratum using observed clock edges; do not claim exhaustive coverage from a finite sample. Sequence timing and reset duration must track the selected period. Put clock generation details under a Clock Timing and Randomization subsection in the Verification Plan, and keep the strategy overview high-level.",
       "global_communities": 2
     },
     {
       "id": "verification_plan",
+      "depends_on": [
+        "strategy",
+        "@registers"
+      ],
       "heading": "6. Verification Plan",
       "generator": "entries",
       "queries": [
         "{scope} programming sequence configuration reset",
         "{scope} transfers data ordering expected outputs",
-        "{scope} status interrupts errors"
+        "{scope} status interrupts errors",
+        "{scope} clock frequency period minimum maximum operating range timing"
       ],
-      "entry_kinds": ["sequence_implementation", "monitor_implementation", "check_implementation", "scoreboard_implementation", "coverage_implementation", "test_integration"],
-      "instructions": "Translate the preceding verification strategy into a concrete implementation plan. Cover all six areas: (1) sequences: base and child sequence names, owning agent/sequencer, transaction fields and configuration knobs, constrained random and directed stimulus, reset/configure/traffic ordering and virtual-sequence coordination; (2) monitors: sampled interface, clock/reset handling, transaction reconstruction and analysis ports; (3) checks: where each check lives, its trigger, specification-derived expected result and failure/reporting condition; assertions need corresponding cover properties; (4) scoreboards: monitor analysis-port connections and transaction types, expected-data predictor/reference model from cited behavior, queues or matching keys, comparisons, ordering, reset flushing, end-of-test drain and mismatch reporting; (5) coverage: sampling points, meaningful bins/crosses and assertion covers; (6) integration: component connections, sequence-to-check mappings, basic smoke test first, subsequent test families and implementation order. Use component and sequence names already defined in strategy. State what each component will consume, produce and compare in details; do not merely list component names. Name missing protocol rules or timing as designer questions rather than inventing behavior. Proposed implementation architecture is INFERRED with cited sources and an inference_reason; documented behavior remains separately cited. RTL-observation-derived handling must cite its observation ID and remain INFERRED for RTL engineer review. State machines, when needed, are plan-only and outside hackathon code generation. Later Stimulus, Checks and Coverage sections elaborate this plan using the same names."
+      "entry_kinds": [
+        "sequence_implementation",
+        "monitor_implementation",
+        "check_implementation",
+        "scoreboard_implementation",
+        "coverage_implementation",
+        "test_integration",
+        "clock_timing"
+      ],
+      "instructions": "Translate the preceding verification strategy into a concrete implementation plan. Cover all six areas: (1) sequences: base and child sequence names, owning agent/sequencer, transaction fields and configuration knobs, constrained random and directed stimulus, reset/configure/traffic ordering and virtual-sequence coordination; (2) monitors: sampled interface, clock/reset handling, transaction reconstruction and analysis ports; (3) checks: where each check lives, its trigger, specification-derived expected result and failure/reporting condition; assertions need corresponding cover properties; (4) scoreboards: monitor analysis-port connections and transaction types, expected-data predictor/reference model from cited behavior, queues or matching keys, comparisons, ordering, reset flushing, end-of-test drain and mismatch reporting; (5) coverage: sampling points, meaningful bins/crosses and assertion covers; (6) integration: component connections, sequence-to-check mappings, basic smoke test first, subsequent test families and implementation order. Use component and sequence names already defined in strategy. State what each component will consume, produce and compare in details; do not merely list component names. Name missing protocol rules or timing as designer questions rather than inventing behavior. Proposed implementation architecture is INFERRED with cited sources and an inference_reason; documented behavior remains separately cited. RTL-observation-derived handling must cite its observation ID and remain INFERRED for RTL engineer review. State machines, when needed, are plan-only and outside hackathon code generation. Later Stimulus, Checks and Coverage sections elaborate this plan using the same names. Clock timing must be explicit: record nominal frequency and period with units, every source-supported operating band, constraints and unresolved limits. Distinguish DUT limits from proposed testbench settings. Plan directed min/max/nominal tests plus reproducible seed-based random samples in low/middle/high strata of EACH band; never sample gaps or invent missing bounds. Keep period fixed per test and change only before reset/traffic unless dynamic switching is explicitly supported. Cover sampled period/frequency band, boundary and stratum using observed clock edges; do not claim exhaustive coverage from a finite sample. Sequence timing and reset duration must track the selected period. Put clock generation details under a Clock Timing and Randomization subsection in the Verification Plan, and keep the strategy overview high-level."
     },
     {
       "id": "configurations",
+      "depends_on": [
+        "@registers"
+      ],
       "heading": "7. Configurations",
       "generator": "configurations",
       "queries": [
@@ -114,13 +141,19 @@
     },
     {
       "id": "stimulus",
+      "depends_on": [
+        "verification_plan",
+        "configurations",
+        "@interfaces"
+      ],
       "heading": "8. Sequences and Stimulus",
       "generator": "entries",
       "queries": [
         "{scope} configuration options",
         "{scope} data transfer",
         "{scope} error conditions",
-        "{scope} thresholds levels and limits"
+        "{scope} thresholds levels and limits",
+        "{scope} clock frequency period minimum maximum operating range timing"
       ],
       "entry_kinds": [
         "directed_test",
@@ -129,11 +162,15 @@
         "error_injection",
         "corner_case"
       ],
-      "instructions": "Stimulus architecture: every active agent owns random sequences that drive only its own interface, randomizing both what they drive and when they execute; each agent runs a top sequence selecting among its permissible child sequences at random, keeping sequences generic with directed stimulus exceptional. The top-level test or virtual sequence only spawns the corresponding agent sequences: it drives nothing directly, touches no virtual interfaces, and uses no delays. Sequencer handles are passed explicitly to every send/start call, held in the virtual sequence (started on the null sequencer) or in a virtual sequencer container reached without hierarchical pathing; avoid p_sequencer lock-in. Cross-dependencies between features or interfaces are coordinated either from the top level or by extending a sequence. Each entry declares in details whether it uses its agent standalone or coordinates with other agents; coordinated entries name the exact mechanism (sequencer handle switch, semaphore, event, or shared resource) and every sequencer taking part. Each high-level sequence entry states what it extends and what controlled stimulus it drives, e.g. 'extends <base sequence> and drives controlled <behavior> stimulus'. Each entry names the sequence it uses (from the strategy section where one applies), its owning agent and sequencer, and the specification behaviour it exercises: configuration sweeps, traffic, error injection and corner cases. Each entry explains how randomness is injected: which transaction fields, timing, delays, interleavings and error events are randomized, under what constraints and distributions (uniform, weighted, corner-biased), how seeds keep runs reproducible, and which knobs scale randomness up or down per scenario.",
+      "instructions": "Stimulus architecture: every active agent owns random sequences that drive only its own interface, randomizing both what they drive and when they execute; each agent runs a top sequence selecting among its permissible child sequences at random, keeping sequences generic with directed stimulus exceptional. The top-level test or virtual sequence only spawns the corresponding agent sequences: it drives nothing directly, touches no virtual interfaces, and uses no delays. Sequencer handles are passed explicitly to every send/start call, held in the virtual sequence (started on the null sequencer) or in a virtual sequencer container reached without hierarchical pathing; avoid p_sequencer lock-in. Cross-dependencies between features or interfaces are coordinated either from the top level or by extending a sequence. Each entry declares in details whether it uses its agent standalone or coordinates with other agents; coordinated entries name the exact mechanism (sequencer handle switch, semaphore, event, or shared resource) and every sequencer taking part. Each high-level sequence entry states what it extends and what controlled stimulus it drives, e.g. 'extends <base sequence> and drives controlled <behavior> stimulus'. Each entry names the sequence it uses (from the strategy section where one applies), its owning agent and sequencer, and the specification behaviour it exercises: configuration sweeps, traffic, error injection and corner cases. Each entry explains how randomness is injected: which transaction fields, timing, delays, interleavings and error events are randomized, under what constraints and distributions (uniform, weighted, corner-biased), how seeds keep runs reproducible, and which knobs scale randomness up or down per scenario. Clock timing must be explicit: record nominal frequency and period with units, every source-supported operating band, constraints and unresolved limits. Distinguish DUT limits from proposed testbench settings. Plan directed min/max/nominal tests plus reproducible seed-based random samples in low/middle/high strata of EACH band; never sample gaps or invent missing bounds. Keep period fixed per test and change only before reset/traffic unless dynamic switching is explicitly supported. Cover sampled period/frequency band, boundary and stratum using observed clock edges; do not claim exhaustive coverage from a finite sample. Sequence timing and reset duration must track the selected period. Put clock generation details under a Clock Timing and Randomization subsection in the Verification Plan, and keep the strategy overview high-level.",
       "dependency_order": true
     },
     {
       "id": "checks",
+      "depends_on": [
+        "stimulus",
+        "configurations"
+      ],
       "heading": "9. Checks and Scoreboards",
       "generator": "entries",
       "queries": [
@@ -155,12 +192,17 @@
     },
     {
       "id": "coverage",
+      "depends_on": [
+        "stimulus",
+        "checks"
+      ],
       "heading": "10. Functional Coverage",
       "generator": "entries",
       "queries": [
         "{scope} configuration options",
         "{scope} interrupt types priority",
-        "{scope} error conditions"
+        "{scope} error conditions",
+        "{scope} clock frequency period minimum maximum operating range timing"
       ],
       "entry_kinds": [
         "covergroup",
@@ -168,10 +210,13 @@
         "cover_property",
         "register_coverage"
       ],
-      "instructions": "Functional coverage in three tiers: (1) all basic scenarios captured in the specification; (2) basic scenarios crossed with configurations; (3) basic scenarios crossed with concurrent events (e.g. transfer crossed with error). Build coverpoints from derived, meaningful classifications, not raw wide buses: explicit bins for boundaries, zero, maximums and representative mids, with illegal_bins/ignore_bins for impossible or uninteresting combinations. Cross only the targeted high-risk interactions; every covergroup traces to a plan feature and states its sampling event and whether it is per-instance. Cross-reference specification sections to find interactions, then cover only the high-risk ones; never cross every section against every other. Translate the RTL observations section into a separate 'Coverage from RTL observations' subsection: one entry per observation-driven coverage point, citing the observation IDs, marked INFERRED and NEEDS_REVIEW for the RTL design engineer. Every assertion in the checks section (labelled a_<name>) gets one cover_property entry here (c_<name>) that covers the same property, so each check's scenario is proven exercised and no vacuous pass counts as proof; the plan is refused while an assertion has none. Report each covergroup, cross and register-coverage entry in structured fields: covergroup holds its name; coverpoints lists one item per coverpoint (a cross is a coverpoint whose name lists the crossed items) with its explicit bins, including illegal_bins and ignore_bins written as 'illegal_bins: ...' and 'ignore_bins: ...'. Put the sampling event, per-instance flag and traceability in details. A cover_property entry leaves covergroup empty and coverpoints empty, names the cover property label (c_<assertion label>) in its text and the paired assertion label (a_<label>) in details."
+      "instructions": "Functional coverage in three tiers: (1) all basic scenarios captured in the specification; (2) basic scenarios crossed with configurations; (3) basic scenarios crossed with concurrent events (e.g. transfer crossed with error). Build coverpoints from derived, meaningful classifications, not raw wide buses: explicit bins for boundaries, zero, maximums and representative mids, with illegal_bins/ignore_bins for impossible or uninteresting combinations. Cross only the targeted high-risk interactions; every covergroup traces to a plan feature and states its sampling event and whether it is per-instance. Cross-reference specification sections to find interactions, then cover only the high-risk ones; never cross every section against every other. Translate the RTL observations section into a separate 'Coverage from RTL observations' subsection: one entry per observation-driven coverage point, citing the observation IDs, marked INFERRED and NEEDS_REVIEW for the RTL design engineer. Every assertion in the checks section (labelled a_<name>) gets one cover_property entry here (c_<name>) that covers the same property, so each check's scenario is proven exercised and no vacuous pass counts as proof; the plan is refused while an assertion has none. Report each covergroup, cross and register-coverage entry in structured fields: covergroup holds its name; coverpoints lists one item per coverpoint (a cross is a coverpoint whose name lists the crossed items) with its explicit bins, including illegal_bins and ignore_bins written as 'illegal_bins: ...' and 'ignore_bins: ...'. Put the sampling event, per-instance flag and traceability in details. A cover_property entry leaves covergroup empty and coverpoints empty, names the cover property label (c_<assertion label>) in its text and the paired assertion label (a_<label>) in details. Clock timing must be explicit: record nominal frequency and period with units, every source-supported operating band, constraints and unresolved limits. Distinguish DUT limits from proposed testbench settings. Plan directed min/max/nominal tests plus reproducible seed-based random samples in low/middle/high strata of EACH band; never sample gaps or invent missing bounds. Keep period fixed per test and change only before reset/traffic unless dynamic switching is explicitly supported. Cover sampled period/frequency band, boundary and stratum using observed clock edges; do not claim exhaustive coverage from a finite sample. Sequence timing and reset duration must track the selected period. Put clock generation details under a Clock Timing and Randomization subsection in the Verification Plan, and keep the strategy overview high-level."
     },
     {
       "id": "callouts",
+      "depends_on": [
+        "verification_plan"
+      ],
       "heading": "11. Integration and Reuse",
       "generator": "entries",
       "queries": [

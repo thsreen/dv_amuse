@@ -1,0 +1,23 @@
+class cg_clock_coverage extends uvm_subscriber #(clock_tick);
+  `uvm_component_utils(cg_clock_coverage)
+  longint unsigned expected_period_ps, observed_period_ps;
+  bit reported;
+  covergroup cg;
+    cp_period_ps: coverpoint observed_period_ps {
+{{PERIOD_BINS}}
+    }
+  endgroup
+  function new(string name, uvm_component parent);
+    super.new(name,parent); cg=new();
+  endfunction
+  function void write(clock_tick tick);
+    if(tick.period_since_last<=0) return;
+    observed_period_ps=longint'(tick.period_since_last/1ps);
+    if(observed_period_ps!=expected_period_ps)
+      `uvm_error("CLOCK_PERIOD_MISMATCH", "Observed source period differs from selected test setting")
+    if(!reported) begin
+      $display("CLOCK_PERIOD_OBSERVED_PS %0d",observed_period_ps); reported=1;
+    end
+    cg.sample();
+  endfunction
+endclass

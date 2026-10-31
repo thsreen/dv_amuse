@@ -2,7 +2,7 @@
 import re
 
 from ..ingest.extract import locate_quote
-from .contracts import identifier, pointer
+from .contracts import IDENTIFIER_RULE, identifier, is_identifier, pointer
 
 
 ROLES = {
@@ -16,6 +16,8 @@ def validate(plan, specification, definition, sources):
     if specification.get("source_authority") == "RTL_INFERRED":
         raise ValueError("Unvalidated RTL-derived expectations cannot be compiled into verification code")
     identifier(plan.top)
+    if abs(plan.clock_period_ns*1000-round(plan.clock_period_ns*1000))>1e-6:
+        raise ValueError('Clock period must be representable at 1ps resolution')
     for define in plan.defines:
         if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(?:=[A-Za-z0-9_']+)?", define):
             raise ValueError('Invalid explicit build define')
@@ -43,6 +45,9 @@ def validate(plan, specification, definition, sources):
             raise ValueError("Duplicate code-plan IDs")
     facts = {f.id: f for f in plan.facts}
     validate_facts(plan.facts,specification,sources)
+    from .clock_timing import validate_ranges
+    from ..quality.quick_testing import enabled
+    validate_ranges(plan.clock_period_ranges,plan.facts,test_only=enabled() and specification.get('test_only',False))
     for category in (plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.sequencer_variables, plan.routes, plan.checks, plan.tests, plan.hooks,plan.coverage):
         for item in category:
             if not set(item.fact_ids) <= facts.keys():
@@ -50,6 +55,7 @@ def validate(plan, specification, definition, sources):
     agents = {a.id: a for a in plan.agents}
     # A single package holds all generated classes, including generated drain/vseqs.
     symbols=['cg_item','cg_env','cg_scoreboard','cg_system_coverage']
+    if plan.clock_period_ranges: symbols.append('cg_clock_coverage')
     symbols += [a.id+'_'+suffix for a in plan.agents for suffix in ('cfg','sequencer','driver','monitor','coverage','agent')]
     symbols += [s.id for s in plan.sequences] + [t.id for t in plan.tests]
     symbols += [t.id+'_vseq' for t in plan.tests]
@@ -237,15 +243,18 @@ def validate(plan, specification, definition, sources):
 
 
 def validate_facts(facts,specification,sources):
+    from ..quality.quick_testing import test_item_allowed
     if specification.get('source_authority')=='RTL_INFERRED':
         raise ValueError('Unvalidated RTL-derived expectations are not executable')
+    bad=[f.id for f in facts if not is_identifier(f.id)]
+    if bad: raise ValueError(f'Invalid fact identifiers {bad}: {IDENTIFIER_RULE}')
     ids=[identifier(f.id) for f in facts]
     if len(ids)!=len(set(ids)): raise ValueError('Duplicate fact IDs')
     for fact in facts:
         try: origin=pointer(specification,fact.plan_pointer)
         except (KeyError,IndexError,ValueError,TypeError):
             raise ValueError(f'Fact {fact.id} points outside the testplan') from None
-        if not isinstance(origin,dict) or origin.get('provenance')!='DOCUMENTED':
+        if not isinstance(origin,dict) or (origin.get('provenance')!='DOCUMENTED' and not test_item_allowed(specification,origin)):
             raise ValueError(f'Fact {fact.id} is not a documented plan item')
         if origin.get('cited_rtl_observation_ids') or origin.get('review_owner')=='RTL_DESIGN_ENGINEER':
             raise ValueError('RTL observations cannot supply executable expectations')

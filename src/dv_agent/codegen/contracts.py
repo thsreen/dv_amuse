@@ -163,13 +163,24 @@ class CoverageGoal(Model):
     fact_ids: list[str] = Field(min_length=1)
 
 
+class ClockPeriodRange(Model):
+    name: str
+    min_ps: int = Field(ge=2, le=1000000000)
+    max_ps: int = Field(ge=2, le=1000000000)
+    nominal_ps: int | None = Field(default=None, ge=2, le=1000000000)
+    cited_chunk_ids: list[str] = Field(min_length=1, max_length=16)
+    provenance: Literal['DOCUMENTED','INFERRED','ASSUMED'] = 'DOCUMENTED'
+    inference_reason: str = ''
+
+
 class CodePlan(Model):
     contract: Literal["verification_codegen_v1"] = "verification_codegen_v1"
     top: str
     clock: str
     reset: str
     reset_active: Literal["high", "low"]
-    clock_period_ns: int = Field(default=10, ge=2, le=1000000)
+    clock_period_ns: float = Field(default=10, ge=0.002, le=1000000)
+    clock_period_ranges: list[ClockPeriodRange] = Field(default_factory=list, max_length=16)
     reset_cycles: int = Field(default=8, ge=2, le=10000)
     defines: list[str] = Field(default_factory=list, max_length=32)
     request_timeout_cycles: int = Field(default=10000, ge=1, le=10000000)
@@ -191,10 +202,72 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode()).hexdigest()
 
 
+IDENTIFIER_RULE = ("identifiers start with a letter and contain only letters, digits and underscores "
+                   "(no hyphens, dots or spaces) and are not reserved words")
+
+
+def is_identifier(value):
+    return isinstance(value, str) and bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", value)) and value not in RESERVED
+
+
 def identifier(value):
-    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", value) or value in RESERVED:
-        raise ValueError(f"Invalid generated identifier: {value!r}")
+    if not is_identifier(value):
+        raise ValueError(f"Invalid generated identifier: {value!r}: {IDENTIFIER_RULE}")
     return value
+
+
+def safe_identifier(value):
+    """The closest valid identifier: runs of other characters become one underscore."""
+    text = re.sub(r"[^A-Za-z0-9_]+", "_", str(value)).strip("_") or "id"
+    if not text[0].isalpha():
+        text = "f_" + text
+    return text + "_id" if text in RESERVED else text
+
+
+def normalize_fact_ids(data):
+    """Rename invalid fact ids in a model answer, and every `fact_ids` reference to them, in place.
+
+    Fact ids are internal labels. Rejecting `F-RST-01` cost two model calls and stopped a run, so any answer
+    anywhere in the code stage is repaired deterministically instead. Returns {old: new} for what changed.
+    """
+    facts = []
+
+    def collect(node):
+        if isinstance(node, dict):
+            for key, child in node.items():
+                if key == "facts" and isinstance(child, list):
+                    facts.extend(f for f in child if isinstance(f, dict) and isinstance(f.get("id"), str))
+                collect(child)
+        elif isinstance(node, list):
+            for child in node:
+                collect(child)
+
+    collect(data)
+    taken = {f["id"] for f in facts if is_identifier(f["id"])}
+    renamed = {}
+    for fact in facts:
+        if is_identifier(fact["id"]):
+            continue
+        new = base = safe_identifier(fact["id"])
+        number = 2
+        while new in taken:
+            new, number = f"{base}_{number}", number + 1
+        taken.add(new)
+        renamed[fact["id"]] = new
+        fact["id"] = new
+    if renamed:
+        def relink(node):
+            if isinstance(node, dict):
+                for key, child in node.items():
+                    if key == "fact_ids" and isinstance(child, list):
+                        node[key] = [renamed.get(x, x) if isinstance(x, str) else x for x in child]
+                    else:
+                        relink(child)
+            elif isinstance(node, list):
+                for child in node:
+                    relink(child)
+        relink(data)
+    return renamed
 
 
 def pointer(value, path):

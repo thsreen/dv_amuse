@@ -4,7 +4,7 @@
     uvm_active_passive_enum is_active = UVM_ACTIVE;
     bit polarity_set = 0;
     bit active_level;
-    time assert_time = 100ns;
+    realtime assert_time = 100ns;
     bit auto_pulse = 1;
 
     function new(string name = "reset_cfg");

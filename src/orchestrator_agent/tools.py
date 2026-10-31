@@ -139,7 +139,10 @@ def run_dv_testplan(args: dict, ctx: StepContext) -> dict:
         item = res.get(name)
         if item and item.get("status") not in ("PASS", "NOT_RUN"):
             incomplete.append(f"{name}:{item['status']}")
-    return dict(status="BLOCKED" if incomplete else "PASS",
+    if "status" in res:
+        incomplete = [f"{b['id']}:{b['status']}" for b in res.get("blocking_dependencies", [])]
+    status = res.get("status", "BLOCKED" if incomplete else "PASS")
+    return dict(status="PASS" if status == "PASS" else "BLOCKED",
                 summary=f"testplan [{sections}]" + (f"; incomplete: {', '.join(incomplete)}" if incomplete else ""),
                 files=_files(out, "testplan_doc.json", "testplan_doc.md", "testplan_doc.html"),
                 detail=dict(res, rtl_used=bool(rtl_graph)))

@@ -14,6 +14,8 @@ from .render import ROOT
 
 
 INSTRUCTIONS = """Construct a reusable verification implementation contract from this testplan and specification evidence.
+QUICK_TEST_AUTO_APPROVAL items, when explicitly supplied in a quick-testing run, are scoped
+inferred infrastructure settings permitted for that test run only. They are not human sign-off.
 Documented items are atomic records. Child fields/signals are linked by JSON pointers, not repeated in their parents.
 Audit metadata and duplicate quotes are omitted from item summaries; complete original source text is stored once
 in source_evidence. Quote facts verbatim from those sources. Keep the supplied pointers and source IDs for validation.
@@ -42,6 +44,10 @@ Dedicated coverage subscribers tap monitor analysis ports; drivers never supply 
 For protocols outside the catalog use custom plus declared driver.body/monitor.body hooks, not invented builtin protocols.
 Do not generate design-specific reference-model FSMs; describe such unsupported work in questions. Missing essential source
 information must produce questions and no runnable tests instead of guessed behavior. Templates and identifiers are generic.
+Identifiers (fact ids, names) start with a letter and use only letters, digits and underscores, for example
+f1 or f_reset_1; never hyphens, dots or spaces. If repair_feedback is present, previous_output was refused for
+the reasons given (repair_rules restates the format): return the complete corrected object, fix every listed
+problem, and keep the rest unchanged.
 Return exactly the schema object, including empty arrays for unused lists.
 """
 
@@ -62,10 +68,11 @@ def strict_schema(model):
 
 
 def eligible_items(plan, sources):
+    from ..quality.quick_testing import test_item_allowed
     found = []
     def walk(value, path):
         if isinstance(value, dict):
-            if value.get('provenance')=='DOCUMENTED' and not value.get('cited_rtl_observation_ids'):
+            if (value.get('provenance')=='DOCUMENTED' or test_item_allowed(plan,value)) and not value.get('cited_rtl_observation_ids'):
                 ids=set(value.get('cited_chunk_ids', [])) | set(value.get('cited_req_ids', []))
                 if value.get('chunk_id'): ids.add(value['chunk_id'])
                 ids.update(s['chunk_id'] for s in value.get('sources', []) if isinstance(s,dict) and s.get('chunk_id'))

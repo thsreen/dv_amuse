@@ -7,7 +7,7 @@ from dv_agent.quality.claims import entry_claims
 from dv_agent.graph.graph import load_graph
 from dv_agent.core.llm import LLMError
 from dv_agent.pipeline import GRAPH_FILE, run_build_graph, run_ingest, run_testplan_doc
-from test_testplan_doc import _llm
+from test_testplan_doc import _llm, entries_handler
 
 
 @pytest.fixture
@@ -25,6 +25,9 @@ def _ctrl_chunk(payload):
 def clean_entries(contradiction_until_repaired=True, always_wrong=False):
     """Deterministically valid entries; stimulus claims CTRL resets to FFh (the cited text says 00h)."""
     def handler(payload):
+        if payload["section"]["id"] == "feature_description":
+            # A valid prerequisite lets these tests reach the claims check under test.
+            return entries_handler(payload)
         chunks = [c["chunk_id"] for c in payload["chunks"]]
         entry = {"text": f"{payload['section']['id']} behaviour is exercised", "kind": None, "provenance": "INFERRED",
                  "cited_req_ids": [], "cited_chunk_ids": chunks[:1], "details": []}

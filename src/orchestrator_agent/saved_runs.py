@@ -19,9 +19,11 @@ def latest_successful(runs_root, selected=None):
     if not root.is_dir(): return None
     for directory in root.iterdir():
         if not directory.is_dir() or not directory.resolve().is_relative_to(root): continue
+        if (directory/'quick_testing.json').exists(): continue
         try:
             plan_path=directory/'dv/testplan_doc.json'
             plan=json.loads(plan_path.read_text())
+            if plan.get('test_only'): continue
             sections=plan.get('sections',[])
             if not sections or plan.get('generation_status','COMPLETE')!='COMPLETE': continue
             if plan.get('source_authority','DOCUMENTED')!='DOCUMENTED': continue

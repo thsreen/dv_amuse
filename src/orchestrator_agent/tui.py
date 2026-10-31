@@ -13,6 +13,7 @@ import re
 import shutil
 import threading
 import time
+import textwrap
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,6 +21,7 @@ GREEN, YELLOW, RED, DIM, RESET = "\x1b[32m", "\x1b[33m", "\x1b[31m", "\x1b[2m", 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 MARK = {"PASS": ("*", GREEN), "RUN": (">", YELLOW), "....": ("o", DIM),
+        "WAITING_HUMAN": ("?", YELLOW), "PLAN_UPDATED": ("*", GREEN),
         "INTERRUPTED": ("x", RED),
         "FAIL": ("x", RED), "BLOCKED": ("x", RED), "TIMEOUT": ("x", RED),
         "SKIPPED": ("-", DIM), "REUSED": ("*", DIM), "NOT_RUN": ("-", DIM)}
@@ -59,6 +61,13 @@ def _short(value: str, width: int) -> str:
 
 def _pad_ansi(value: str, width: int) -> str:
     return value + " " * max(0, width - len(ANSI.sub("", value)))
+
+
+def _wrap(value: str, width: int) -> list[str]:
+    """Retain complete task messages, including long identifiers and explicit lines."""
+    wrapper = textwrap.TextWrapper(width=max(1, width), break_on_hyphens=False)
+    return [line for paragraph in str(value).split("\n")
+            for line in (wrapper.wrap(paragraph) or [""])]
 
 
 def testplan_substeps() -> list[tuple[str, str]]:
@@ -110,20 +119,28 @@ class Dashboard:
 
     def _restore_retries(self):
         path = Path(self.out_dir) / ('code_trace.jsonl' if self.substep_owner == 'code' else 'orchestrator_trace.jsonl')
+        active_sub = active_tool = None
         try:
             with path.open() as handle:
                 for line in handle:
                     try: event = json.loads(line)
                     except ValueError: continue
+                    if not isinstance(event,dict): continue
                     kind = event.get('event')
                     if kind in ('tool_done','substep_done','tool_interrupted'):
                         key = ('tool',event.get('step')) if kind.startswith('tool') else ('sub',event.get('id'))
                         self._finished(key,event.get('status','INTERRUPTED'))
+                        if kind=='substep_done': active_sub=None
                     elif kind in ('tool_start','substep_start'):
                         key = ('tool',event.get('step')) if kind == 'tool_start' else ('sub',event.get('id'))
                         self._starting(key)
+                        if kind=='substep_start': active_sub=event.get('id')
+                        else: active_tool=event.get('step')
                     elif kind in ('tool_retry','substep_retry'):
                         key = ('tool',event.get('step')) if kind == 'tool_retry' else ('sub',event.get('id'))
+                        self._retry(key,event.get('status','FAIL'))
+                    elif kind=='task_retry' and (active_sub or active_tool):
+                        key=('sub',active_sub) if active_sub else ('tool',active_tool)
                         self._retry(key,event.get('status','FAIL'))
         except OSError:
             pass
@@ -131,7 +148,7 @@ class Dashboard:
 
     def _finished(self, key, status):
         self._retry_active.discard(key)
-        if status not in ('PASS','NOT_RUN','SKIPPED','REUSED'):
+        if status not in ('PASS','NOT_RUN','SKIPPED','REUSED','PLAN_UPDATED'):
             self._failed[key] = status
         else:
             self._failed.pop(key,None)
@@ -139,8 +156,7 @@ class Dashboard:
 
     def _retry(self, key, previous):
         self._failed[key] = previous
-        if key not in self._retry_active:
-            self._retry_counts[key] = self._retry_counts.get(key,0) + 1
+        self._retry_counts[key] = self._retry_counts.get(key,0) + 1
         self._retry_active.add(key)
 
     def _starting(self, key):
@@ -173,6 +189,7 @@ class Dashboard:
             self.substeps=[(s['id'],s['label']) for s in event['steps']]
             self.substatus={sid:self.substatus.get(sid,'....') for sid,label in self.substeps}
         elif kind == "run_start":
+            self.active_substep = None
             self._retry_active.clear()
             self.steps = list(event.get("steps", self.steps))
             self.status = {sid: "...." for sid in self.steps}
@@ -225,6 +242,11 @@ class Dashboard:
                 self.substatus[sid] = event.get("status", "PASS")
             self.task_name = event.get("label") or self._substep_label(sid)
             self.task_detail = event.get("status", "")
+        elif kind == 'human_review':
+            sid=event.get('id')
+            if sid in self.substatus: self.substatus[sid]='WAITING_HUMAN'
+            self.task_name='Human clarification required'
+            self.task_detail=event.get('question','')
         elif kind == "task_progress":
             self.task_detail = event.get("message", "")
             match = re.search(r"\[(\d+)/(\d+)\]", self.task_detail)
@@ -252,6 +274,8 @@ class Dashboard:
             self.finish = dict(status="NEEDS_REVIEW",
                                reason=event.get("step") or event.get("what") or kind)
         elif kind == "run_finish":
+            self.active_substep = None
+            self._retry_active.clear()
             self.finish = dict(status=event.get("status"), reason=event.get("reason", ""))
             self.current = {}
             self.task_name = "Run finished"
@@ -277,12 +301,26 @@ class Dashboard:
             if kind:
                 self.show(self._plain(kind, event or {}))
             return
-        width = max(80, min(180, shutil.get_terminal_size((120, 30)).columns))
+        width = max(4, min(180, shutil.get_terminal_size((120, 30)).columns))
+        if width < 80:
+            # A three-column minimum would overflow narrow terminals and hide statuses.
+            content_w = max(1, width - 4)
+            bar = "+" + "-" * (content_w + 2) + "+"
+            lines = ["\x1b[2J\x1b[H" + bar]
+            # Keep the current task at the bottom, visible when the terminal scrolls.
+            for pane in (self._left(content_w), self._right(content_w), self._middle(content_w)):
+                for row in pane:
+                    lines.extend(f"| {part.ljust(content_w)} |" for part in _wrap(ANSI.sub("", row), content_w))
+                lines.append(bar)
+            self.show("\n".join(lines))
+            return
         left_w, middle_w = max(22, width // 4), max(28, width // 3)
         right_w = width - left_w - middle_w - 10
         left = self._left(left_w)
         middle = self._middle(middle_w)
         right = self._right(right_w)
+        right = [part for row in right for part in
+                 (_wrap(ANSI.sub("", row), right_w) if len(ANSI.sub("", row)) > right_w else [row])]
         rows = max(len(left), len(middle), len(right))
         bar = "+" + "-" * (left_w + 2) + "+" + "-" * (middle_w + 2) + "+" + "-" * (right_w + 2) + "+"
         lines = ["\x1b[2J\x1b[H" + bar]
@@ -377,12 +415,12 @@ class Dashboard:
         minutes, seconds = divmod(rem, 60)
         current_key=('sub',self.active_substep) if self.active_substep else ('tool',self.current.get('step'))
         retry_status=self._display_status(current_key,'RUN')
-        return ["progress", f"{done}/{total} tasks complete",
+        lines = ["progress", f"{done}/{total} tasks complete",
                 "[" + "#" * filled + "-" * (bar_w - filled) + f"] {percent}%",
                 "-" * width, "current task",
-                _short(self.task_name, width),
+                self.task_name,
                 *( [retry_status] if retry_status!='RUN' else []),
-                _short(self.task_detail, width) if self.task_detail else "(waiting for task output)",
+                self.task_detail if self.task_detail else "(waiting for task output)",
                 "task progress",
                 ("[" + "#" * round(bar_w * self.task_fraction[0] / self.task_fraction[1])
                  + "-" * (bar_w - round(bar_w * self.task_fraction[0] / self.task_fraction[1]))
@@ -390,6 +428,7 @@ class Dashboard:
                  if self.task_fraction else "awaiting next checkpoint"),
                 "-" * width, "started", self.started_utc,
                 "elapsed", f"{hours:02d}:{minutes:02d}:{seconds:02d}"]
+        return [part for line in lines for part in _wrap(line, width)]
 
     def _right(self, width: int) -> list[str]:
         done = sum(1 for sid in self.steps if self.status.get(sid) in ("PASS", "NOT_RUN", "SKIPPED"))

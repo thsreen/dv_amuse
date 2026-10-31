@@ -981,3 +981,125 @@ def test_utility_configuration_builds_supported_tieoff_without_uvm_agent(inputs)
     result=design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
     assert len(result.agents)==1 and result.tie_offs[0].signal=='enable_static'
     assert not any(a.id=='enable_config' for a in result.agents)
+
+
+def test_basic_ambiguity_waits_for_human_instead_of_failing(inputs):
+    from dv_agent.quality.human_review import HumanReviewPending
+    root,spec,definition,contract,rtl=inputs
+    llm=workflow_model(contract);normal=llm.handlers['code_infrastructure']
+    def ambiguous(payload):
+        result=normal(payload)
+        if payload['task']['id']=='foundation_reset':
+            result['ambiguities']=[dict(kind='reset_polarity',question='Confirm reset active level')]
+        return result
+    llm.handlers['code_infrastructure']=ambiguous
+    with pytest.raises(HumanReviewPending):
+        build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[rtl])
+    state=json.loads((root/'output/code_generation_state.json').read_text())
+    assert state['status']=='WAITING_HUMAN'
+    assert json.loads((root/'output/code_work_manifest.json').read_text())['status']=='WAITING_HUMAN'
+    assert not any(n=='code_interfaces' for n,p in llm.calls)
+
+
+@pytest.mark.parametrize('respect_approval',[True,False])
+def test_human_approval_revises_plan_then_automatically_resumes_code(inputs,respect_approval):
+    from dv_agent.quality.human_review import approve,review_handler
+    root,spec,definition,contract,rtl=inputs
+    spec['sections'][0].update(generator='entries',heading='Checks',status='PASS')
+    spec['sections'][0]['entries'][0].update(kind='check',id='storage_check',validation=[],cited_req_ids=[])
+    (root/'plan.json').write_text(json.dumps(spec))
+    llm=workflow_model(contract);normal=llm.handlers['code_infrastructure']
+    def ambiguous(payload):
+        result=normal(payload)
+        if payload['task']['id']=='foundation_reset' and 'HUMAN-' not in json.dumps(payload['evidence']):
+            result['ambiguities']=[dict(kind='reset_polarity',question='Confirm reset active level')]
+        return result
+    llm.handlers['code_infrastructure']=ambiguous
+    if not respect_approval:
+        original_reset=llm.handlers['code_reset']
+        llm.handlers['code_reset']=lambda p:original_reset(p)|dict(reset_active='low')
+    approvals=[]
+    def human(folder,request):
+        approvals.append(request['id'])
+        approve(folder,request['id'],request['nonce'],{'reset_active':'high'},'Design engineer confirmed',
+                actor='designer',channel='terminal',reference='tty:confirmed')
+    with review_handler(human):
+        if not respect_approval:
+            with pytest.raises(ValueError,match='honor human-approved'):
+                build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[rtl])
+            assert len(approvals)==1
+            return
+        result=build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[rtl])
+    assert any(s.startswith('HUMAN-') for s in json.loads((root/'plan.json').read_text())['evidence_index'])
+    assert result['contract']=='verification_codegen_v1' and len(approvals)==1
+    plan=json.loads((root/'plan.json').read_text())
+    assert plan['human_approvals'][0]['bindings']=={'reset_active':'high'}
+    assert 'Approved by user designer' in (root/'plan.md').read_text()
+    assert 'Approved by user designer' in (root/'plan.html').read_text()
+
+
+def test_invalid_fact_ids_are_normalized_everywhere_and_references_follow():
+    from dv_agent.codegen.contracts import IDENTIFIER_RULE, identifier, normalize_fact_ids, safe_identifier
+    answer={'facts':[{'id':'F-RST-01'},{'id':'F_RST_01'},{'id':'f.2 x'},{'id':'ok1'}],
+            'sequences':[{'fact_ids':['F-RST-01','ok1','f.2 x']}],
+            'nested':{'agents':[{'fact_ids':['F-RST-01'],'facts':[{'id':'1st'}]}]}}
+    renamed=normalize_fact_ids(answer)
+    assert renamed=={'F-RST-01':'F_RST_01_2','f.2 x':'f_2_x','1st':'f_1st'}  # a collision gets a suffix, never a duplicate
+    assert [f['id'] for f in answer['facts']]==['F_RST_01_2','F_RST_01','f_2_x','ok1']
+    assert answer['sequences'][0]['fact_ids']==['F_RST_01_2','ok1','f_2_x'] and answer['nested']['agents'][0]['fact_ids']==['F_RST_01_2']
+    assert all(identifier(f['id']) for f in answer['facts'])
+    assert normalize_fact_ids(answer)=={}  # valid ids are left alone
+    assert safe_identifier('class')=='class_id' and safe_identifier('--')=='id' and safe_identifier('9')=='f_9'
+    with pytest.raises(ValueError,match='letters, digits and underscores'): identifier('F-RST-01')
+    assert 'hyphens' in IDENTIFIER_RULE
+
+
+def test_validate_facts_lists_every_bad_identifier_with_the_rule(inputs):
+    from dv_agent.codegen.contracts import Fact
+    from dv_agent.codegen.validate import validate_facts
+    facts=[Fact(id=i,statement='s',source_id='CH-1',quote='quote text',plan_pointer='/sections/0') for i in ('A-1','b','C-3')]
+    with pytest.raises(ValueError) as caught: validate_facts(facts,{},{})
+    assert "['A-1', 'C-3']" in str(caught.value) and 'underscores' in str(caught.value)
+
+
+def test_hyphenated_reset_fact_ids_need_no_repair_call_and_the_rename_is_recorded(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    llm=workflow_model(contract);normal=llm.handlers['code_infrastructure'];seen=[]
+    def answer(payload):
+        result=normal(payload)
+        if payload['task']['id']=='foundation_reset':
+            seen.append(payload)
+            for number,fact in enumerate(result['facts'],1): fact['id']=f'F-RST-{number:02d}'
+        return result
+    llm.handlers['code_infrastructure']=answer
+    design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    assert len(seen)==1 and 'repair_feedback' not in seen[0]  # one call: the ids were normalized, not refused
+    context=json.loads((root/'output/code_context.json').read_text())
+    renamed=[r['renamed_fact_ids'] for r in context['requests'] if r.get('renamed_fact_ids')]
+    assert renamed and all(new.startswith('F_RST_') for m in renamed for new in m.values())
+
+
+def test_a_refused_answer_returns_with_the_rule_and_its_own_previous_output(inputs):
+    from dv_agent.codegen.contracts import IDENTIFIER_RULE
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    llm=workflow_model(contract);normal=llm.handlers['code_collation'];calls=[]
+    def collate(payload):
+        calls.append(payload)
+        result=normal(payload)
+        if len(calls)==1: result['check_approach']=[]
+        else:
+            assert payload['repair_rules']=={'identifiers':IDENTIFIER_RULE}
+            assert payload['previous_output']['check_approach']==[] and 'nonempty check_approach' in payload['repair_feedback']
+        return result
+    llm.handlers['code_collation']=collate
+    design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output',pseudocode_only=True)
+    assert len(calls)==2
+
+
+def test_prompts_state_the_identifier_format_and_how_to_use_repair_feedback():
+    from dv_agent.codegen.reasoning import INSTRUCTIONS
+    from dv_agent.codegen.units import INFRASTRUCTURE_INSTRUCTIONS
+    for text in (INSTRUCTIONS,INFRASTRUCTURE_INSTRUCTIONS):
+        assert 'never hyphens' in text and 'repair_feedback' in text and 'previous_output' in text

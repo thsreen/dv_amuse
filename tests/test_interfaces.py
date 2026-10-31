@@ -110,17 +110,22 @@ def test_interfaces_come_first_and_feed_every_section(spec_repo, tmp_path):
     assert lineage(G, art)["sources"]
 
 
-def test_blocked_interface_step_does_not_stop_the_plan(spec_repo, tmp_path):
+def test_blocked_interface_step_stops_all_following_model_work(spec_repo, tmp_path):
     out, _ = _graph(spec_repo, tmp_path)
 
     def failing(payload):
         raise LLMError("transient", "simulated")
-    summary = run_testplan_doc(out, _llm(testplan_interfaces=failing), mode="graph")
+    llm = _llm(testplan_interfaces=failing)
+    summary = run_testplan_doc(out, llm, mode="graph")
     assert summary["interfaces"]["status"] == "BLOCKED"
     status = {s["id"]: s["status"] for s in summary["sections"]}
-    assert status.pop("strategy") == "NOT_RUN"  # the strategy is built from verified interface groups
-    assert status.pop("rtl_observations") == "NOT_RUN"  # opt-in; no RTL graph provided
-    assert set(status.values()) == {"PASS"}
+    for name in ("strategy", "verification_plan", "stimulus", "checks", "coverage", "callouts"):
+        assert status[name] == "BLOCKED"
+    assert set(status.values()) == {"BLOCKED"}
+    assert summary["registers"]["status"] == "BLOCKED"
+    assert not any(name in ("testplan_registers", "testplan_entries", "testplan_strategy", "testplan_configurations")
+                   for name, _ in llm.calls)
+    assert summary["status"] == "BLOCKED"
     assert "**BLOCKED**" in (out / "testplan_doc.md").read_text()
     assert run_testplan_doc(out, _llm(), mode="graph")["reused"] is False
 
@@ -222,3 +227,17 @@ def test_interface_sources_use_document_markers(spec_repo, tmp_path):
     assert re.search(r"Source: `[^`]+`, CH-", md) is None
     signal_row = next(line for line in md.splitlines() if line.startswith("| CLK |"))
     assert "📄<!--dv-sources:" in signal_row
+
+
+def test_testbench_supplied_clock_and_reset_raise_plan_time_questions_when_undocumented():
+    from dv_agent.plan.interfaces import interface_questions
+
+    def group(name, category, signals):
+        return dict(name=name, category=category, signals=[
+            dict(name=n, direction=d, direction_documented=True, active_level_documented=documented) for n, d, documented in signals])
+    groups = [group("clk", "clock", [("CLK", "input", False)]), group("rst", "reset", [("RST", "input", False)]),
+              group("tick", "clock", [("TICK", "output", False)]), group("clk2", "clock", [("CLK2", "input", True)])]
+    texts = [q["text"] for q in interface_questions({"groups": groups})]
+    assert any(t.startswith("What is the active edge of CLK ") for t in texts)  # a clock the testbench supplies
+    assert any(t.startswith("What is the active level of RST ") for t in texts)
+    assert not any("TICK" in t or "CLK2" in t for t in texts)  # a derived clock output or a documented edge needs none
