@@ -160,7 +160,16 @@ class Dashboard:
         kind = event.get("event")
         if kind in ("substep_done", "tool_done", "run_finish"):
             self.elapsed_s = max(0, int(time.monotonic() - self.started))
-        if kind == 'substeps_configured':
+        if kind=='notification_start':
+            if 'startup_notification' not in self.steps: self.steps.insert(0,'startup_notification')
+            self.status['startup_notification']='RUN'
+            self.task_name='Send startup notification to Hermes/Telegram'
+            self.task_detail=''
+        elif kind=='notification_done':
+            self.status['startup_notification']='PASS' if event.get('status')=='SENT' else 'NOT_RUN'
+            self.summary['startup_notification']=event.get('reason') or event.get('status')
+            self.task_detail='Notification: '+event.get('status','')
+        elif kind == 'substeps_configured':
             self.substeps=[(s['id'],s['label']) for s in event['steps']]
             self.substatus={sid:self.substatus.get(sid,'....') for sid,label in self.substeps}
         elif kind == "run_start":
@@ -252,6 +261,7 @@ class Dashboard:
         self.redraw(kind, event)
 
     def _step_label(self, sid: str) -> str:
+        if sid=='startup_notification': return 'Startup notification'
         item = next((s for s in self.flow.get("steps", []) if s["id"] == sid), None)
         return item.get("description", sid) if item else sid
 
@@ -285,6 +295,9 @@ class Dashboard:
         self.show("\n".join(lines))
 
     def _plain(self, kind: str, event: dict) -> str:
+        if kind=='notification_start': return '[run] Send startup notification to Hermes/Telegram'
+        if kind=='notification_done': return f"[notification {event.get('status')}] {event.get('reason','')}"
+        if kind=='human_review': return f"[WAITING_HUMAN] {event.get('question','')} ({event.get('request_id','')})"
         if kind == 'run_start' and self.substep_owner == 'code':
             return f"[started] {self.started_utc}"
         if kind == "tool_start":

@@ -185,3 +185,9 @@ def _clear_progress_sinks():
     from dv_agent.core.progress import set_global_sink, set_sink
     set_sink(None)
     set_global_sink(None)
+
+
+@pytest.fixture(autouse=True)
+def disable_live_start_notifications(monkeypatch):
+    """Tests never send messages using a developer's real bot configuration."""
+    monkeypatch.setenv('DV_AGENT_START_NOTIFICATION','0')

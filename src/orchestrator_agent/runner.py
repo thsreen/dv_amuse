@@ -172,6 +172,8 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
     started = time.monotonic()
     emit("run_start", flow=str(flow_path), steps=[s["id"] for s in order],
          dry_run=dry_run, approvals=sorted(approved))
+    from dv_agent.core.notifications import notify_start
+    notify_start(out_dir,'plan',emit,dry_run=dry_run)
 
     def finish(status: str, reason: str = "", *, approvals_needed=None,
                question: str = "", pending: str | None = None) -> dict:

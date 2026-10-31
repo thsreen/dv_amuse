@@ -433,6 +433,9 @@ def _main(argv: list[str] | None) -> int:
         if args.fresh:
             result["cleared"] = clear_run(out)
             emit(f"cleared {len(result['cleared'])} cached artifacts (--fresh)")
+        from .core.notifications import notify_start
+        result['notification']=notify_start(out,'pipeline')
+        emit('startup notification: '+result['notification']['status'])
         emit(f"[1/{len(stages)}] ingest: {args.repo} -> {out}")
         result["ingest"] = run_ingest(args.repo, out, args.include, force=force)
         emit(f"ingest done: {result['ingest']['chunks']} chunks")

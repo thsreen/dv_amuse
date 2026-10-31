@@ -13,7 +13,7 @@ from .tui import Dashboard
 def preview(out):
     return '\n'.join(['--- code preview ---', f'Testplan: {out / "dv/testplan_doc.json"}',
                       '/code will execute automatically:'] +
-                     [f'  {i}. {label}.' for i, (_, label) in enumerate(STEPS, 1)] +
+                     [f'  {i}. {label}.' for i, (_, label) in enumerate([('startup_notification','Send startup notification to Hermes/Telegram')]+STEPS, 1)] +
                      [f'Output: {out / "code"}',
                       'Dependency notes and pseudocode are saved along the way. Use /run afterward.'])
 
@@ -40,6 +40,8 @@ def execute(build, out, variables, *, llm, show, dashboard=False, ansi=False):
         event('run_finish', **result)
 
     event('run_start', steps=['code'])
+    from dv_agent.core.notifications import notify_start
+    notify_start(out,'code',event)
     event('tool_start', step='code', tool='dv_agent.codegen', attempt=1)
     try:
         with reporting(sink=lambda message: event('task_progress', step='code', message=message),

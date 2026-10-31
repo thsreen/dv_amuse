@@ -55,7 +55,7 @@ def _check_mode(mode: str) -> str:
     if mode not in MODES:
         raise ValueError(f"unknown mode: {mode} (expected one of {', '.join(MODES)})")
     return mode
-RUN_MARKERS = ("manifest.json", BUILD_STATS, GRAPH_FILE, TRACE_FILE)
+RUN_MARKERS = ("manifest.json", BUILD_STATS, GRAPH_FILE, TRACE_FILE, "notification_pipeline.json", "notification_outbox")
 
 
 def _trace_info(tracer: Tracer) -> dict:
@@ -86,7 +86,7 @@ def _ingest_current(repo: Path, out: Path, include: list[str] | None) -> bool:
 
 RUN_ARTIFACTS = ("manifest.json", "chunks.jsonl", "text", GRAPH_FILE, BUILD_STATS,
                  TEST_PLAN, TESTPLAN_DOC, TESTPLAN_MD, TESTPLAN_HTML, *STEP_FILES, DENSE_DIR, INDEX_FILE,
-                 "llm_cache", TRACE_FILE)
+                 "llm_cache", TRACE_FILE, "notification_pipeline.json")
 
 
 def _remove(p: Path) -> bool:

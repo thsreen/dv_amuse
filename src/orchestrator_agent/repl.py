@@ -67,7 +67,8 @@ def ask_card(flow: dict, flow_path: Path, variables: dict, requirement: str,
                   f"RTL top: {scan['top'] or '(not identified)'}"]
         lines += [f"note: {note}" for note in scan["notes"]]
     lines.append("/plan will:")
-    for i, step in enumerate(flow["steps"], 1):
+    lines.append("  1. Send startup notification to Hermes/Telegram.")
+    for i, step in enumerate(flow["steps"], 2):
         lines.append(f"  {i}. {descriptions.get(step['tool'], step.get('description', step['tool']))}")
         if step["tool"] == "dv_testplan":
             for subid, label in testplan_substeps():
