@@ -39,15 +39,14 @@ src/dv_agent/uvc/
   clock/    clock_if, clock_cfg, clock_driver, clock_monitor, clock_agent, clock_tick, clock_pkg
   reset/    reset_if, reset_cfg, reset_item, reset_sequencer, reset_driver, reset_monitor, reset_agent,
             reset_pulse_seq, reset_pkg
-  common/   common_cfg   holds clock_cfg and reset_cfg; bind_clock() and bind_reset() are the only
+  common/   common_cfg   exposes clk_cfg and rst_cfg; bind_clock() and bind_reset() are the only
                          project-specific calls
-            common_agent instantiates clock_agent and reset_agent, gives each its own cfg, apply_reset()
-            common_env   instantiates common_agent from a common_cfg
+            common_agent exposes clk_agent and rst_agent, gives each its own cfg, apply_reset()
+            common_env   exposes cmn_agent and cmn_cfg
             common_pkg   imports clock_pkg and reset_pkg and includes the three classes
 ```
 
-The generated test builds one `common_cfg`, binds the clock and reset interfaces, creates `common_env`, and
-calls `common_infra.agent.apply_reset()`. The top module connects `clock_bus.clk` and `reset_bus.reset` to the
+The generated `cg_env` extends `common_env` and calls the base build/connect phases. The test creates one `cg_env cmn_env` and `common_cfg cmn_cfg`, binds the clock/reset configuration through `clk_cfg`/`rst_cfg`, and calls `cmn_env.cmn_agent.apply_reset()`. There is no separate common environment beside the generated environment. The top module connects `clock_bus.clk` and `reset_bus.reset` to the
 bound DUT ports. Compile order: `clock_if`, `reset_if`, `clock_pkg`, `reset_pkg`, `common_pkg`, then the
 design's interfaces and package.
 
@@ -66,3 +65,23 @@ fixed input.
   is asked once.
 - Verified: the UART acceptance project compiles and passes both tests under Xezim with UVM 2020.3.1
   (`DV_AGENT_TEST_SIMULATION=1 pytest tests/test_codegen.py -k real_uart`).
+
+## Stable instance names and extension
+
+The common UVC class names stay `common_env`, `common_agent`, `common_cfg`,
+`clock_agent` and `reset_agent`. Instance handles and factory instance names use
+`cmn_env`, `cmn_agent`, `cmn_cfg`, `clk_agent`, `rst_agent`, `clk_cfg`, `rst_cfg`.
+The config-db field remains `"cfg"`. Normal hierarchy:
+
+```text
+uvm_test_top.cmn_env                   (cg_env extends common_env)
+  cmn_agent                           (common_agent)
+    clk_agent                         (clock_agent)
+    rst_agent                         (reset_agent)
+```
+
+Extend the common environment/agent with UVM factory overrides or a project subclass,
+and always call `super.build_phase`/`super.connect_phase`. Generated protocol agents
+and scoreboards share the derived environment with the inherited clock/reset agent.
+Custom code using old `common_infra.agent`, `.clock` or `.reset` configuration paths
+must migrate to the names above and regenerate existing output.

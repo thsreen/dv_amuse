@@ -52,8 +52,8 @@ def test_clock_manifest_and_templates_use_selected_ps_period_and_monitor_coverag
     assert '+UVM_TESTNAME=basic_functional' in args and '+CLOCK_PERIOD_PS=2501' in args
     code=root/'output'/'code'/manifest['build_id'][:16]
     test=(code/'tests/basic_functional.svh').read_text()
-    assert 'clock_control.period * 8' in test and 'CLOCK_RANGE' in test
-    assert 'clock_uvc.mon.ap.connect(clock_cov.analysis_export)' in test
+    assert 'clk_cfg.period * 8' in test and 'CLOCK_RANGE' in test
+    assert 'cmn_env.cmn_agent.clk_agent.mon.ap.connect(clock_cov.analysis_export)' in test
     assert 'realtime period' in (code/'common_uvc/clock/clock_cfg.svh').read_text()
     assert '$floor' in (code/'common_uvc/clock/clock_driver.svh').read_text()
     assert '$realtime' in (code/'common_uvc/clock/clock_monitor.svh').read_text()

@@ -1110,13 +1110,18 @@ def test_generated_testbench_instantiates_the_common_environment_and_compiles_it
     for name in ('common_cfg.svh','common_agent.svh','common_env.svh','common_pkg.sv'):
         assert (code/'common_uvc/common'/name).is_file()
     test=(code/'tests/basic_functional.svh').read_text()
-    assert 'common_env::type_id::create("common_infra",this)' in test and 'common_control.bind_reset(' in test
+    assert 'cg_env::type_id::create("cmn_env",this)' in test and 'cmn_cfg.bind_reset(' in test
     assert 'clock_agent::type_id::create' not in test and 'reset_agent::type_id::create' not in test  # the common agent owns them
-    assert 'common_infra.agent.apply_reset();' in test and 'reset_pulse_seq::type_id::create' not in test
+    assert 'cmn_env.cmn_agent.apply_reset();' in test and 'reset_pulse_seq::type_id::create' not in test
     files=(code/'compile.f').read_text().split()
     assert files.index('common_uvc/reset/reset_pkg.sv')<files.index('common_uvc/common/common_pkg.sv')<files.index(next(f for f in files if f.endswith('verification_top.sv')))
     assert 'import common_pkg::*;' in (code/'peripheral_verification_pkg.sv').read_text()
     env=(code/'common_uvc/common/common_env.svh').read_text()
     assert 'class common_env extends uvm_env' in env and 'common_agent::type_id::create' in env
+    generated_env=(code/'uvm/cg_env.svh').read_text()
+    assert 'class cg_env extends common_env' in generated_env
+    assert 'super.build_phase(phase)' in generated_env and 'super.connect_phase(phase)' in generated_env
+    assert 'common_agent cmn_agent;' in env and 'create("cmn_agent", this)' in env
+    assert 'common_env common_infra' not in test
     agent=(code/'common_uvc/common/common_agent.svh').read_text()
-    assert 'clock_agent::type_id::create("clock_uvc"' in agent and 'reset_agent::type_id::create("reset_uvc"' in agent
+    assert 'clock_agent::type_id::create("clk_agent"' in agent and 'reset_agent::type_id::create("rst_agent"' in agent

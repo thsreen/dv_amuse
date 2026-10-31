@@ -63,7 +63,7 @@ def validate(plan, specification, definition, sources):
     symbols += [c.id+'_coverage' for c in plan.coverage]
     if len(symbols)!=len(set(symbols)):
         raise ValueError('Generated class names collide; choose distinct component/sequence/test IDs')
-    if any(a.id in {'sb','system_cov','build_phase','connect_phase','new'} or a.id.endswith('_control') for a in plan.agents):
+    if any(a.id in {'sb','system_cov','cmn_agent','cmn_cfg','build_phase','connect_phase','new'} or a.id.endswith('_control') for a in plan.agents):
         raise ValueError('Agent name collides with environment infrastructure')
     owners = {plan.clock: "clock_uvc", plan.reset: "reset_uvc"}
     for tie in plan.tie_offs:

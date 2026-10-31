@@ -212,7 +212,7 @@ def render(plan, ports, hooks=None):
         timing=[f'    cg_clock_period_ps={default_ps};',
                 '    void\'($value$plusargs("CLOCK_PERIOD_PS=%d",cg_clock_period_ps));',
                 f'    if(!({allowed})) `uvm_fatal("CLOCK_RANGE", "Selected period is outside approved bands")',
-                '    clock_control.period=real\'(cg_clock_period_ps) * 1ps;',
+                '    clk_cfg.period=real\'(cg_clock_period_ps) * 1ps;',
                 '    $display("CLOCK_PERIOD_SELECTED_PS %0d",cg_clock_period_ps);']
     for test in plan.tests:
         members = [f"  {a.id}_sequencer {a.id}_sqr;" for a in plan.agents if a.active]
@@ -236,21 +236,21 @@ def render(plan, ports, hooks=None):
             test_members += [f"  {a.id}_cfg {a.id}_control;"]
             test_build += [f'    {a.id}_control={a.id}_cfg::type_id::create("{a.id}_control");',
                            f'    if(!uvm_config_db #(virtual {a.id}_if)::get(this,"","{a.id}_vif",{a.id}_control.vif)) `uvm_fatal("VIF", "{a.id}_vif missing")',
-                           f'    env.{a.id}_control={a.id}_control;']
+                           f'    cmn_env.{a.id}_control={a.id}_control;']
             if a.active:
-                handles += [f"    seq.{a.id}_sqr=env.{a.id}.sqr;"]
+                handles += [f"    seq.{a.id}_sqr=cmn_env.{a.id}.sqr;"]
         for setting in test.sequencer_settings:
             variable=next(v for v in plan.sequencer_variables if v.id==setting.variable)
-            handles += [f'    env.{variable.agent}.sqr.{variable.id}={sv(setting.value)};']
+            handles += [f'    cmn_env.{variable.agent}.sqr.{variable.id}={sv(setting.value)};']
         if plan.clock_period_ranges:
             test_members += ['  cg_clock_coverage clock_cov;']
         add(f"tests/{test.id}.svh", template('test.svh', TEST=test.id, DECLARATIONS='\n'.join(test_members), BUILD='\n'.join(test_build),
             CLOCK_TIMING_SETUP='\n'.join(timing+(['    clock_cov=cg_clock_coverage::type_id::create("clock_cov",this);',
                 '    clock_cov.expected_period_ps=cg_clock_period_ps;'] if plan.clock_period_ranges else [])), RESET_CYCLES=plan.reset_cycles,
-            CLOCK_COVERAGE_CONNECT='    clock_uvc.mon.ap.connect(clock_cov.analysis_export);' if plan.clock_period_ranges else '',
+            CLOCK_COVERAGE_CONNECT='    cmn_env.cmn_agent.clk_agent.mon.ap.connect(clock_cov.analysis_export);' if plan.clock_period_ranges else '',
             CLOCK_PERIOD=plan.clock_period_ns, RESET_ACTIVE=int(plan.reset_active=='high'), RESET_TIME=plan.clock_period_ns*plan.reset_cycles,
             MIN_COMPARISONS=test.minimum_comparisons, SEQUENCERS='\n'.join(handles),
-            SYSTEM_COVERAGE_RESET=(f'    env.system_cov.reset_vif=reset_control.vif; env.system_cov.reset_active={int(plan.reset_active=="high")}; env.system_cov.flush();' if plan.routes else '')))
+            SYSTEM_COVERAGE_RESET=(f'    cmn_env.system_cov.reset_vif=rst_cfg.vif; cmn_env.system_cov.reset_active={int(plan.reset_active=="high")}; cmn_env.system_cov.flush();' if plan.routes else '')))
     # Includes are sorted by construction, not lexicographically: dependencies precede users.
     artifacts[f"{package}.sv"] = template('package.sv', PACKAGE=package, INCLUDES='\n'.join(includes))
     connections = {name: 'dut_'+name for name in ports}
