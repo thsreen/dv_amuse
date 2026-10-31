@@ -272,12 +272,14 @@ total; estimated calls flagged. Local cache hits consume nothing (shown as
 output carries its run's totals; `dv-agent usage [--last N | --trace ID]`
 reports across runs.
 
-## 22. `retrieval/evaluate.py` — retrieval metrics (standalone, no CLI)
+## 22. `retrieval/evaluate.py` — retrieval metrics (`dv-agent evaluate`)
 
-`load_cases()` + recall@k / MRR computation over a labeled case file
-(`eval/uart_cases.json`). Import from Python; wired into no command yet.
-Every retrieval claim needs a measurement here before being stated as an
-improvement.
+`load_cases()` + recall@k / MRR over a labeled case file (`eval/uart_cases.json`), run by
+`dv-agent evaluate --out runs/<run> [--cases FILE] [--k 1 3 5] [--ablate] [--table]`. `--ablate` reports
+lexical-only (no graph propagation) beside the full configuration, with recall by question type and the
+missed queries. No model call. Every retrieval claim needs a measurement here before being stated as an
+improvement. Measured on `runs/uart_fast` (24 questions): recall@1 0.79 lexical vs 0.75 graph, both 1.00 at
+k=3; graph propagation gave no gain on this set.
 
 ## 23. `core/models.py` + `core/fsutil.py` — shared leaves (no pipeline logic)
 

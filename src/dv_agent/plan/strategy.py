@@ -7,6 +7,7 @@ agent-level and top-level scoreboards. Code then checks the proposal against the
 (group coverage, signal ownership and direction, register names, scoreboard inputs). The strategy
 classifies each item by source support; architecture choices remain INFERRED unless source-prescribed.
 """
+from .interface_roles import INFRASTRUCTURE, group_roles
 from .interfaces import compact
 from ..core.llm import LLM, LLMError
 from ..core.progress import emit
@@ -41,6 +42,9 @@ broad sequence family and checking responsibility per interface where sufficient
   correctness: how the agent ensures the behaviour is correct (protocol assertions, monitor checks, a scoreboard
   inside the agent, the top-level scoreboard, a reference model, register-model checks, coverage), each with
   what exactly is checked and against which specification behaviour.
+- interface_roles classifies each group. infrastructure_source (a clock or reset the testbench supplies): its agent only
+  generates the source; it has no correctness mechanism of its own and is never an input of a scoreboard. observed_output
+  (the DUT drives it): a passive agent that monitors; never driven. functional_interface: the full treatment above.
 - scoreboards: agent-level scoreboards (inputs: that agent) and top-level scoreboards that span several agents
   (for example comparing data written on one interface with data observed on another), each with its reference
   model or predictor and what it compares.
@@ -125,7 +129,8 @@ def build_strategy(llm: LLM, tracer: Tracer, interfaces: dict | None, registers:
     signals = sorted({s["name"] for g in groups for s in g["signals"]})
     context = context or {"requirements": [], "chunks": []}
     chunk_ids = sorted(set(_evidence_chunks(interfaces, registers)) | {c["chunk_id"] for c in context["chunks"]})
-    payload = dict(scope=scope, interface_groups=compact(interfaces), registers=_register_summary(registers),
+    payload = dict(scope=scope, interface_groups=compact(interfaces), interface_roles=group_roles(groups),
+                   registers=_register_summary(registers),
                    requirements=[{k: r[k] for k in ("req_id", "statement", "kind")} for r in context["requirements"]],
                    chunks=[{"chunk_id": c["chunk_id"], "section": c["section"], "text": c["text"][:chunk_chars]}
                            for c in context["chunks"]],
@@ -205,9 +210,11 @@ def _rtl_actions(data: dict, observations: list[dict]) -> tuple[list[dict], list
 
 def validate_strategy(data: dict, groups: list[dict], reg_labels: set[str], chunk_ids: set[str], sources=None) -> dict:
     by_group = {g["name"]: g for g in groups}
+    roles = group_roles(groups)
     notes: list[str] = []
     owner: dict[str, str] = {}
     agents = []
+    source_agents: set[str] = set()
     for a in data.get("agents", []):
         name = a["name"].strip()
         if not name or name in {x["name"] for x in agents}:
@@ -236,7 +243,13 @@ def validate_strategy(data: dict, groups: list[dict], reg_labels: set[str], chun
             drives = []
         regs = [r for r in dict.fromkeys(a["registers"]) if r in reg_labels]
         correctness = [c for c in a["correctness"] if c["description"].strip()]
-        if not correctness:
+        if own and all(roles[g] == INFRASTRUCTURE for g in own):
+            # A clock/reset source has nothing to compare; its agent only generates the source.
+            source_agents.add(name)
+            if correctness:
+                notes.append(f"{name}: drives only clock/reset sources, which need no correctness mechanism; removed")
+            correctness = []
+        elif not correctness:
             notes.append(f"{name}: no correctness mechanism stated")
         cites = [c for c in dict.fromkeys(a["cited_chunk_ids"]) if c in chunk_ids]
         cites = cites or sorted({c for g in own for c in by_group[g]["cited_chunk_ids"]})
@@ -247,7 +260,10 @@ def validate_strategy(data: dict, groups: list[dict], reg_labels: set[str], chun
     agent_names = {a["name"] for a in agents}
     scoreboards = []
     for sb in data.get("scoreboards", []):
-        inputs = [i for i in dict.fromkeys(sb["inputs"]) if i in agent_names]
+        sources_named = sorted(set(sb["inputs"]) & source_agents)
+        if sources_named:
+            notes.append(f"scoreboard {sb['name']}: clock/reset source agents {sources_named} are not scoreboard inputs; removed")
+        inputs = [i for i in dict.fromkeys(sb["inputs"]) if i in agent_names and i not in source_agents]
         unknown = sorted(set(sb["inputs"]) - agent_names)
         if unknown:
             notes.append(f"scoreboard {sb['name']}: unknown input agents {unknown} removed")

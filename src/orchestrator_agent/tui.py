@@ -102,6 +102,55 @@ class Dashboard:
         self.task_detail = ""
         self.task_fraction: tuple[int, int] | None = None
         self._lock = threading.RLock()
+        self._failed = {}
+        self._retry_counts = {}
+        self._retry_active = set()
+        self.active_substep = None
+        self._restore_retries()
+
+    def _restore_retries(self):
+        path = Path(self.out_dir) / ('code_trace.jsonl' if self.substep_owner == 'code' else 'orchestrator_trace.jsonl')
+        try:
+            with path.open() as handle:
+                for line in handle:
+                    try: event = json.loads(line)
+                    except ValueError: continue
+                    kind = event.get('event')
+                    if kind in ('tool_done','substep_done','tool_interrupted'):
+                        key = ('tool',event.get('step')) if kind.startswith('tool') else ('sub',event.get('id'))
+                        self._finished(key,event.get('status','INTERRUPTED'))
+                    elif kind in ('tool_start','substep_start'):
+                        key = ('tool',event.get('step')) if kind == 'tool_start' else ('sub',event.get('id'))
+                        self._starting(key)
+                    elif kind in ('tool_retry','substep_retry'):
+                        key = ('tool',event.get('step')) if kind == 'tool_retry' else ('sub',event.get('id'))
+                        self._retry(key,event.get('status','FAIL'))
+        except OSError:
+            pass
+        self._retry_active.clear()
+
+    def _finished(self, key, status):
+        self._retry_active.discard(key)
+        if status not in ('PASS','NOT_RUN','SKIPPED','REUSED'):
+            self._failed[key] = status
+        else:
+            self._failed.pop(key,None)
+            self._retry_counts.pop(key,None)
+
+    def _retry(self, key, previous):
+        self._failed[key] = previous
+        if key not in self._retry_active:
+            self._retry_counts[key] = self._retry_counts.get(key,0) + 1
+        self._retry_active.add(key)
+
+    def _starting(self, key):
+        if key in self._failed and key not in self._retry_active:
+            self._retry(key,self._failed[key])
+
+    def _display_status(self, key, status):
+        if status == 'RUN' and key in self._retry_active:
+            return f"{self._failed[key]}/RETRY({self._retry_counts[key]})"
+        return status
 
     def handle(self, event: dict) -> None:
         with self._lock:
@@ -115,10 +164,12 @@ class Dashboard:
             self.substeps=[(s['id'],s['label']) for s in event['steps']]
             self.substatus={sid:self.substatus.get(sid,'....') for sid,label in self.substeps}
         elif kind == "run_start":
+            self._retry_active.clear()
             self.steps = list(event.get("steps", self.steps))
             self.status = {sid: "...." for sid in self.steps}
             self.substatus = {sid: "...." for sid, _ in self.substeps}
         elif kind == "tool_start":
+            self._starting(('tool',event['step']))
             self.calls += 1
             self.current = {k: event.get(k) for k in
                             ("step", "tool", "attempt", "revisit", "extra_prompt")}
@@ -127,6 +178,7 @@ class Dashboard:
             self.task_detail = ""
             self.task_fraction = None
         elif kind == "tool_done":
+            self._finished(('tool',event['step']),event.get('status','FAIL'))
             self.status[event["step"]] = event.get("status", "?")
             self.summary[event["step"]] = event.get("summary", "")
             if event["step"] == self.substep_owner and event.get("status") == "PASS":
@@ -135,7 +187,9 @@ class Dashboard:
                         self.substatus[sid] = 'NOT_RUN' if self.substep_owner=='code' else "REUSED"
             elif event['step']==self.substep_owner:
                 for sid,status in self.substatus.items():
-                    if status=='RUN': self.substatus[sid]=event.get('status','FAIL')
+                    if status=='RUN':
+                        self.substatus[sid]=event.get('status','FAIL')
+                        self._finished(('sub',sid),event.get('status','FAIL'))
             if event.get("status") not in ("PASS", "NOT_RUN"):
                 self.current = {}
             self.task_name = self._step_label(event["step"])
@@ -147,6 +201,8 @@ class Dashboard:
             self.task_name = "Reuse saved testplan"
         elif kind == "substep_start":
             sid = event.get("id")
+            self.active_substep = sid
+            self._starting(('sub',sid))
             if sid in self.substatus:
                 self.substatus[sid] = "RUN"
             self.task_name = event.get("label") or self._substep_label(sid)
@@ -154,6 +210,8 @@ class Dashboard:
             self.task_fraction = None
         elif kind == "substep_done":
             sid = event.get("id")
+            self._finished(('sub',sid),event.get('status','PASS'))
+            if self.active_substep == sid: self.active_substep = None
             if sid in self.substatus:
                 self.substatus[sid] = event.get("status", "PASS")
             self.task_name = event.get("label") or self._substep_label(sid)
@@ -164,7 +222,15 @@ class Dashboard:
             if match and int(match[2]) > 0:
                 self.task_fraction = (min(int(match[1]), int(match[2])), int(match[2]))
         elif kind == "tool_retry":
+            self._retry(('tool',event['step']),event.get('status','FAIL'))
             self.status[event["step"]] = "RUN"
+        elif kind in ('substep_retry','task_retry'):
+            sid = event.get('id') or self.active_substep
+            if sid:
+                self._retry(('sub',sid),event.get('status','FAIL'))
+                self.substatus[sid] = 'RUN'
+            elif self.current:
+                self._retry(('tool',self.current['step']),event.get('status','FAIL'))
         elif kind == "tool_skip_optional":
             self.status[event["step"]] = "SKIPPED"
         elif kind == "decider":
@@ -225,13 +291,19 @@ class Dashboard:
             line = f"{event['step']}: {event['tool']}"
             if event.get("extra_prompt"):
                 line += f" (follow-up: {_short(event['extra_prompt'], 80)})"
-            return f"[run] {line}"
+            status=self._display_status(('tool',event['step']),'RUN')
+            return f"[{status if status!='RUN' else 'run'}] {line}"
         if kind == "tool_done":
             return f"[{event.get('status')}] {event['step']}: {event.get('summary', '')}"
         if kind == "substep_start":
-            return f"[run] {event.get('label') or self._substep_label(event.get('id'))}"
+            status=self._display_status(('sub',event.get('id')),'RUN')
+            return f"[{status if status!='RUN' else 'run'}] {event.get('label') or self._substep_label(event.get('id'))}"
         if kind == "substep_done":
             return f"[{event.get('status')}] {self._substep_label(event.get('id'))}"
+        if kind in ('tool_retry','substep_retry','task_retry'):
+            key=('tool',event['step']) if kind=='tool_retry' else ('sub',event.get('id') or self.active_substep)
+            if key[1] is None and self.current: key=('tool',self.current['step'])
+            return f"[{self._display_status(key,'RUN')}] {key[1] or self.task_name}"
         if kind == "task_progress":
             return f"[progress] {event.get('message', '')}"
         if kind == "substeps_reused":
@@ -290,10 +362,13 @@ class Dashboard:
         filled = round(bar_w * done / total) if total else 0
         hours, rem = divmod(self.elapsed_s, 3600)
         minutes, seconds = divmod(rem, 60)
+        current_key=('sub',self.active_substep) if self.active_substep else ('tool',self.current.get('step'))
+        retry_status=self._display_status(current_key,'RUN')
         return ["progress", f"{done}/{total} tasks complete",
                 "[" + "#" * filled + "-" * (bar_w - filled) + f"] {percent}%",
                 "-" * width, "current task",
                 _short(self.task_name, width),
+                *( [retry_status] if retry_status!='RUN' else []),
                 _short(self.task_detail, width) if self.task_detail else "(waiting for task output)",
                 "task progress",
                 ("[" + "#" * round(bar_w * self.task_fraction[0] / self.task_fraction[1])
@@ -312,19 +387,23 @@ class Dashboard:
             mark, color = MARK.get(status, ("?", DIM))
             if self.ansi:
                 mark = f"{color}{mark}{RESET}"
-            lines.append(f"{mark} {_short(sid, id_w).ljust(id_w)} {status}")
+            display=self._display_status(('tool',sid),status)
+            label_width=max(1,width-len(display)-3)
+            lines.append(f"{mark} {_short(sid,label_width).ljust(label_width)} {display}")
             if sid == self.substep_owner:
                 for subid, label in self.substeps:
                     substatus = self.substatus.get(subid, "....")
                     marker, color = MARK.get(substatus, ("?", DIM))
                     if self.ansi:
                         marker = f"{color}{marker}{RESET}"
-                    text = _short(label, max(5, id_w - 2))
-                    lines.append(f"  {marker} {text.ljust(max(5, id_w - 2))} {substatus}")
+                    display=self._display_status(('sub',subid),substatus)
+                    label_width=max(1,width-len(display)-5)
+                    text = _short(label,label_width)
+                    lines.append(f"  {marker} {text.ljust(label_width)} {display}")
         if self.substep_owner=='code':
             budget=max(18,shutil.get_terminal_size((120,30)).lines-4)
             if len(lines)>budget:
-                current=next((i for i,line in enumerate(lines) if ' RUN' in line and i>1),len(lines)-1)
+                current=next((i for i,line in enumerate(lines) if (' RUN' in line or '/RETRY(' in line) and i>1),len(lines)-1)
                 start=max(1,min(current-3,len(lines)-budget+2))
                 lines=[lines[0],f'({start} earlier rows; full details in code trace)']+lines[start:start+budget-3]
         return lines

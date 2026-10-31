@@ -63,9 +63,10 @@ def render(plan, ports, hooks=None):
                       PARITY={'none': 0, 'even': 1, 'odd': 2}[a.parity], STOP_BITS=a.stop_bits, DATA_WIDTH=data_width)
         signals = '\n'.join(f"  logic [{width-1}:0] {role};" for role,width in widths.items())
         artifacts[f"interfaces/{a.id}_if.sv"] = template("interface.sv", SIGNALS=signals, **values)
-        for component in ('cfg', 'sequencer'):
-            add(f"uvm/{a.id}_{component}.svh", template(component + '.svh', **values))
-        for component in ('driver', 'monitor'):
+        for component in (('cfg','sequencer') if a.active else ('cfg',)):
+            add(f"uvm/{a.id}_{component}.svh", template(component + '.svh',
+                VARIABLES='\n'.join(f'  bit [{v.width-1}:0] {v.id}={sv(v.default)};' for v in plan.sequencer_variables if v.agent==a.id), **values))
+        for component in (('driver','monitor') if a.active else ('monitor',)):
             add(f"uvm/{a.id}_{component}.svh", template(a.protocol + '_' + component + '.svh',
                 DRIVER_HOOK=hook(a.id, 'driver.body'), MONITOR_HOOK=hook(a.id, 'monitor.body'), **values))
         regs = [r for r in plan.registers if r.agent == a.id]
@@ -73,12 +74,16 @@ def render(plan, ports, hooks=None):
         classes = '\n'.join(f"    if(observed.address=={sv(r.address)}) address_class={i+1};" for i, r in enumerate(regs))
         event_bins = ('bins writes={1}; bins reads={2};' if a.protocol == 'wishbone' else
                       'bins receive={3}; bins transmit={4};' if a.protocol=='serial' else 'bins observed={5};')
-        add(f"uvm/{a.id}_coverage.svh", template('coverage.svh', EVENT_BINS=event_bins, ADDRESS_BINS=bins,
-            ADDRESS_CLASS=classes, DATA_MASK=sv((1 << data_width)-1), COVER_BITS=data_width,
-            FRAME_COVERPOINTS=(f"    cp_parity: coverpoint parity_mode {{ bins configured={{{values['PARITY']}}}; }}\n"
-                              f"    cp_stop: coverpoint stop_bits {{ bins configured={{{a.stop_bits}}}; }}" if a.protocol=='serial' else ''),
-            COVERAGE_HOOK=hook(a.id, 'coverage.sample'), **values))
-        add(f"uvm/{a.id}_agent.svh", template('agent.svh', **values))
+        if a.coverage_enabled:
+            add(f"uvm/{a.id}_coverage.svh", template('coverage.svh', EVENT_BINS=event_bins, ADDRESS_BINS=bins,
+                ADDRESS_CLASS=classes, DATA_MASK=sv((1 << data_width)-1), COVER_BITS=data_width,
+                FRAME_COVERPOINTS=(f"    cp_parity: coverpoint parity_mode {{ bins configured={{{values['PARITY']}}}; }}\n"
+                                  f"    cp_stop: coverpoint stop_bits {{ bins configured={{{a.stop_bits}}}; }}" if a.protocol=='serial' else ''),
+                COVERAGE_HOOK=hook(a.id, 'coverage.sample'), **values))
+        add(f"uvm/{a.id}_agent.svh", template('agent.svh' if a.active else 'passive_agent.svh',
+            COVERAGE_MEMBER=f'  {a.id}_coverage cov;' if a.coverage_enabled else '',
+            COVERAGE_BUILD=f'    cov={a.id}_coverage::type_id::create("cov",this); cov.cfg=cfg;' if a.coverage_enabled else '',
+            COVERAGE_CONNECT='    mon.ap.connect(cov.analysis_export);' if a.coverage_enabled else '', **values))
         top_declarations.append(f"  {a.id}_if {a.id}_bus(clock_bus.clk, reset_bus.reset);")
         for role, name in a.bindings.items():
             if ports[name]['direction']=='input' and a.active:
@@ -165,18 +170,28 @@ def render(plan, ports, hooks=None):
         if plan.routes:
             env_connect += [f"    {a.id}.mon.ap.connect(system_cov.analysis_export);"]
     add('uvm/cg_env.svh', template('env.svh', DECLARATIONS='\n'.join(env_members), BUILD='\n'.join(env_build), CONNECT='\n'.join(env_connect)))
-    for seq in plan.sequences:
-        operations = []
-        for op in seq.operations:
+    ordered=[];pending=list(plan.sequences)
+    while pending:
+        ready=[s for s in pending if not s.extends or s.extends in {p.id for p in ordered}]
+        if not ready: raise ValueError('Cyclic or unknown base sequence')
+        ordered+=ready
+        pending=[s for s in pending if s not in ready]
+    for seq in ordered:
+        operations = ['    super.body();'] if seq.extends else []
+        for index,op in enumerate(seq.operations):
+            def value(field,default):
+                binding=next((b for b in seq.controls if b.operation==index and b.field==field),None)
+                return 'p_sequencer.'+binding.variable if binding else default
             kind = 0 if op.kind == 'idle' else 1 if op.kind in ('write', 'random_write') else 2 if op.kind == 'read' else 6 if op.kind=='poll' else 5 if op.kind=='custom' else 3
-            operations += [f"    repeat({op.count}) begin", '      tr=cg_item::type_id::create("request");',
-                           '      start_item(tr);', f"      tr.kind={kind}; tr.address={sv(op.address)}; tr.mask={sv(op.mask)}; tr.cycles={op.cycles};"]
+            operations += [f"    repeat({value('count',op.count)}) begin", '      tr=cg_item::type_id::create("request");',
+                           '      start_item(tr);', f"      tr.kind={kind}; tr.address={value('address',sv(op.address))}; tr.mask={sv(op.mask)}; tr.cycles={value('cycles',op.cycles)};"]
             if op.kind.startswith('random_'):
                 operations += ['      if(!tr.randomize()) `uvm_fatal("RAND", "randomization failed")', f"      tr.data &= {sv(op.mask)};"]
             else:
-                operations += [f"      tr.data={sv(op.data)};"]
+                operations += [f"      tr.data={value('data',sv(op.data))};"]
             operations += ['      finish_item(tr);', '    end']
-        add(f"sequences/{seq.id}.svh", template('sequence.svh', SEQUENCE=seq.id, OPERATIONS='\n'.join(operations)))
+        add(f"sequences/{seq.id}.svh", template('sequence.svh', SEQUENCE=seq.id, BASE=seq.extends or 'uvm_sequence #(cg_item)',
+            SEQUENCER=f'  `uvm_declare_p_sequencer({seq.agent}_sequencer)' if seq.controls else '', OPERATIONS='\n'.join(operations)))
     # Per-test virtual sequences hold typed sequencer handles. They spawn only agent sequences.
     sequences = {s.id: s for s in plan.sequences}
     for test in plan.tests:
@@ -192,7 +207,7 @@ def render(plan, ports, hooks=None):
         for a in plan.agents:
             if a.active:
                 drain_name = f"{test.id}_{a.id}_drain"
-                add(f"sequences/{drain_name}.svh", template('sequence.svh', SEQUENCE=drain_name,
+                add(f"sequences/{drain_name}.svh", template('sequence.svh', SEQUENCE=drain_name, BASE='uvm_sequence #(cg_item)', SEQUENCER='',
                     OPERATIONS=f'    tr=cg_item::type_id::create("drain"); start_item(tr); tr.kind=0; tr.cycles={test.drain_cycles}; finish_item(tr);'))
                 stages += [f"    begin {drain_name} drain; drain={drain_name}::type_id::create(\"drain\"); drain.start({a.id}_sqr); end"]
         add(f"sequences/{test.id}_vseq.svh", template('virtual_sequence.svh', TEST=test.id, DECLARATIONS='\n'.join(members), STAGES='\n'.join(stages)))
@@ -204,6 +219,9 @@ def render(plan, ports, hooks=None):
                            f'    env.{a.id}_control={a.id}_control;']
             if a.active:
                 handles += [f"    seq.{a.id}_sqr=env.{a.id}.sqr;"]
+        for setting in test.sequencer_settings:
+            variable=next(v for v in plan.sequencer_variables if v.id==setting.variable)
+            handles += [f'    env.{variable.agent}.sqr.{variable.id}={sv(setting.value)};']
         add(f"tests/{test.id}.svh", template('test.svh', TEST=test.id, DECLARATIONS='\n'.join(test_members), BUILD='\n'.join(test_build),
             CLOCK_PERIOD=plan.clock_period_ns, RESET_ACTIVE=int(plan.reset_active=='high'), RESET_TIME=plan.clock_period_ns*plan.reset_cycles,
             MIN_COMPARISONS=test.minimum_comparisons, SEQUENCERS='\n'.join(handles),

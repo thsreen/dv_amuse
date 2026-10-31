@@ -863,3 +863,27 @@ def test_cancellation_reaches_worker_pool_threads():
     assert runner() == [False, False, False]
     token.set()
     assert runner() == [True, True, True]
+
+
+def test_model_stage_is_stopped_at_the_global_deadline_instead_of_running_on(tmp_path):
+    from dv_agent.core import cancel
+    seen = {}
+
+    def long_stage(args, ctx):
+        deadline = time.monotonic() + 10
+        while not cancel.is_cancelled() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        seen["cancelled"] = cancel.is_cancelled()
+        return dict(status="FAIL", summary="stopped at the deadline", files=[])
+
+    flow = base_flow(policy={"global_timeout_s": 1},
+                     steps=[dict(id="plan", tool="dv_testplan", agent="dv", args={}, max_attempts=1),
+                            dict(id="after", tool="stub_b", agent="rtl", args={})])
+    calls = []
+    registry = dict(stub_registry(calls), dv_testplan=ToolSpec("dv", SPEC, False, long_stage))
+    started = time.monotonic()
+    result = runner.run_flow(write_flow(tmp_path, flow), out_dir=tmp_path / "run", variables={}, registry=registry)
+    assert time.monotonic() - started < 8 and seen == {"cancelled": True}
+    assert result["status"] == "NEEDS_REVIEW" and not calls  # the next step was not started
+    events = [json.loads(line) for line in (tmp_path / "run/orchestrator_trace.jsonl").read_text().splitlines()]
+    assert any(e["event"] == "budget_exhausted" and e.get("detail") for e in events)

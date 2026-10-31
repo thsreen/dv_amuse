@@ -5,16 +5,18 @@ facts can supply executable expectations. Each API request has its own checkpoin
 """
 import json
 from pathlib import Path
+from typing import Literal
+from types import SimpleNamespace
 
 from pydantic import Field
 
 from ..ingest.extract import locate_quote
 from ..core.fsutil import atomic_write_text
 from ..graph.graph_checkpoint import CheckpointLLM
-from ..core.progress import emit
+from ..core.progress import emit, emit_event
 from ..retrieval.retrieval import BM25, tokenize
 from ..core.trace import Tracer
-from .contracts import Model, CodePlan, Fact, Sequence, Route, Check, Hook, Test, CoverageGoal, digest, identifier, pointer
+from .contracts import Model, CodePlan, Fact, Sequence, Route, Check, Hook, Test, CoverageGoal, Register, SequencerVariable, digest, identifier, pointer
 from .reasoning import INSTRUCTIONS, compact_items, eligible_items, strict_schema
 from .validate import validate,validate_facts
 from .events import stage, skip, feature_steps
@@ -27,17 +29,18 @@ class Dependency(Model):
 
 class WorkTask(Model):
     id: str = Field(max_length=64)
-    title: str
+    title: str = Field(max_length=120)
     category: str
-    goal: str
-    plan_pointers: list[str] = Field(min_length=1, max_length=6)
+    goal: str = Field(max_length=600)
+    plan_pointers: list[str] = Field(min_length=1, max_length=2)
     depends_on: list[Dependency] = Field(default_factory=list)
     queries: list[str] = Field(min_length=1, max_length=3)
+    interface_id: str | None = None
 
 
 class WorkGraph(Model):
     understanding: str
-    tasks: list[WorkTask] = Field(min_length=1, max_length=64)
+    tasks: list[WorkTask] = Field(min_length=1, max_length=256)
     questions: list[str] = Field(default_factory=list)
 
 
@@ -45,6 +48,8 @@ class CrossDependency(Model):
     task_id: str
     requires: str
     reason: str
+    mechanism: Literal['ordering','sequence_extension','p_sequencer_config'] = 'ordering'
+    controls: list[str] = Field(default_factory=list,max_length=8)
 
 
 class Collation(Model):
@@ -72,6 +77,8 @@ class StepImplementation(Model):
 
 
 class Fragment(Model):
+    sequencer_variables: list[SequencerVariable] = Field(default_factory=list,max_length=8)
+    registers: list[Register] = Field(default_factory=list,max_length=8)
     facts: list[Fact] = Field(default_factory=list, max_length=32)
     sequences: list[Sequence] = Field(default_factory=list, max_length=16)
     routes: list[Route] = Field(default_factory=list, max_length=16)
@@ -166,6 +173,9 @@ class Evidence:
             if per_source.get(w['source_id'],0)>=2: continue
             windows.append(w);per_source[w['source_id']]=per_source.get(w['source_id'],0)+1
             if len(windows)==8: break
+        if not selected:
+            found={w['source_id'] for w in windows}
+            selected=[self.items[i] for i in ranked if found & set(self.items[i]['source_ids'])][:item_limit]
         return dict(documented_items=selected,source_excerpts=windows,
                     available_source_ids=sorted(wanted),retrieval_queries=queries,focused_recovery=focus)
 
@@ -303,7 +313,10 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
     intentions,strategy=inventory(plan)
     if not intentions: raise ValueError('No stimulus/check/coverage implementation intentions in saved plan')
     directory=Path(directory)
-    work=directory/'code_work'/digest([plan,definition,llm.model,INSTRUCTIONS,Path(__file__).read_text(),feedback])[:16]
+    from .render import template_hash
+    from .units import foundation as build_foundation, CYCLE, InfrastructurePlan, InterfaceBase, infrastructure_profile, INFRASTRUCTURE_INSTRUCTIONS, PROFILE_PATH
+    work=directory/'code_work'/digest([plan,definition,llm.model,INSTRUCTIONS,Path(__file__).read_text(),
+                                    Path(__file__).with_name('units.py').read_text(),PROFILE_PATH.read_text(),template_hash(),feedback])[:16]
     work.mkdir(parents=True,exist_ok=True)
     evidence=Evidence(plan,sources)
     client=CheckpointLLM(llm,directory/'llm_cache'/'code_work',stage='code_work')
@@ -318,7 +331,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             for attempt in range(2):
                 if len(json.dumps(payload))>48000: raise ValueError(f'{name}: work package too large; split this package')
                 emit(f'code work: {name}, {len(json.dumps(payload))} characters'+(' (repair)' if attempt else ''))
-                result=client.structured(name=name,instructions=INSTRUCTIONS+'\n'+rules,payload=payload,
+                result=client.structured(name=name,instructions=(INFRASTRUCTURE_INSTRUCTIONS if name in {'code_infrastructure','code_clock','code_reset','code_interfaces','code_interface_base','code_interface','code_interface_needs'} else INSTRUCTIONS)+'\n'+rules,payload=payload,
                                          schema=strict_schema(model),tracer=tracer)
                 try:
                     typed=model.model_validate(result.data);check(typed)
@@ -327,6 +340,10 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                                task_id=payload.get('task',{}).get('id'),reason=str(exc),rejected_output=result.data)
                     _write(directory/'code_planning_issue.json',issue)
                     if attempt: raise
+                    sid=name
+                    if name in ('code_infrastructure','code_pseudocode'): sid+=':'+payload['task']['id']
+                    elif name in ('code_interface','code_interface_base','code_interface_needs','code_feature'): sid+=':'+payload['task_id']
+                    emit_event('substep_retry',id=sid,status='FAIL',attempt=attempt+2)
                     payload=payload|dict(repair_feedback=str(exc))
                     if recover is not None: payload=recover(payload,result.data,str(exc))
                     continue
@@ -339,13 +356,19 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
 
         def call(name,payload,model,rules,check=lambda result:None,recover=None):
             sid=name
-            label=None
-            if name=='code_pseudocode':
+            label=payload.get('task_title')
+            if name in ('code_pseudocode','code_infrastructure'):
                 sid+=':'+payload['task']['id']
                 label='Understand '+payload['task']['title']
+            elif name in ('code_interface','code_interface_base','code_interface_needs'):
+                sid+=':'+payload['task_id']
             elif name=='code_feature':
                 sid+=':'+payload['task_id']
                 label='Implement '+tasks[payload['task_id']].title
+            assessment=None
+            if name=='code_interface_needs':
+                assessment=unit_row('assessment_'+payload['task_id'],'Assess '+payload['task_title'])
+                assessment.update(status='RUN',phase='assess',cycle=['retrieve','assess','validate','checkpoint']);save_execution()
             with stage(sid,label) as outcome:
                 try:
                     result=request(name,payload,model,rules,check,recover)
@@ -354,10 +377,107 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                         work_manifest.update(status='BLOCKED',blocked_stage=sid,
                                              reason=str(exc) if isinstance(exc,ValueError) else type(exc).__name__)
                         _write(directory/'code_work_manifest.json',work_manifest)
+                    # Unit/feature rows are persisted independently of API checkpoints.
+                    if execution:
+                        execution['status']='BLOCKED'
+                        for row in execution['steps']:
+                            if row['status']=='RUN': row['status']='BLOCKED'
+                        save_execution()
                     raise
+                if assessment is not None:
+                    assessment.update(status='PASS',phase='checkpoint',decision=result.model_dump());save_execution()
                 outcome['reused']=records[-1]['cached']
                 return result
 
+        execution=dict(status='IN_PROGRESS',mode='pseudocode_only' if pseudocode_only else 'generate_code',cycle=CYCLE,steps=[
+            dict(id='foundation_clock',title='Clock',status='PENDING',phase='retrieve',cycle=CYCLE),
+            dict(id='foundation_reset',title='Reset',status='PENDING',phase='retrieve',cycle=CYCLE)])
+        # Unlike completed source documents, this file is a live checkpoint.
+        def save_execution():
+            atomic_write_text(work/'execution_plan.json',json.dumps(execution,indent=2)+'\n')
+            atomic_write_text(directory/'CODE_EXECUTION_PLAN.md',
+                '# Code execution plan\n\nOrder: clock → reset → all interface bases → assess/build each interface → each feature → integration.\n\n'
+                +'Each step: '+' → '.join(CYCLE)+'. Compilation/simulation are deferred.\n\n'
+                +'\n'.join(f"{i}. **{r['title']}** — {r['status']}, {r.get('phase','pending')}"
+                            for i,r in enumerate(execution['steps'],1))+'\n')
+        save_execution()
+        feature_steps([],{},execution['steps'])
+        def unit_row(tid,title):
+            existing=next((r for r in execution['steps'] if r['id']==tid),None)
+            if existing is not None: return existing
+            row=dict(id=tid,title=title,status='PENDING',phase='retrieve',cycle=CYCLE)
+            execution['steps'].append(row);save_execution()
+            feature_steps([],{},execution['steps'])
+            return row
+        def run_unit(tid,title,goal,queries,model,check,dependencies,rules,scoped=None):
+            row=unit_row(tid,title)
+            selected=evidence.fetch(queries,item_limit=8,focus=True)
+            scope=scoped or definition
+            profile=dependencies.get('infrastructure_profile') or infrastructure_profile('clock' if tid=='foundation_clock' else 'reset' if tid=='foundation_reset' else 'utility')
+            if tid.startswith('collateral_'):
+                profile=dict(kind='collateral',required=['source-supported ownership and required protocol configuration'],
+                             deferred=['scoreboard','functional tests','full register map'])
+            row['profile']=profile
+            task=dict(id=tid,title=title,goal=goal,category='infrastructure',plan_pointers=[],depends_on=[],queries=queries)
+            payload=dict(task=task,evidence=selected,interface=scope,dependencies=dependencies,profile=profile)
+            _write(work/(tid+'.context.json'),payload)
+            try:
+                row.update(status='RUN',phase='understand_and_pseudocode');save_execution()
+                def pseudo_check(p):
+                    _facts_in_context(p.facts,selected);validate_facts(p.facts,plan,sources)
+                    if any(not text.strip() for text in p.actions+p.completion):
+                        raise ValueError('Infrastructure needs nonblank actions and bounded completion')
+                    if p.blockers:
+                        raise ValueError('Infrastructure blockers must concern this profile only; no scoreboard, runnable test, '
+                                         'coverage or missing DUT sampling edge is required for clock generation: '+'; '.join(p.blockers))
+                def recovery(retry,rejected,reason):
+                    nonlocal selected
+                    data=rejected if isinstance(rejected,dict) else {}
+                    gaps=[q for key in ('questions','blockers') for q in
+                          (data.get(key,[]) if isinstance(data.get(key,[]),list) else []) if isinstance(q,str)]
+                    selected=evidence.fetch(gaps[:8]+queries,item_limit=8,focus=True)
+                    return retry|dict(evidence=selected)
+                pseudo=call('code_infrastructure',payload,InfrastructurePlan,
+                    'Plan ONLY this unit, using supported facts. Repeat the common execution cycle. '
+                    'Describe only required infrastructure actions and completion; source gaps for deferred collateral are questions. '
+                    'Do not request details of other interfaces or a full register map. No invented expectations. '+rules,
+                    pseudo_check,recovery)
+                _write(work/(tid+'.pseudocode.json'),pseudo.model_dump())
+                row['deferred_questions']=pseudo.questions
+                _artifact(work/(tid+'.md'),'# '+title+' infrastructure\n\n'+pseudo.understanding+'\n\n## Required actions\n\n'
+                    +'\n'.join('- '+a for a in pseudo.actions)+'\n\n## Completion\n\n'+'\n'.join('- '+c for c in pseudo.completion)
+                    +'\n\n## Deferred questions\n\n'+'\n'.join('- '+q for q in pseudo.questions)+'\n')
+                row.update(phase='implement');save_execution()
+                def validate_unit(result):
+                    row.update(phase='validate');save_execution()
+                    check(result,selected)
+                unit=call('code_'+('clock' if tid=='foundation_clock' else 'reset' if tid=='foundation_reset' else 'interface_base' if model is InterfaceBase else 'interface'),
+                          dict(task_id=tid,task_title=title,interface=scope,evidence=selected,
+                               pseudocode=pseudo.model_dump(),dependencies=dependencies,profile=profile),model,rules,
+                          validate_unit)
+                row.update(phase='validate');save_execution()
+                _write(work/(tid+'.implementation.json'),unit.model_dump())
+                row.update(phase='checkpoint',status='PLANNED' if pseudocode_only else 'PASS');save_execution()
+                return unit
+            except (Exception,KeyboardInterrupt):
+                row.update(status='BLOCKED');execution['status']='BLOCKED';save_execution();raise
+        def unit_facts(facts,context):
+            _facts_in_context(facts,context);validate_facts(facts,plan,sources)
+        def save_unit(name,text):
+            path=work/name;path.parent.mkdir(parents=True,exist_ok=True);_artifact(path,text)
+        try:
+            foundation=build_foundation(run_unit,call,definition,evidence,unit_facts,save_unit,
+                                       lambda candidate,scope:validate(candidate,plan,scope,sources),
+                                       render_units=not pseudocode_only)
+        except (Exception,KeyboardInterrupt) as exc:
+            execution['status']='BLOCKED';save_execution()
+            work_manifest.update(status='BLOCKED',reason=str(exc) if isinstance(exc,ValueError) else type(exc).__name__)
+            _write(directory/'code_work_manifest.json',work_manifest)
+            raise
+        foundation.questions=list(dict.fromkeys(foundation.questions+[
+            question for r in execution['steps'] for question in r.get('deferred_questions',[])]))
+        _write(work/'foundation.json',foundation.model_dump())
+        assembled=foundation
         def graph_check(g): dependency_waves(g,{i['plan_pointer'] for i in intentions})
         batches=[];batch=[]
         for intention in intentions:
@@ -370,25 +490,35 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             def batch_check(g):
                 dependency_waves(g,{i['plan_pointer'] for i in batch})
                 if used & {t.id for t in g.tasks}: raise ValueError('Work IDs must not collide with earlier batches')
-            g=call('code_grouping',dict(high_level_strategy=strategy,intentions=batch,batch=index,existing_task_ids=sorted(used)),WorkGraph,
-                'Group similar plan intentions into cohesive feature work packages (at most six pointers each). '
+                if any(t.interface_id and t.interface_id not in {a.id for a in foundation.agents} for t in g.tasks):
+                    raise ValueError('Work package refers to an unknown interface')
+            g=call('code_grouping',dict(high_level_strategy=strategy,intentions=batch,batch=index,existing_task_ids=sorted(used),
+                interfaces=[dict(id=a.id,protocol=a.protocol) for a in foundation.agents]),WorkGraph,
+                'Group by ONE interface or ONE feature per package, at most TWO closely related intention pointers. '
+                'Set interface_id when scoped to one supplied interface; use null for a cross-interface feature. '
                 'Include every supplied intention exactly once, including unsupported ones as review work. Identify '
-                'within-batch dependent features with reasons; cross-batch dependencies will be collated afterward. '
+                'local interface/feature identity; a separate dedicated dependency pass follows even for one batch. '
                 'Use unique IDs. No dependency merely because items are adjacent. These are implementation proposals.',batch_check)
             graphs.append(g);used.update(t.id for t in g.tasks)
         graph=WorkGraph(understanding='\n'.join(g.understanding for g in graphs),tasks=[t for g in graphs for t in g.tasks],
                         questions=[q for g in graphs for q in g.questions])
-        if len(graphs)>1:
+        if graphs:
             def collation_check(c):
                 candidate=graph.model_copy(deep=True);by_id={t.id:t for t in candidate.tasks}
                 for dep in c.dependencies:
                     if dep.task_id not in by_id or dep.requires not in by_id: raise ValueError('Unknown cross-batch dependency')
+                    for control in dep.controls: identifier(control)
+                    if dep.mechanism=='p_sequencer_config' and not dep.controls:
+                        raise ValueError('p_sequencer dependency needs explicit control names')
                     if dep.requires not in {d.task_id for d in by_id[dep.task_id].depends_on}:
                         by_id[dep.task_id].depends_on.append(Dependency(task_id=dep.requires,reason=dep.reason))
                 graph_check(candidate)
-            collated=call('code_dependencies',dict(high_level_strategy=strategy,tasks=[dict(id=t.id,title=t.title,goal=t.goal,
+            collated=call('code_dependencies',dict(high_level_strategy=strategy,tasks=[dict(id=t.id,title=t.title,goal=t.goal[:240],
+                interface_id=t.interface_id,
                 depends_on=[d.model_dump() for d in t.depends_on]) for t in graph.tasks]),Collation,
-                'Collate feature understanding across batches. Add genuine cross-feature dependencies with reasons '
+                'Run a dedicated dependency analysis across interface/feature groups. Identify genuine prerequisites with reasons. '
+                'For each dependency select ordering, sequence_extension (extend/reuse a base sequence), or '
+                'p_sequencer_config (shared typed sequencer configuration). List needed control names, not invented values. '
                 'without changing task scope or inventing expected behavior. No source documents are supplied here.',collation_check)
             by_id={t.id:t for t in graph.tasks}
             for dep in collated.dependencies:
@@ -398,12 +528,12 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
         graph_check(graph)
         waves=dependency_waves(graph,{i['plan_pointer'] for i in intentions})
         tasks={t.id:t for t in graph.tasks}
-        feature_steps(waves,tasks)
-        if len(graphs)==1: skip("code_dependencies")
+        feature_steps(waves,tasks,execution['steps'])
         ancestors={}
         for wave in waves:
             for tid in wave: ancestors[tid]={d.task_id for d in tasks[tid].depends_on}|{a for d in tasks[tid].depends_on for a in ancestors[d.task_id]}
         independent={tid:sorted(t for t in tasks if t!=tid and t not in ancestors[tid] and tid not in ancestors[t]) for tid in tasks}
+        _write(work/'dependency_handling.json',collated.model_dump())
         _write(work/'dependencies.json',dict(**graph.model_dump(),generation_waves=waves,independent=independent,
                                             dependency_authority='INFERRED_IMPLEMENTATION_ORDER',review_status='NEEDS_REVIEW'))
         _artifact(work/'DEPENDENCIES.md','# Feature dependency plan\n\n'+graph.understanding+'\n\n'+
@@ -415,10 +545,74 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             review_status='NEEDS_REVIEW',quality_policy='actionable_source_backed_features_and_complete_collation')
         _write(directory/'code_work_manifest.json',work_manifest)
 
+        def implement_feature(tid,pseudo,selected):
+            nonlocal assembled
+            task=tasks[tid]
+            # Only this pseudocode, its excerpts and shared API signatures go to coding.
+            coding=dict(task_id=tid,pseudocode=pseudo.model_dump(),shared_agents=[a.model_dump() for a in assembled.agents],
+                        dependency_handling=[d.model_dump() for d in collated.dependencies if d.task_id==tid],
+                        shared_registers=[r.model_dump() for r in assembled.registers],
+                            shared_sequences=[dict(id=s.id,agent=s.agent,purpose=s.purpose) for s in assembled.sequences],
+                            sequencer_variables=[v.model_dump() for v in assembled.sequencer_variables],
+                        builtin_coverage=[a.id+'_coverage' for a in assembled.agents if a.coverage_enabled],
+                        dependency_components=[dict(task_id=d.task_id,**completed[d.task_id]) for d in task.depends_on],
+                        evidence=selected)
+            def fragment_check(f):
+                row.update(phase='validate');save_execution()
+                _facts_in_context(f.facts,selected)
+                validate(_merge(assembled,f),plan,definition,sources)
+                mapped=[m.step for m in f.step_implementations]
+                expected={key+'/'+str(i) for key in ('stimulus_steps','check_steps','coverage_steps')
+                          for i in range(len(getattr(pseudo,key)))}
+                if set(mapped)!=expected or len(mapped)!=len(set(mapped)):
+                    raise ValueError('Every pseudocode step needs exactly one implementation mapping or explicit question')
+                allowed={s.id for s in f.sequences}|{c.id for c in f.checks}|{r.id for r in f.routes}|{h.id for h in f.hooks}
+                allowed|={r.id for r in assembled.registers}|{c.id for c in f.coverage}|{a.id+'_coverage' for a in assembled.agents if a.coverage_enabled}
+                for mapping in f.step_implementations:
+                    if bool(mapping.component_ids)==bool(mapping.question.strip()):
+                        raise ValueError('A pseudocode step must be implemented or explicitly deferred with a question')
+                    if not set(mapping.component_ids)<=allowed: raise ValueError('Step mapping references an unknown component')
+                for dep in (d for d in collated.dependencies if d.task_id==tid):
+                    if dep.mechanism=='sequence_extension' and not any(
+                            s.extends in completed[dep.requires].get('sequences',[]) for s in f.sequences) and not f.questions:
+                        raise ValueError('Dependency needs a base sequence extension or an explicit unresolved question')
+                    if dep.mechanism=='p_sequencer_config' and not set(dep.controls)<={
+                            b.variable for s in f.sequences for b in s.controls} and not f.questions:
+                        raise ValueError('Dependency needs the declared p_sequencer controls or an explicit unresolved question')
+            fragment=call('code_feature',coding,Fragment,
+                f'Implement ONLY work package {tid} from its saved pseudocode. Return reusable typed operations, '
+                'sequence/check/scoreboard declarations and declared coverage hooks, not raw framework code. '
+                'Apply dependency_handling: sequence_extension uses Sequence.extends to call the base body before local '
+                'operations; p_sequencer_config declares typed sequencer_variables and Sequence.controls referencing '
+                'operation indexes/fields. Use only supported settings. Unsupported cross-agent inheritance/control '
+                'requires explicit ordering or a question, not arbitrary SV snippets. '
+                'Use existing agent names; namespace NEW IDs with this task ID. facts must include every new '
+                'supporting fact. Do not redefine agents or silently omit unsupported steps: put them in questions. '
+                'Map EVERY stimulus_steps/N, check_steps/N and coverage_steps/N to emitted component_ids or an explicit '
+                'question, never both. Use typed coverage goals for specific bins/crosses over cg_item fields; '
+                'builtin coverage references apply only where its existing bins actually meet the goal. '
+                'Coverage must subscribe to observed monitor transactions. Do not invent expected behavior.',fragment_check)
+            assembled=_merge(assembled,fragment)
+            _write(work/(tid+'.fragment.json'),fragment.model_dump())
+            completed[tid]['sequences']=[s.id for s in fragment.sequences]
+            completed[tid]['checks']=[c.id for c in fragment.checks]
+            completed[tid]['routes']=[r.id for r in fragment.routes]
+            completed[tid]['coverage']=[c.id for c in fragment.coverage]
+            assembled.questions=list(dict.fromkeys(assembled.questions+pseudo.questions))
+            assembled.questions=list(dict.fromkeys(assembled.questions+[
+                tid+': '+m.question for m in fragment.step_implementations if m.question.strip()]))
+            work_manifest['completed_tasks'].append(tid)
+            _write(directory/'code_work_manifest.json',work_manifest)
+
+        for wave in waves:
+            for tid in wave: unit_row(tid,tasks[tid].title)
+        feature_steps(waves,tasks,execution['steps'])
         completed={};pseudocode_by_id={};contexts={}
         for wave in waves:
             for tid in wave:
                 task=tasks[tid]
+                row=unit_row(tid,task.title)
+                row.update(status='RUN',phase='retrieve');save_execution()
                 emit(f'code feature {tid}: retrieve excerpts, write pseudocode, implement scoped components')
                 targets=[]
                 for p in task.plan_pointers:
@@ -450,6 +644,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                     _write(work/(tid+'.recovery.context.json'),retry)
                     return retry
 
+                row.update(phase='understand_and_pseudocode');save_execution()
                 pseudo=call('code_pseudocode',payload,Pseudocode,
                     'This is feature planning, not the final runnable CodePlan: retain supported partial algorithms '
                     'even when other features or final bus bindings need clarification. Do not require a complete '
@@ -473,6 +668,10 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 pseudocode_by_id[tid]=pseudo;contexts[tid]=selected
                 work_manifest['pseudocode_tasks'].append(tid)
                 _write(directory/'code_work_manifest.json',work_manifest)
+                if not pseudocode_only:
+                    row.update(phase='implement');save_execution()
+                    implement_feature(tid,pseudo,selected)
+                row.update(phase='checkpoint',status='PLANNED' if pseudocode_only else 'PASS');save_execution()
         try:
             approach=_collate(call,strategy,tasks,pseudocode_by_id)
         except ValueError as exc:
@@ -486,69 +685,15 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 for key in ('shared_setup','stimulus_approach','check_approach','coverage_approach','questions'))+'\n')
         work_manifest['status']='PSEUDOCODE_READY_NEEDS_REVIEW'
         _write(directory/'code_work_manifest.json',work_manifest)
-        if pseudocode_only: return work_manifest
-        context=evidence.fetch(['clock reset polarity interface protocol input output integration configuration register address access'],item_limit=24)
-        foundation_payload=dict(interface=definition,high_level_strategy=strategy,collated_pseudocode=approach.model_dump(),evidence=context)
-        if feedback: foundation_payload['repair_feedback']=feedback
-        def foundation_check(p):
-            if p.sequences or p.routes or p.checks or p.tests or p.coverage: raise ValueError('Foundation must not implement feature tests/checks/sequences/coverage')
-            _facts_in_context(p.facts,context);validate(p,plan,definition,sources)
-        foundation=call('code_foundation',foundation_payload,CodePlan,
-            'Generate ONLY shared wiring/configuration/agents, explicit input ownership, simple register mirrors and '
-            'required custom driver/monitor hook declarations from collated pseudocode. Empty sequences/routes/checks/tests. '
-            'Use only retrieved DOCUMENTED facts; proposed strategy is guidance, not an expectation source.',foundation_check)
-        _write(work/'foundation.json',foundation.model_dump())
-        assembled=foundation
-        assembled.questions=list(dict.fromkeys(assembled.questions+approach.questions))
-        for wave in approach.execution_order:
-            for tid in wave:
-                task=tasks[tid];pseudo=pseudocode_by_id[tid];selected=contexts[tid]
-                # Only this pseudocode, its excerpts and shared API signatures go to coding.
-                coding=dict(task_id=tid,pseudocode=pseudo.model_dump(),shared_agents=[a.model_dump() for a in foundation.agents],
-                            collated_approach=approach.model_dump(),
-                            shared_registers=[r.model_dump() for r in foundation.registers],
-                            builtin_coverage=[a.id+'_coverage' for a in foundation.agents],
-                            dependency_components=[dict(task_id=d.task_id,**completed[d.task_id]) for d in task.depends_on],
-                            evidence=selected)
-                def fragment_check(f):
-                    _facts_in_context(f.facts,selected)
-                    validate(_merge(assembled,f),plan,definition,sources)
-                    mapped=[m.step for m in f.step_implementations]
-                    expected={key+'/'+str(i) for key in ('stimulus_steps','check_steps','coverage_steps')
-                              for i in range(len(getattr(pseudo,key)))}
-                    if set(mapped)!=expected or len(mapped)!=len(set(mapped)):
-                        raise ValueError('Every pseudocode step needs exactly one implementation mapping or explicit question')
-                    allowed={s.id for s in f.sequences}|{c.id for c in f.checks}|{r.id for r in f.routes}|{h.id for h in f.hooks}
-                    allowed|={r.id for r in foundation.registers}|{c.id for c in f.coverage}|{a.id+'_coverage' for a in foundation.agents}
-                    for mapping in f.step_implementations:
-                        if bool(mapping.component_ids)==bool(mapping.question.strip()):
-                            raise ValueError('A pseudocode step must be implemented or explicitly deferred with a question')
-                        if not set(mapping.component_ids)<=allowed: raise ValueError('Step mapping references an unknown component')
-                fragment=call('code_feature',coding,Fragment,
-                    f'Implement ONLY work package {tid} from its saved pseudocode. Return reusable typed operations, '
-                    'sequence/check/scoreboard declarations and declared coverage hooks, not raw framework code. '
-                    'Use existing agent names; namespace NEW IDs with this task ID. facts must include every new '
-                    'supporting fact. Do not redefine agents or silently omit unsupported steps: put them in questions. '
-                    'Map EVERY stimulus_steps/N, check_steps/N and coverage_steps/N to emitted component_ids or an explicit '
-                    'question, never both. Use typed coverage goals for specific bins/crosses over cg_item fields; '
-                    'builtin coverage references apply only where its existing bins actually meet the goal. '
-                    'Coverage must subscribe to observed monitor transactions. Do not invent expected behavior.',fragment_check)
-                assembled=_merge(assembled,fragment)
-                _write(work/(tid+'.fragment.json'),fragment.model_dump())
-                completed[tid]['sequences']=[s.id for s in fragment.sequences]
-                completed[tid]['checks']=[c.id for c in fragment.checks]
-                completed[tid]['routes']=[r.id for r in fragment.routes]
-                completed[tid]['coverage']=[c.id for c in fragment.coverage]
-                assembled.questions=list(dict.fromkeys(assembled.questions+pseudo.questions))
-                assembled.questions=list(dict.fromkeys(assembled.questions+[
-                    tid+': '+m.question for m in fragment.step_implementations if m.question.strip()]))
-                work_manifest['completed_tasks'].append(tid)
-                _write(directory/'code_work_manifest.json',work_manifest)
+        if pseudocode_only:
+            execution['status']='PSEUDOCODE_READY_NEEDS_REVIEW';save_execution()
+            return work_manifest
         # Collate interfaces and completed component signatures, never all specification text.
         integration_payload=dict(understanding=graph.understanding,dependency_waves=approach.execution_order,
             collated_pseudocode=approach.model_dump(),
             components=completed,agents=[dict(id=a.id,protocol=a.protocol) for a in assembled.agents],
             sequences=[dict(id=s.id,agent=s.agent,purpose=s.purpose,fact_ids=s.fact_ids) for s in assembled.sequences],
+            sequencer_variables=[v.model_dump() for v in assembled.sequencer_variables],
             available_fact_ids=[f.id for f in assembled.facts])
         def integration_check(i):
             validate(_merge(assembled,i),plan,definition,sources)
@@ -563,7 +708,11 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                         tid=next(iter(owners[sid]))
                         for dep in ancestors[tid]:
                             required=set(completed[dep].get('sequences',[]))
-                            if required and not seen & required:
+                            inherited=set();base=next(s.extends for s in assembled.sequences if s.id==sid)
+                            while base:
+                                inherited.add(base)
+                                base=next(s.extends for s in assembled.sequences if s.id==base)
+                            if required and not (seen|inherited) & required:
                                 raise ValueError(f'Test {test.id} starts {tid} before dependency {dep}')
                     seen.update(stage)
         integration=call('code_integration',integration_payload,Integration,
@@ -577,6 +726,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                                                      integration=integration.model_dump()))
         _artifact(work/'COLLATED_UNDERSTANDING.md','# Collated implementation understanding\n\n'+graph.understanding+'\n\n'+
             '\n\n'.join(f'## {tid}\n\n{completed[tid]["understanding"]}\n\n[Detailed pseudocode]({tid}.md)' for wave in waves for tid in wave))
+        execution['status']='COMPLETE_NEEDS_REVIEW';save_execution()
         work_manifest['status']='COMPLETE_NEEDS_REVIEW'
         _write(directory/'code_work_manifest.json',work_manifest)
         return assembled

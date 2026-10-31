@@ -5,6 +5,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from .html_report import render_html
+
 
 MAX_REPORT_BYTES = 16 * 1024 * 1024
 MAX_RUN_DIRECTORIES = 32768
@@ -129,7 +131,7 @@ def create_report_server(out: Path, port: int = 8765) -> HTTPServer:
                     return
                 _check_artifacts(run)
                 if name == "testplan_doc.html":
-                    render_testplan(run)
+                    render_testplan(run)  # deliberate: upgrades HTML written by an older renderer; deterministic, no model call
                 data = (run / name).read_bytes()
                 mime = "text/html" if name.endswith(".html") else "text/plain"
                 self._reply(200, data, mime + "; charset=utf-8")
@@ -168,7 +170,6 @@ def create_report_server(out: Path, port: int = 8765) -> HTTPServer:
                 self._error(400, str(exc))
 
     try:
-        from .html_report import render_html
         return HTTPServer(("127.0.0.1", port), Handler)
     except OSError as exc:
         raise ValueError(f"Cannot start testplan viewer on port {port}: {exc.strerror}") from None

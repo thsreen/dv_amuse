@@ -5,12 +5,15 @@ from ..core.progress import emit_event
 
 STEPS=[
     ('code_selection','Select saved plan and RTL interface'),
-    ('code_grouping','Plan clock, reset, interfaces and small feature tasks'),
-    ('code_dependencies','Collate cross-group dependencies'),
-    ('code_pseudocode','Retrieve excerpts and write feature pseudocode'),
-    ('code_collation','Collate the implementation pseudocode'),
-    ('code_foundation','Build reusable interfaces and configuration'),
-    ('code_feature','Implement stimulus, checks and monitor coverage'),
+    ('code_clock','Clock: retrieve, pseudocode, implement and validate'),
+    ('code_reset','Reset: retrieve, pseudocode, implement and validate'),
+    ('code_interfaces','Identify interface groups'),
+    ('code_interface','Each interface: scaffold, assess needs, then build selected infrastructure'),
+    ('code_grouping','Group small tasks by interface or feature'),
+    ('code_dependencies','Analyze sequence extension, sequencer controls and ordering'),
+    ('code_pseudocode','Write pseudocode for one feature'),
+    ('code_feature','Implement and validate that feature before the next'),
+    ('code_collation','Collate completed feature algorithms'),
     ('code_integration','Compose sequences and executable tests'),
     ('code_validation','Validate evidence, ownership and widths'),
     ('code_review','Review source-backed implementation'),
@@ -38,12 +41,29 @@ def skip(*stage_ids):
     for sid in stage_ids: emit_event('substep_done',id=sid,label=dict(STEPS).get(sid,sid),status='NOT_RUN')
 
 
-def feature_steps(waves,tasks):
-    steps=[]
-    for sid,label in STEPS:
-        if sid in ('code_pseudocode','code_feature'):
+def feature_steps(waves,tasks,unit_rows=()):
+    steps=[STEPS[0]]
+    for row in unit_rows:
+        tid=row['id']
+        if not tid.startswith(('foundation_','interface_','collateral_','assessment_')): continue
+        if tid.startswith('interface_') and not any(sid=='code_interfaces' for sid,_ in steps):
+            steps.append(('code_interfaces','Identify interface groups'))
+        if tid.startswith('assessment_'):
+            steps.append(('code_interface_needs:'+tid.removeprefix('assessment_'),'Assess '+row['title']))
+            continue
+        steps.append(('code_infrastructure:'+tid,'Plan infrastructure '+row['title']))
+        sid='code_clock' if tid=='foundation_clock' else 'code_reset' if tid=='foundation_reset' else ('code_interface_base:' if tid.startswith('interface_') else 'code_interface:')+tid
+        steps.append((sid,'Implement and validate '+row['title']))
+    if not unit_rows: steps+=STEPS[1:5]
+    elif not any(sid=='code_interfaces' for sid,_ in steps): steps.append(('code_interfaces','Identify interface groups'))
+    for sid,label in STEPS[5:]:
+        if sid=='code_pseudocode':
             for wave in waves:
                 for tid in wave:
-                    steps.append((sid+':'+tid,('Understand ' if sid=='code_pseudocode' else 'Implement ')+tasks[tid].title))
+                    steps.append(('code_pseudocode:'+tid,'Understand '+tasks[tid].title))
+                    steps.append(('code_feature:'+tid,'Implement '+tasks[tid].title))
+            if not tasks: steps.append((sid,label))
+        elif sid=='code_feature':
+            if not tasks: steps.append((sid,label))
         else: steps.append((sid,label))
     emit_event('substeps_configured',steps=[dict(id=sid,label=label) for sid,label in steps])

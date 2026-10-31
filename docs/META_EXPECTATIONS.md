@@ -21,7 +21,7 @@ participant notes and secondary coverage; confirm against the official rules.
 1. **Theme fit**: dv_agent fits **Build for Your World** (verification engineering is the author's
    domain) or **Push the Frontier** (a machine that turns a specification into a reviewed test plan).
 2. **Genuine Meta model use at runtime**: Muse Spark must do load-bearing work in a live run.
-   Status: not yet shown (no live run).
+   Status: shown. Live runs are recorded under `runs/` (for example `orch-20261030T181215Z`: 34 API calls, 13 of 13 sections PASS; `uart_fast`: 61 calls, 21 repair calls). Show a run in the demo.
 
 Failing either gate means the project is not scored.
 

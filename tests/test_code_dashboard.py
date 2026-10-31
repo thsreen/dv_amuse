@@ -72,7 +72,7 @@ def test_repl_code_restores_plan_without_replanning_and_fresh_disables_restore(t
     terminal.repl(input_fn=script(['/code']), output_fn=shown.append, llm=object())
     assert calls == [(out, variables)]
     assert 'Using saved successful testplan:' in '\n'.join(shown)
-    assert 'Collate the implementation pseudocode' in '\n'.join(shown)
+    assert 'Collate completed feature algorithms' in '\n'.join(shown)
     terminal.repl(input_fn=script(['/fresh', '/code']), output_fn=shown.append, llm=object())
     assert len(calls) == 1
     assert 'Code blocked: no testplan' in '\n'.join(shown)

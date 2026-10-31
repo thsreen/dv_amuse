@@ -19,10 +19,36 @@ MAX_STATEMENT = 4000
 MAX_RULES = 64
 
 TEMPLATE_FILENAME = "methodology_rules_v0.json"
+PIN_FILENAME = TEMPLATE_FILENAME + ".sha256"
+
+
+class ProtectedFileChanged(ValueError):
+    """The shipped rules differ from the owner's pinned digest."""
 
 
 def default_rules_path() -> Path:
     return Path(__file__).resolve().parents[1] / "templates" / TEMPLATE_FILENAME
+
+
+def shipped_rules_bytes() -> bytes:
+    """The shipped rules file, verified against the owner's pinned SHA-256 before anything uses it.
+
+    These rules become plan entries tagged "Recommended by DV agent", so an agent must never be able to
+    change them unnoticed. The pin sits beside the file and both are write-protected for agents
+    (docs/PROTECTED_FILES.md). A mismatch is an error, not a warning.
+    """
+    path = default_rules_path()
+    data = path.read_bytes()
+    pin = path.with_name(PIN_FILENAME)
+    try:
+        expected = pin.read_text(encoding="utf-8").split()[0].lower()
+    except (OSError, IndexError):
+        raise ProtectedFileChanged(f"{TEMPLATE_FILENAME}: pin file {PIN_FILENAME} is missing or empty") from None
+    if hashlib.sha256(data).hexdigest() != expected:
+        raise ProtectedFileChanged(
+            f"{TEMPLATE_FILENAME} does not match its owner-pinned SHA-256. Only the owner may change it: review the "
+            f"diff, then re-pin with `sha256sum {TEMPLATE_FILENAME} > {PIN_FILENAME}` (docs/PROTECTED_FILES.md).")
+    return data
 
 
 def _rule_error(source: str, index: int, problem: str) -> ValueError:
@@ -93,9 +119,7 @@ def load_methodology_rules(path: str | Path | None = None) -> list[dict]:
     User rules with the same ID replace shipped rules; new IDs are
     appended. Raises ValueError on unreadable or invalid files.
     """
-    defaults = validate_rules(
-        json.loads(default_rules_path().read_text(encoding="utf-8")),
-        "defaults")
+    defaults = validate_rules(json.loads(shipped_rules_bytes().decode("utf-8")), "defaults")
     if path in (None, ""):
         return defaults
     try:

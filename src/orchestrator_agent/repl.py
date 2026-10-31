@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
+from dv_agent.quality.code_notice import abort_requested, code_notice
 from dv_agent.report.testplan_viewer import create_report_server
 
 from .actions import build_code, run_tests
@@ -77,7 +78,7 @@ def ask_card(flow: dict, flow_path: Path, variables: dict, requirement: str,
     lines += [f"output: {out / 'dv' / 'testplan_doc.md'} and testplan_doc.html",
               *( [f"inferred RTL specification: {out / 'rtl_spec' / 'doc' / 'rtl_derived_spec.md'}",
                   "All draft-derived checks remain INFERRED and require RTL engineer validation."] if derived else []),
-              "Then /code builds only cited DOCUMENTED plan items and a basic smoke test.",
+              "Then /code builds only cited DOCUMENTED plan items (it warns first; /abort stops it).",
               "/run executes the basic built test; /regress executes every built test.",
               f"ready: {'yes' if ready else 'no — name a local repository with RTL and a clear top module'}"]
     return "\n".join(lines)
@@ -302,6 +303,11 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                 show("Code blocked: no testplan was generated.")
                 continue
             try:
+                for notice in code_notice(json.loads((out / "dv" / "testplan_doc.json").read_text(encoding="utf-8"))):
+                    show(notice)
+                if abort_requested(interactive=input_fn is None):
+                    show("Code aborted before it started; nothing was generated.")
+                    continue
                 show(code_preview(out))
                 code_llm, _ = models()
                 result = execute_code(build_code, out, variables, llm=code_llm, show=show,

@@ -221,3 +221,12 @@ DV_AGENT_TEST_SIMULATION=1 .venv/bin/python -m pytest \
 
 Live model-generated code from the latest production plan is still unvalidated;
 these results apply to the explicit acceptance contract.
+
+
+The current orchestrator coding flow is ordered and incremental: clock, reset, one interface
+at a time, dedicated dependency analysis, then one feature at a time. Each unit repeats
+retrieval, pseudocode, implementation, validation and checkpointing. See
+[the execution and dependency plan](CODE_WORK_PACKAGES.md). `/code` and standalone
+`build-code` defer compilation by default; `/run`/`/regress` compile later, or standalone
+`build-code --compile` explicitly opts in. Sequence inheritance and typed `p_sequencer`
+variables/settings are schema-controlled, width-checked extensions to the reusable templates.

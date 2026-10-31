@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 import httpx
@@ -283,3 +284,24 @@ def test_interruption_is_logged_in_request_and_trace(tmp_path):
     assert events[-1]['status']=='INTERRUPTED' and events[-1]['error_type']=='KeyboardInterrupt'
     spans=read_trace(tmp_path/'trace.jsonl')
     assert all(s['level']=='ERROR' and s['status_message']=='KeyboardInterrupt' for s in spans)
+
+
+def test_langfuse_mirror_withholds_prompts_and_output_unless_opted_in(tmp_path, monkeypatch):
+    secret = {"instructions": "x", "payload": {"chunk": "CONFIDENTIAL SPEC TEXT"}}
+
+    def run(sink):
+        lf = FakeLangfuse()
+        with Tracer(sink, "run", client=lf) as tracer:
+            with tracer.span("llm:x", as_type="generation", input=secret) as span:
+                span.update(output={"answer": "CONFIDENTIAL SPEC TEXT"})
+        return lf, read_trace(sink)
+
+    monkeypatch.delenv("LANGFUSE_CAPTURE_CONTENT", raising=False)
+    lf, local = run(tmp_path / "a.jsonl")
+    sent = repr(lf.log)
+    assert "CONFIDENTIAL" not in sent and "withheld" in sent
+    assert any("CONFIDENTIAL SPEC TEXT" in json.dumps(r) for r in local)  # the local trace stays complete
+
+    monkeypatch.setenv("LANGFUSE_CAPTURE_CONTENT", "1")
+    lf, _ = run(tmp_path / "b.jsonl")
+    assert "CONFIDENTIAL SPEC TEXT" in repr(lf.log)

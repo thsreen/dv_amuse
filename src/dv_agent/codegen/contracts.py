@@ -30,6 +30,7 @@ class Agent(Model):
     parity: Literal["none", "even", "odd"] = "none"
     stop_bits: int = Field(default=1, ge=1, le=2)
     active: bool = True
+    coverage_enabled: bool = True
 
 
 class Register(Model):
@@ -59,12 +60,28 @@ class Operation(Model):
     count: int = Field(default=1, ge=1, le=1024)
 
 
+class SequenceBinding(Model):
+    operation: int = Field(ge=0)
+    field: Literal['data','address','count','cycles']
+    variable: str
+
+
+class SequencerVariable(Model):
+    id: str
+    agent: str
+    width: int = Field(ge=1,le=64)
+    default: int = Field(ge=0)
+    fact_ids: list[str] = Field(min_length=1)
+
+
 class Sequence(Model):
     id: str
     agent: str
     purpose: str
     operations: list[Operation] = Field(min_length=1, max_length=256)
     fact_ids: list[str] = Field(min_length=1)
+    extends: str | None = None
+    controls: list[SequenceBinding] = Field(default_factory=list,max_length=16)
 
 
 class Condition(Model):
@@ -95,9 +112,15 @@ class Check(Model):
     fact_ids: list[str] = Field(min_length=1)
 
 
+class SequencerSetting(Model):
+    variable: str
+    value: int = Field(ge=0)
+
+
 class Test(Model):
     id: str
     stages: list[list[str]] = Field(min_length=1, max_length=128)
+    sequencer_settings: list[SequencerSetting] = Field(default_factory=list,max_length=32)
     seed: int = Field(default=1, ge=1, le=2147483647)
     drain_cycles: int = Field(default=1024, ge=1, le=10000000)
     minimum_comparisons: int = Field(default=1, ge=1)
@@ -155,6 +178,7 @@ class CodePlan(Model):
     tie_offs: list[TieOff] = Field(default_factory=list, max_length=128)
     registers: list[Register] = Field(default_factory=list, max_length=128)
     sequences: list[Sequence] = Field(default_factory=list, max_length=128)
+    sequencer_variables: list[SequencerVariable] = Field(default_factory=list,max_length=64)
     routes: list[Route] = Field(default_factory=list, max_length=64)
     checks: list[Check] = Field(default_factory=list, max_length=64)
     tests: list[Test] = Field(default_factory=list, max_length=64)

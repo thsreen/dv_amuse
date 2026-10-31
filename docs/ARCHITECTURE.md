@@ -117,8 +117,8 @@ Responses are cached by a hash of model, call name, instructions, payload and sc
 nothing unless a prompt changes. Each call records input, cached-input, output and reasoning tokens
 (estimated when the API reports none); the final test plan lists them per model call, with repair and
 local-cache counts, and `dv-agent usage` totals them per run and per call. `--llm auto|on|off` (or `DV_AGENT_LLM_MODE`) controls
-whether the model is used; `FakeLLM` drives the offline tests. Live use is not yet verified (see
-`docs/WORKSHOP_REVIEW.md` for the open API questions).
+whether the model is used; `FakeLLM` drives the offline tests. Live runs are recorded under `runs/`: `orch-20261030T181215Z` (basic mode, 34 API calls, 13 of 13 sections PASS, 2 token-budget retries) and `uart_fast` (graph mode, 61 calls, 21 repair calls, 11 of 12 sections PASS). The API accepted strict `json_schema` output in these runs. Per-attempt metadata (no
+prompts, headers or provider bodies) is in each stage's `llm_requests.jsonl`.
 
 ## Provenance and lineage
 
@@ -171,5 +171,7 @@ are unchanged; `--force` reruns a stage; `--fresh` also clears the response cach
 
 ## Status
 
-Offline: all stages implemented and tested (`pytest -q`, fake model). Not yet: a live Meta API run,
-refuse-and-repair in stage 2, the sign-off command, and hidden coverage data.
+Offline: all stages implemented and tested (`pytest -q`, fake model), and live Meta API runs are recorded
+(see Model integration). Not yet: refuse-and-repair in stage 2, the sign-off command, and hidden coverage data.
+Retrieval quality is measured with `dv-agent evaluate --out runs/<run> --ablate --table`; on the 24 labelled
+UART questions graph propagation did not beat plain BM25, so no retrieval-improvement claim is made.

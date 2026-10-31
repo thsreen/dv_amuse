@@ -46,7 +46,7 @@ def load_sources(plan, graph_path=None):
 
 
 def build_project(plan_path, interface_path, directory, *, llm=None, contract_path=None,
-                  rtl_files=(), expected_top=None, compile=True):
+                  rtl_files=(), expected_top=None, compile=False):
     plan_path,interface_path,directory=Path(plan_path).resolve(),Path(interface_path).resolve(),Path(directory).resolve()
     directory.mkdir(parents=True,exist_ok=True)
     with project_lock(directory):
@@ -116,8 +116,8 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     for agent in plan.agents:
         if agent.protocol=='custom':
             slots={h.slot for h in plan.hooks if h.target==agent.id and hook_code.get(h.id)}
-            if not {'driver.body','monitor.body'} <= slots:
-                raise ValueError('Custom protocol requires implemented driver and monitor hooks')
+            if not ({'driver.body','monitor.body'} if agent.active else {'monitor.body'}) <= slots:
+                raise ValueError('Custom protocol requires monitor hooks and, for active agents, driver hooks')
     with stage('code_render'):
         artifacts,compile_files=render(plan,ports,hook_code)
     rtl=[Path(p).resolve() for p in rtl_files]
@@ -145,7 +145,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
                   files={name:digest(text) for name,text in artifacts.items()},
                   coverage_collectors=[dict(id=a.id+'_coverage',source='monitor '+a.id,
                                             file=f'uvm/{a.id}_coverage.svh',sampling='completed observed transaction',
-                                            fact_ids=a.fact_ids) for a in plan.agents]
+                                            fact_ids=a.fact_ids) for a in plan.agents if a.coverage_enabled]
                                       + [dict(id=c.id,source='monitor '+c.agent,file=f'uvm/{c.id}_coverage.svh',
                                               sampling='completed observed transaction',fact_ids=c.fact_ids) for c in plan.coverage]
                                       + ([dict(id='system_coverage',source='all interface monitors',
@@ -167,7 +167,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     if llm and not contract_path:
         manifest['work_documents']=str(directory/'code_work_manifest.json')
     items=[]
-    for category in ('agents','registers','sequences','routes','checks','tests','hooks','coverage'):
+    for category in ('agents','registers','sequencer_variables','sequences','routes','checks','tests','hooks','coverage'):
         for item in getattr(plan,category):
             items.append(dict(id=item.id,kind=category,fact_ids=item.fact_ids,
                               plan_references=[next(f for f in plan.facts if f.id==fid).plan_pointer for fid in item.fact_ids],
@@ -175,10 +175,13 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     for path,value in (('code_plan.json',plan.model_dump()),('traceability.json',dict(items=items)),
                        ('code_questions.json',dict(status='NEEDS_REVIEW' if plan.questions else 'PASS',questions=plan.questions))):
         atomic_write_text(code/path,json.dumps(value,indent=2)+'\n')
-    emit('code [4/5]: compile generated UVM and preserve diagnostics')
-    with stage('code_compile') as outcome:
-        manifest['compile']=compile_project(manifest) if compile else dict(status='NOT_RUN',reason='compile disabled explicitly')
-        outcome['status']=manifest['compile']['status']
+    if compile:
+        emit('code: explicit standalone compilation requested')
+        with stage('code_compile') as outcome:
+            manifest['compile']=compile_project(manifest)
+            outcome['status']=manifest['compile']['status']
+    else:
+        manifest['compile']=dict(status='NOT_RUN',reason='Deferred to /run or /regress')
     if llm and plan.hooks and compiler_feedback is None and manifest['compile']['status']=='FAIL':
         # Repair only diagnostics naming a generated extension file. Framework,
         # missing-library and DUT errors cannot authorize model edits to those files.

@@ -32,7 +32,7 @@ that saved text. Offline tests drive the real OpenAI SDK through a scripted HTTP
 | Save every turn, resume, branch | Stage-level reuse, `--force`/`--fresh`, response cache; no turn-level state (there is no loop) | Small today; grows with an agent loop |
 | Files API + model transcription (scans, tables, figures) | pypdf, DOCX and HTML text only; diagrams and image-only pages are lost | **Medium** for real specs (bit-field and timing diagrams) |
 | Client: SDK retries (4, honours Retry-After), 180 s timeout, `MODEL_API_KEY`/`MODEL_API_BASE_URL`/`MODEL_API_MODEL` | Own retry loop (3 attempts, fixed backoff, ignores Retry-After), 90 s timeout, `META_BASE_URL`/`META_MODEL` | Small; align |
-| JSON mode (`text.format = json_object`) + parsing in code | Strict `json_schema` everywhere. Meta documents `json_schema` (examples omit `strict`); the workshop never relies on it | **Risk**: unverified live |
+| JSON mode (`text.format = json_object`) + parsing in code | Strict `json_schema` everywhere. Meta documents `json_schema` (examples omit `strict`); the workshop never relies on it | Verified live: the API accepted strict `json_schema` in recorded runs (`runs/*/dv/llm_requests.jsonl`) |
 | `openai>=2,<3` | `openai>=2`, 3.40 installed | Risk: untested major version |
 | Offline tests through the real SDK (scripted transport) | Fake client objects bypass the SDK, so request-shape errors would not be caught | Small |
 | Agent Console (turns, refusals, sign-off) | Langfuse traces + `trace.jsonl` + Markdown; no Langfuse keys yet | Small (Langfuse can be the console) |
@@ -41,7 +41,7 @@ that saved text. Offline tests drive the real OpenAI SDK through a scripted HTTP
 ## Hackathon gates and rules (from META_EXPECTATIONS.md)
 
 - **Public repository**: `thsreen/dv_amuse` is private. Must change before submission.
-- **Genuine Meta model use**: not yet shown. Nothing has run live; the API contract is unverified.
+- **Genuine Meta model use**: shown. Live runs are recorded under `runs/` (see `META_EXPECTATIONS.md`); the demo must show one.
 - **Anti-project "basic RAG applications"**: dv_agent's retrieval core is RAG. The pitch and demo
   must lead with what is not basic RAG: model-built interface groups, register map and strategy,
   checked against the specification, with refusals, repairs and human sign-off.

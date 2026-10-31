@@ -242,6 +242,7 @@ def _main(argv: list[str] | None) -> int:
     pcode.add_argument("--rtl-file", type=Path, action="append", required=True)
     pcode.add_argument("--top", required=True)
     pcode.add_argument("--llm", choices=LLM_MODES, default="auto")
+    pcode.add_argument("--compile", action="store_true", help="explicit standalone compile; generation normally defers simulation")
     pcode.add_argument("--no-compile", action="store_true", help="record compilation as NOT_RUN")
 
     prun = sub.add_parser('run-code', help='compile and simulate saved functional verification code; no model calls')
@@ -302,7 +303,7 @@ def _main(argv: list[str] | None) -> int:
         llm, _ = _models_for(args.llm)
         try:
             result = build_project(args.testplan,args.interface,args.out,llm=llm,contract_path=args.contract,
-                                   rtl_files=args.rtl_file,expected_top=args.top,compile=not args.no_compile)
+                                   rtl_files=args.rtl_file,expected_top=args.top,compile=args.compile and not args.no_compile)
         except OSError as exc:
             raise UsageError(f"Code generation input/tool unavailable: {exc}") from None
         print(json.dumps(result,indent=2))

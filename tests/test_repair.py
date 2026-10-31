@@ -130,6 +130,7 @@ def fixed_strategy(payload):
     data["agents"][1]["drives"] = []
     data["agents"][1]["correctness"] = [{"mechanism": "monitor_check", "description": "IRQ only when counter is zero"}]
     data["agents"][2]["interface_groups"] = ["Clock", "Reset"]
+    data["agents"][2]["correctness"] = []  # a clock/reset source has no correctness mechanism of its own
     data["agents"].append({"name": "misc_agent", "interface_groups": ["Ungrouped signals"], "mode": "passive",
                            "role": "tick monitor", "drives": [], "monitors": ["TICK_O"], "registers": [],
                            "sequences": [], "correctness": [{"mechanism": "coverage", "description": "tick seen"}],

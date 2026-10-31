@@ -31,7 +31,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 rtl_agent = ["templates/*.json", "templates/*.jsonc"]
-dv_agent = ["templates/*.json", "templates/common_uvc/*/*.sv", "templates/common_uvc/*/*.svh",
+dv_agent = ["templates/*.json", "templates/*.sha256", "templates/common_uvc/*/*.sv", "templates/common_uvc/*/*.svh",
             "templates/codegen/*.json", "templates/codegen/*.tmpl",
             "templates/uvm_agent/*.json", "templates/uvm_agent/*.tmpl", "templates/uvm_agent/*.md"]
 orchestrator_agent = ["flows/*.json"]

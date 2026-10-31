@@ -17,12 +17,15 @@ Basic lexical RAG is the default. Start:
 ```
 
 Then enter `Generate verification collateral for ../baseline_repos/uart16550` and `/plan`.
-Afterward type `/code`. It automatically groups related features, retrieves relevant specification
-excerpts, records dependencies and per-feature pseudocode, collates the implementation approach,
-generates the reusable UVM foundation and components, validates/reviews them, renders source files,
-and compiles with Xezim/UVM. No separate intermediate command is needed. The terminal shows an
-English preview and the same progress dashboard as `/plan`, including each feature's understanding
-and implementation tasks, the current task, start time and elapsed time at completion checkpoints.
+Afterward type `/code`. It runs clock, reset, each interface, then individual feature tasks.
+Every unit repeats retrieve → understand/pseudocode → implement → validate → checkpoint.
+After all interface scaffolds, a per-interface assessment selects scaffold-only, utility configuration,
+passive monitoring or a full agent; only the chosen components are built. Decisions and reasons are
+saved under `infrastructure_needs/` and shown in the execution queue. Features are grouped by interface or function; a dedicated dependency pass chooses sequence
+extension, typed `p_sequencer` controls or ordering. One feature completes before the next starts.
+`CODE_EXECUTION_PLAN.md` and the work directory's `execution_plan.json` record this queue.
+Xezim compilation/simulation is deferred to `/run` or `/regress`. The terminal shows the
+English preview and progress dashboard, including the current unit and elapsed time.
 Noninteractive terminals receive plain progress lines; there are no timer-only redraws.
 
 In a restarted session, `/code` automatically selects the latest successful compatible documented
@@ -130,7 +133,7 @@ The interactive terminal has five commands:
 | Command | Action |
 | --- | --- |
 | `/plan` | Ingest specifications, or draft one from RTL with inferred authority; build graphs, recover registers/configurable controls, and write `testplan_doc.json`, editable Markdown and readable HTML. |
-| `/code` | Generate `/plan` if needed. With a configured model, design/review a documented-source implementation contract, render reusable functional UVM components and compile. Without a model or explicit code contract, retain the labeled legacy smoke scaffold. |
+| `/code` | Generate `/plan` if needed. With a configured model, design/review a documented-source implementation contract, incrementally render reusable UVM components; defer compilation to `/run` or `/regress`. Without a model or explicit code contract, retain the labeled legacy smoke scaffold. |
 | `/run` | Execute the first built test with local Xezim; functional UVM tests require UVM sources and real checking/coverage evidence. |
 | `/regress` | Execute all tests in the current code manifest and retain per-test/seed logs and coverage. |
 | `/fresh` | Start over: new run directory, no cached state reused. The earlier run is kept for review. Saying "start fresh" works too. |
@@ -147,14 +150,14 @@ documented-only policy. `run --fresh` clears cached and derived state in
 
 `/plan` requires `MODEL_API_KEY`. `/run` and `/regress` need a local `xezim`
 executable on `PATH` or `XEZIM_BIN` set to its full path. A missing simulator
-or plan reports BLOCKED; it never reports a simulated PASS. Functional generation
+or plan reports BLOCKED; it never reports a simulated PASS. Functional simulation
 also requires `XEZIM_UVM_DIR` pointing to a UVM source release. The legacy smoke
 test does not claim functional correctness. See [CODE_GENERATION.md](CODE_GENERATION.md)
 for contracts, templates, supported behaviors, recovery and current validation limits.
 Saved functional projects can also be replayed without a model using
 `dv-agent run-code --out <run>` or `dv-agent run-code --out <run> --regress`.
-`/code` writes feature dependency/understanding notes and collated pseudocode before
-translation. These are indexed by `<run>/code_work_manifest.json`; standalone
+`/code` saves dependency notes and each unit’s pseudocode before implementing that unit;
+final collation follows incremental translation. These are indexed by `<run>/code_work_manifest.json`; standalone
 `dv-agent plan-code --out <run>` stops at pseudocode. See [work packages](CODE_WORK_PACKAGES.md).
 Ctrl-D leaves the terminal. The
 advanced non-interactive CLI below remains available for custom flow files.
@@ -164,6 +167,14 @@ on an available port and prints its URL, the polished HTML file path and the
 editable Markdown path. The viewer lists all generated plans under `runs/`.
 Keep the orchestrator terminal open while using the URL. If local port binding
 is unavailable, the HTML file remains readable directly.
+
+### Warning before code
+
+`/code` starts without a confirmation step, because code is built only from DOCUMENTED plan entries that cite a
+specification source. First it prints what will and will not be used (used vs inferred, assumed, uncited and RTL
+observation entries; DV-agent methodology rules are not used as code facts; lineage note when entries cite chunks
+only). On a real terminal it then waits `DV_AGENT_CODE_ABORT_SECONDS` seconds (default 10, 0 disables) for `/abort`;
+Ctrl-C stops it at any time. Piped or scripted sessions do not wait. Generated code stays NEEDS_REVIEW.
 
 ## Advanced CLI
 
@@ -262,8 +273,8 @@ are logged and ignored; the recommended order continues.
 | Total overrides | `max_overrides` (3) | Further overrides rejected |
 | Rejected decider proposals | `> max_overrides` | Owner review (nagging decider) |
 | Total tool calls | `max_total_tool_calls` (32) | Owner review (possible loop) |
-| Per-step timeout | `timeout_s` / `default_step_timeout_s` (600s) | Step TIMEOUT, then attempts/owner |
-| Global timeout | `global_timeout_s` (3600s) | Owner review |
+| Per-step timeout | `timeout_s` / `default_step_timeout_s` (600s) | Step TIMEOUT, then attempts/owner. Not applied to `dv_build_graph` and `dv_testplan`, which run until the global timeout |
+| Global timeout | `global_timeout_s` (3600s) | Owner review. Also stops a running model stage: at the deadline it starts no new model calls, keeps what it saved, and the run reverts to the owner |
 | `review_gate` step | `--approve <id>` | Run pauses until approved |
 
 Each run writes `orchestrator_trace.jsonl` (every tool call, guard check,

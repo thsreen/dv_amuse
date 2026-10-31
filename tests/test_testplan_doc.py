@@ -685,3 +685,27 @@ def test_evidence_index_covers_rtl_excerpts_and_methodology_rules():
     assert index["EX-1"]["line_start"] == 3
     assert index["METH-X"]["excerpt"] == "Never sample an unknown value."
     assert index["METH-X"]["path"] == "Methodology rules"
+
+
+def test_every_assertion_needs_a_label_and_a_paired_cover_property():
+    from dv_agent.plan.testplan_doc import pairing_problems, render_markdown, unpaired_assertions
+
+    def entry(text, kind, details=()):
+        return {"text": text, "kind": kind, "details": list(details), "provenance": "DOCUMENTED", "cited_req_ids": [],
+                "cited_chunk_ids": ["CH-1"], "cited_rtl_observation_ids": [], "validation": []}
+
+    checks = [entry("ack follows req: a_ack_after_req", "assertion"), entry("data stays stable: a_stable", "assertion"),
+              entry("monitor flags X", "protocol_check"), entry("unlabelled handshake rule", "assertion")]
+    covers = [entry("cover c_ack_after_req", "cover_property"), entry("covergroup", "covergroup")]
+    assert unpaired_assertions(checks, covers) == (["a_stable"], 1)
+    sections = [{"id": "checks", "entries": checks}]
+    assert pairing_problems("coverage", covers, sections) == [
+        "assertion a_stable has no cover_property entry; add one named c_stable with a_stable in its details"]
+    assert "no label" in pairing_problems("checks", checks, [])[0] and pairing_problems("stimulus", checks, []) == []
+    # a cover that names the assertion label in its details counts as paired
+    covers.append(entry("cover the stable rule", "cover_property", ["Assertion: a_stable"]))
+    assert pairing_problems("coverage", covers, sections) == []
+    md = render_markdown({"sections": [dict(id="checks", heading="8", generator="entries", status="PASS", entries=checks),
+                                       dict(id="coverage", heading="9", generator="entries", status="PASS", entries=covers[:1] + covers[1:2])],
+                          "coverage": None, "token_usage": None})
+    assert "Assertions without a paired cover property: a_stable" in md

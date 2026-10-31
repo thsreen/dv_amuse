@@ -22,6 +22,7 @@ from ..ingest.extract import locate_quote
 from ..graph.graph import attach_artifact
 from ..retrieval.graph_fetch import dependency_order, requirement_coverage
 from ..retrieval.combined_fetch import step_targets
+from .interface_roles import group_roles
 from .interfaces import InterfaceConfig, compact, extract_interfaces, interface_questions
 from .interfaces import render as render_interfaces
 from ..core.llm import LLM, LLMError
@@ -138,6 +139,41 @@ def load_template(path: Path | None = None) -> dict:
 def _ids_schema(ids: list[str]) -> dict:
     # Strict JSON schema needs a non-empty enum; "" stands for "no ID" and is dropped in validation.
     return {"type": "array", "items": {"type": "string", "enum": ids or [""]}}
+
+
+_ASSERT_LABEL = re.compile(r"\ba_([A-Za-z0-9_]+)")
+_COVER_LABEL = re.compile(r"\bc_([A-Za-z0-9_]+)")
+
+
+def _blob(entry: dict) -> str:
+    return " ".join([entry.get("text", ""), *entry.get("details", [])])
+
+
+def unpaired_assertions(checks_entries: list[dict], coverage_entries: list[dict]) -> tuple[list[str], int]:
+    """Assertion labels with no cover property, and the number of assertion entries carrying no label at all."""
+    labelled, unlabelled = [], 0
+    for entry in checks_entries:
+        if entry.get("kind") == "assertion":
+            found = _ASSERT_LABEL.findall(_blob(entry))
+            labelled += found[:1]
+            unlabelled += not found
+    covered = {m for e in coverage_entries if e.get("kind") == "cover_property"
+               for m in _COVER_LABEL.findall(_blob(e)) + _ASSERT_LABEL.findall(_blob(e))}
+    return [f"a_{x}" for x in dict.fromkeys(labelled) if x not in covered], unlabelled
+
+
+def pairing_problems(section_id: str, entries: list[dict], sections: list[dict]) -> list[str]:
+    """Rules the prompt states but nothing enforced: assertions are labelled, and each has a cover property."""
+    checks = entries if section_id == "checks" else [e for s in sections if s.get("id") == "checks" for e in s.get("entries", [])]
+    if section_id == "checks":
+        _, unlabelled = unpaired_assertions(entries, [])
+        return [f"{unlabelled} assertion entr{'y has' if unlabelled == 1 else 'ies have'} no label; write each assertion's label "
+                "as a_<name> in its text"] if unlabelled else []
+    if section_id != "coverage":
+        return []
+    missing, _ = unpaired_assertions(checks, entries)
+    return [f"assertion {label} has no cover_property entry; add one named c_{label[2:]} with {label} in its details"
+            for label in missing]
 
 
 def _entries_schema(kinds: list[str] | None, req_ids: list[str], chunk_ids: list[str], rtl_ids=None,
@@ -565,6 +601,8 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                 emit(f"section {sec['id']}: retrieved {len(req_ids)} requirements / {len(chunk_ids)} chunks; "
                      f"previous context {len(payload.get('previous_sections',[]))} sections")
                 payload["source_authority"] = G.graph.get("source_authority", "DOCUMENTED")
+                if interfaces and interfaces.get("groups"):
+                    payload["interface_roles"] = group_roles(interfaces["groups"])
                 from .rtl_observations import compact as compact_rtl
                 rtl_ids = [e["id"] for e in (rtl_observations or {}).get("entries", [])]
                 if rtl_ids:
@@ -615,6 +653,7 @@ def build_testplan_doc(G: nx.MultiDiGraph, H: nx.Graph, llm: LLM, tracer: Tracer
                         cited = {x for e in entries for x in e["cited_req_ids"]}
                         problems += [f"requirement {x} ('{G.nodes[x]['statement'][:70]}') is not cited by any "
                                      "entry; add an entry that cites it" for x in t if x not in cited]
+                        problems += pairing_problems(sec["id"], entries, sections)
                         cited_rtl = {x for e in entries for x in e.get("cited_rtl_observation_ids", [])}
                         problems += [f"RTL observation {oid} needs a cited proposed check or explicit review-dependent handling"
                                      for oid in required_rtl if oid not in cited_rtl]
@@ -1053,8 +1092,9 @@ def _render_coverage_entries(s: dict, doc: dict) -> list[str]:
     subsections = entry_subsections(s, _SUBSECTION_TITLES)
     ids = {g["id"] for g in subsections}
     lines, number = [], 1
-    asserts = sum(1 for sec in doc["sections"] if sec.get("id") == "checks"
-                  for e in sec.get("entries", []) if e["kind"] == "assertion")
+    check_entries = [e for sec in doc["sections"] if sec.get("id") == "checks" for e in sec.get("entries", [])]
+    asserts = sum(1 for e in check_entries if e["kind"] == "assertion")
+    unpaired, _ = unpaired_assertions(check_entries, s["entries"])
     if "assertion_coverage" not in ids and asserts:
         subsections.insert(0, dict(id="assertion_coverage", heading=_SUBSECTION_TITLES.get("assertion_coverage", "Assertion Coverage"),
                                    entry_indexes=[]))
@@ -1064,6 +1104,9 @@ def _render_coverage_entries(s: dict, doc: dict) -> list[str]:
         if g["id"] == "assertion_coverage":
             if entries:
                 lines += _render_assertion_table(entries)
+                if unpaired:
+                    lines += [f"_Assertions without a paired cover property: {', '.join(unpaired)}. "
+                              "Each needs one: NEEDS_REVIEW._", ""]
             else:
                 lines += [f"_No cover properties were generated for the {asserts} assertion(s) in the checks section. "
                           "Every assertion needs a paired cover property: NEEDS_REVIEW._", ""]

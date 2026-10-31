@@ -24,7 +24,7 @@ Separate implementation choices from expected behavior. Template plumbing is inf
 Do not use RTL observations, unvalidated RTL-derived content, outside protocol knowledge or unstated timing as expectations.
 Protocol templates are generic capabilities: select wishbone/serial only when the cited source supports that contract.
 Bindings map canonical role -> exact physical port; reset polarity and bus address representation must be explicit.
-Every DUT input needs an active owner or evidenced tie_off. Do not infer reset polarity or inactive modem levels from names.
+Every DUT input needs an active owner or evidenced tie_off. Do not infer reset polarity or the inactive level of handshake or flow-control inputs from names.
 For all semantic objects give supporting fact_ids. Keep the contract compact and executable, not a paraphrase of the plan.
 Register mirrors support only unbanked simple RW/RO/WO storage with explicit comparison masks; omit side-effect/banked fields
 unless their behavior is fully modeled through an extension. Unknown reset must be null, never invented as zero.
@@ -130,7 +130,7 @@ def review(llm, plan, directory):
             ('top','clock','reset','reset_active','clock_period_ns','reset_cycles','defines','agents','tie_offs')}
     shared['sequence_signatures']=[dict(id=s.id,agent=s.agent,purpose=s.purpose) for s in plan.sequences]
     components=[dict(kind=kind,component=item.model_dump()) for kind in
-                ('registers','sequences','routes','checks','coverage','hooks','tests') for item in getattr(plan,kind)]
+                ('registers','sequencer_variables','sequences','routes','checks','coverage','hooks','tests') for item in getattr(plan,kind)]
     facts={f.id:f.model_dump() for f in plan.facts}
     common_ids={fid for a in list(plan.agents)+list(plan.tie_offs) for fid in a.fact_ids}
     def payload_for(batch):
@@ -163,8 +163,19 @@ def review(llm, plan, directory):
     if problems: raise ValueError('Contract review: '+'; '.join(problems))
 
 
+# Model-written hooks may call only these system functions: pure sampling/formatting helpers.
+# Anything else ($fdisplay, $writememh, $dumpfile, $finish, $value$plusargs, ...) is refused, not blocklisted.
+ALLOWED_SYSTEM_CALLS=frozenset({
+    'display','sformatf','cast','time','realtime','isunknown','onehot','onehot0','countones','clog2','bits','size',
+    'high','low','left','right','dimensions','signed','unsigned','urandom','urandom_range',
+    'past','rose','fell','stable','changed','error','warning','info','typename'})
+
+
 def check_hook(code, task, plan):
     code=_checked_code(code,task.id)
+    for name in dict.fromkeys(re.findall(r'\$(\w+)',re.sub(r'"(?:\\.|[^"\\])*"','""',code))):
+        if name not in ALLOWED_SYSTEM_CALLS:
+            raise ValueError(f'Hook uses ${name}, which is not an allowed system function')
     if re.search(r'\$(?:system|fopen|fwrite|readmem\w*)\b|`(?!uvm_(?:fatal|error|warning|info)\b)|\b(?:force|release|bind|uvm_hdl_\w*)\b|\$root|\bp_sequencer\b|\bdut\s*\.',code):
         raise ValueError('Hook contains forbidden external/system/declaration access')
     if task.slot in ('monitor.body','coverage.sample','scoreboard.compare') and re.search(r'cfg\.vif\.\w+\s*(?:<=|=(?!=))',code):

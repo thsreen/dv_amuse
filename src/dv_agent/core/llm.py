@@ -1,7 +1,7 @@
 """Meta Model API client with strict JSON-schema output, bounded retries, and a response cache.
 
-The API contract (Responses API at META_BASE_URL) follows old_reference/silicon-copilot and is
-not yet verified live in this workspace. META_API_STYLE=chat switches to chat.completions.
+Uses the Responses API at META_BASE_URL with strict `json_schema` output; live runs under runs/ show the
+API accepting it (see each run's llm_requests.jsonl). META_API_STYLE=chat switches to chat.completions.
 """
 import hashlib
 import math
@@ -19,7 +19,7 @@ from typing import Any, Callable, Protocol
 
 from . import cancel
 from .fsutil import atomic_write_text
-from .progress import emit, thread_tag
+from .progress import emit, emit_event, thread_tag
 from .trace import Tracer
 from .usage import estimate_usage
 
@@ -358,6 +358,7 @@ class MetaClient(_Base):
                     error.attempts = attempts
                     raise error from None
                 delay = 2.0 * 2 ** (attempt - 1)
+                emit_event('task_retry',status=exc.kind.upper(),attempt=attempt+1)
                 _request_event('retry_scheduled', **request_fields, attempt=attempt, next_attempt=attempt+1, backoff_s=delay)
                 emit(f"model call {name!r} hit {type(exc).__name__}; retrying in {delay:.0f}s "
                      f"(attempt {attempt}/{self.max_attempts})")

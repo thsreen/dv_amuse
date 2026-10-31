@@ -161,3 +161,46 @@ def test_strategy_bullets_carry_document_markers(run):
             assert "📄<!--dv-sources:" in line, line
         else:
             assert "📄" not in line, line
+
+
+def _group(name, category, directions):
+    return dict(name=name, category=category, cited_chunk_ids=["CH-1"], peer_type="x",
+                signals=[dict(name=f"{name}_{i}", direction=d) for i, d in enumerate(directions)])
+
+
+def _agent(name, groups, mode="active", correctness=()):
+    return dict(name=name, interface_groups=groups, mode=mode, role="r", drives=[], monitors=[], registers=[],
+                sequences=[], correctness=[dict(mechanism=m, description=d) for m, d in correctness],
+                cited_chunk_ids=["CH-1"])
+
+
+def test_interface_roles_come_from_category_and_signal_directions():
+    from dv_agent.plan.interface_roles import FUNCTIONAL, INFRASTRUCTURE, OBSERVED_OUTPUT, group_role
+    assert group_role(_group("clk", "clock", ["input"])) == INFRASTRUCTURE
+    assert group_role(_group("rst", "reset", ["input"])) == INFRASTRUCTURE
+    assert group_role(_group("tick", "clock", ["output"])) == OBSERVED_OUTPUT  # a derived clock is not a source
+    assert group_role(_group("irq", "interrupt", ["output"])) == OBSERVED_OUTPUT
+    assert group_role(_group("bus", "bus", ["input", "output"])) == FUNCTIONAL
+    assert group_role(_group("odd", "clock", ["input", "output"])) == FUNCTIONAL
+
+
+def test_clock_source_agent_gets_no_correctness_mechanism_and_no_scoreboard():
+    from dv_agent.plan.strategy import validate_strategy
+    groups = [_group("clk", "clock", ["input"]), _group("bus", "bus", ["input", "output"]),
+              _group("tick", "clock", ["output"])]
+    sb = lambda name, inputs, level="top": dict(name=name, level=level, inputs=inputs, reference_model="m", compares="c",
+                                                registers=[], cited_chunk_ids=["CH-1"])
+    data = dict(agents=[_agent("clk_agent", ["clk"], correctness=[("monitor_check", "check the clock toggles")]),
+                        _agent("bus_agent", ["bus"], correctness=[("agent_scoreboard", "compare transfers")]),
+                        _agent("tick_agent", ["tick"], "passive", [("monitor_check", "tick rate")])],
+                scoreboards=[sb("top_sb", ["clk_agent", "bus_agent"]), sb("clk_sb", ["clk_agent"], "agent")],
+                virtual_sequences=[], register_model=None)
+    out = validate_strategy(data, groups, set(), {"CH-1"})
+    by_name = {a["name"]: a for a in out["agents"]}
+    assert by_name["clk_agent"]["correctness"] == []
+    assert by_name["bus_agent"]["correctness"] and by_name["tick_agent"]["correctness"]  # real behaviour keeps its checks
+    assert [s["name"] for s in out["scoreboards"]] == ["top_sb"] and out["scoreboards"][0]["inputs"] == ["bus_agent"]
+    text = " ".join(out["validation"])
+    assert "clk_agent: drives only clock/reset sources" in text
+    assert "clock/reset source agents ['clk_agent'] are not scoreboard inputs" in text
+    assert "no correctness mechanism stated" not in text

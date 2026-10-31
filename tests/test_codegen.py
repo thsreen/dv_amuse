@@ -70,7 +70,26 @@ def workflow_model(contract, **overrides):
             coverage_approach=['Subscribe to bus monitor'],questions=[]),
         'code_integration':lambda p:dict(tests=contract['tests'],questions=[]),
         'code_review':lambda p:dict(problems=[])}
+    handlers.update({
+        'code_infrastructure':lambda p:dict(understanding='Identify infrastructure',actions=['Bind scoped ports and configure infrastructure'],
+            completion=['Port shapes and bounded configuration validate'],facts=facts,questions=[]),
+        'code_interface_needs':lambda p:dict(level='full_agent' if p['task_id'] in {a['id'] for a in contract['agents']} else 'scaffold_only',
+            reason='Required by documented interface responsibility',responsibilities=['Only the required interface infrastructure'],
+            coverage=p['task_id'] in {a['id'] for a in contract['agents']},facts=facts),
+        'code_interface_base':lambda p:dict(ports=[port['name'] for port in p['interface']['ports']],facts=facts),
+        'code_clock':lambda p:dict(top=contract['top'],clock=contract['clock'],facts=facts),
+        'code_reset':lambda p:dict(reset=contract['reset'],reset_active=contract['reset_active'],facts=facts),
+        'code_interfaces':lambda p:dict(interfaces=[dict(id=a['id'],title=a['id'],signals=list(a['bindings'].values()),
+            queries=['interface clock reset register']) for a in contract['agents']]),
+        'code_interface':lambda p:dict(agents=[a for a in contract['agents'] if a['id']==p['task_id'].removeprefix('collateral_')],
+            registers=[r for r in contract['registers'] if r['agent']==p['task_id'].removeprefix('collateral_')],facts=facts),
+        'code_dependencies':lambda p:dict(understanding='Dedicated dependency pass',dependencies=[
+            dict(task_id=t['id'],requires=d['task_id'],reason=d['reason']) for t in p['tasks'] for d in t['depends_on']],questions=[]),
+    })
+    foundation_pseudo=handlers['code_pseudocode']
     handlers.update(overrides)
+    feature_pseudo=handlers['code_pseudocode']
+    handlers['code_pseudocode']=lambda p: foundation_pseudo(p) if p['task']['id'].startswith(('foundation_','interface_')) else feature_pseudo(p)
     return FakeLLM(handlers)
 
 
@@ -118,7 +137,9 @@ def test_model_design_and_review_checkpoint_without_extra_calls(inputs):
     llm=workflow_model(contract)
     for _ in range(2):
         build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[rtl],compile=False)
-    assert [name for name,_ in llm.calls]==['code_grouping','code_pseudocode','code_collation','code_foundation','code_feature','code_integration','code_review']
+    assert [name for name,_ in llm.calls]==['code_infrastructure','code_clock','code_infrastructure','code_reset',
+        'code_interfaces','code_infrastructure','code_interface_base','code_interface_needs','code_infrastructure','code_interface','code_grouping','code_dependencies',
+        'code_pseudocode','code_feature','code_collation','code_integration','code_review']
     assert (root/'output/contract_review.json').is_file()
 
 
@@ -140,6 +161,10 @@ def test_custom_hooks_cannot_drive_from_monitor_or_run_external_commands(inputs)
     hook=Hook(id='observe',target='control',slot='monitor.body',purpose='observe',fact_ids=['behavior'])
     for code in ('cfg.vif.we = 1;', '$system("bad");', '`include "bad.svh"', 'class injected; endclass'):
         with pytest.raises(ValueError): check_hook(code,hook,plan)
+    # Allow-list, not deny-list: file, memory, dump and simulation-control calls are all refused.
+    for call in ('$fdisplay(1,"x");','$writememh("f",m);','$dumpfile("x.vcd");','$finish;','$value$plusargs("A=%d",v);','$fscanf(f,"%d",v);'):
+        with pytest.raises(ValueError,match='allowed system function'): check_hook(call,hook,plan)
+    assert check_hook('x = $isunknown(cfg.vif.we) ? 0 : $countones(v); `uvm_info("t",$sformatf("$%0d",x),UVM_LOW)',hook,plan)
 
 
 def test_codegen_lock_refuses_overlapping_writers(inputs):
@@ -250,7 +275,7 @@ def test_compiler_repairs_only_declared_hook_once(inputs,monkeypatch):
         return dict(status='FAIL' if len(compilations)==1 else 'PASS',log=str(log))
     monkeypatch.setattr('dv_agent.codegen.build.compile_project',compile_code)
     manifest=build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,
-                           contract_path=root/'contract.json',rtl_files=[rtl])
+                           contract_path=root/'contract.json',rtl_files=[rtl],compile=True)
     assert manifest['compile']['status']=='PASS' and len(compilations)==2 and len(requests)==2
     assert 'compiler_diagnostics' in requests[1]['repair_feedback']
     assert compilations[0]['build_id']!=compilations[1]['build_id']
@@ -351,9 +376,9 @@ def test_dependency_documents_and_collated_pseudocode_precede_code(inputs):
     assert 'Configure before access' in (work/'dependent.md').read_text()
     assert (work/'COLLATED_PSEUDOCODE.md').is_file() and (work/'collated_understanding.json').is_file()
     names=[name for name,_ in llm.calls]
-    assert max(i for i,n in enumerate(names) if n=='code_pseudocode') < names.index('code_collation') < names.index('code_feature')
+    assert names.index('code_feature') < max(i for i,n in enumerate(names) if n=='code_pseudocode') < names.index('code_collation')
     for name,payload in llm.calls:
-        if name=='code_feature': assert 'collated_approach' in payload and 'pseudocode' in payload
+        if name=='code_feature': assert 'dependency_handling' in payload and 'pseudocode' in payload
         assert len(json.dumps(payload))<48000
     assert result['work_documents']==str(root/'output/code_work_manifest.json')
     assert manifest['status']=='COMPLETE_NEEDS_REVIEW'
@@ -375,9 +400,9 @@ def test_pseudocode_only_batches_inventory_and_collates_cross_batch_dependencies
     spec['sections'][0]['entries']=[dict(spec['sections'][0]['entries'][0],text='Storage access '+('detail '*70)) for _ in range(50)]
     def groups(payload):
         items=payload['intentions'];batch=payload['batch']
-        return dict(understanding='Grouped storage features',tasks=[dict(id=f'b{batch}_t{i//6}',title='Storage group',
-            category='feature',goal='Storage access',plan_pointers=[e['plan_pointer'] for e in items[i:i+6]],
-            depends_on=[],queries=['storage clock reset bus']) for i in range(0,len(items),6)],questions=[])
+        return dict(understanding='Grouped storage features',tasks=[dict(id=f'b{batch}_t{i//2}',title='Storage group',
+            category='feature',goal='Storage access',plan_pointers=[e['plan_pointer'] for e in items[i:i+2]],
+            depends_on=[],queries=['storage clock reset bus']) for i in range(0,len(items),2)],questions=[])
     def collate(payload):
         pending={t['id']:set(t['requires']) for t in payload['dependencies']};seen=set();order=[]
         while pending:
@@ -413,7 +438,8 @@ def test_plan_code_cli_stops_before_code_and_preserves_edited_work_documents(inp
     assert cli.main(['plan-code','--out',str(out)])==0
     result=json.loads(capsys.readouterr().out)
     assert result['status']=='PSEUDOCODE_READY_NEEDS_REVIEW'
-    assert [n for n,p in llm.calls]==['code_grouping','code_pseudocode','code_collation']
+    assert 'code_feature' not in [n for n,p in llm.calls]
+    assert [n for n,p in llm.calls][-3:]==['code_dependencies','code_pseudocode','code_collation']
     assert not (out/'code_manifest.json').exists()
     document=Path(result['work_dir'])/'storage_feature.md'
     document.write_text(document.read_text()+'\nEngineer review note\n')
@@ -434,7 +460,7 @@ def test_pseudocode_step_cannot_silently_disappear(inputs):
     assert len([n for n,p in llm.calls if n=='code_feature'])==2
     manifest=json.loads((root/'output/code_work_manifest.json').read_text())
     assert (Path(manifest['work_dir'])/'storage_feature.pseudocode.json').is_file()
-    assert (Path(manifest['work_dir'])/'COLLATED_PSEUDOCODE.md').is_file()
+    assert not (Path(manifest['work_dir'])/'COLLATED_PSEUDOCODE.md').exists()
 
 
 def test_integrated_test_cannot_start_a_dependent_feature_before_setup(inputs):
@@ -510,13 +536,16 @@ def test_workflow_emits_real_feature_phases_in_execution_order(inputs):
         build_project(root/'plan.json', root/'interface.json', root/'output',
                       llm=workflow_model(contract), rtl_files=[rtl], compile=False)
     starts = [e['id'] for e in events if e['kind']=='substep_start']
-    assert starts == ['code_grouping', 'code_pseudocode:storage_feature', 'code_collation',
-                      'code_foundation', 'code_feature:storage_feature', 'code_integration',
-                      'code_validation', 'code_review', 'code_hooks', 'code_render',
-                      'code_compile', 'code_publish']
-    configured = next(e['steps'] for e in events if e['kind']=='substeps_configured')
+    assert starts == ['code_infrastructure:foundation_clock','code_clock',
+        'code_infrastructure:foundation_reset','code_reset','code_interfaces',
+        'code_infrastructure:interface_control','code_interface_base:interface_control',
+        'code_interface_needs:control','code_infrastructure:collateral_control','code_interface:collateral_control',
+        'code_grouping','code_dependencies','code_pseudocode:storage_feature',
+        'code_feature:storage_feature','code_collation','code_integration',
+        'code_validation','code_review','code_hooks','code_render','code_publish']
+    configured = [e['steps'] for e in events if e['kind']=='substeps_configured'][-1]
     assert any(s['label']=='Understand Storage access' for s in configured)
-    assert any(e.get('id')=='code_compile' and e.get('status')=='NOT_RUN' for e in events)
+    assert not any(e.get('id')=='code_compile' for e in events)
     assert (root/'output/code_manifest.json').is_file()
 
 
@@ -541,6 +570,7 @@ def test_question_only_pseudocode_recovers_targeted_evidence_before_retry(inputs
     normal = llm.handlers['code_pseudocode']
     seen = []
     def pseudo(payload):
+        if payload['task']['id']!='storage_feature': return normal(payload)
         seen.append(payload)
         if len(seen) == 1:
             return dict(understanding='Need storage access details', preconditions=[], stimulus_steps=[],
@@ -567,6 +597,7 @@ def test_incomplete_pseudocode_never_becomes_ready_or_reaches_foundation(inputs,
     normal = llm.handlers['code_pseudocode']
     def pseudo(payload):
         data = normal(payload)
+        if payload['task']['id']!='storage_feature': return data
         if failure == 'questions_only':
             for key in ('stimulus_steps', 'check_steps', 'coverage_steps'): data[key] = []
             data['questions'] = ['What is the bus contract?']
@@ -582,7 +613,7 @@ def test_incomplete_pseudocode_never_becomes_ready_or_reaches_foundation(inputs,
                root/'output', pseudocode_only=True)
     manifest = json.loads((root/'output/code_work_manifest.json').read_text())
     assert manifest['status'] == 'BLOCKED' and manifest['blocked_stage'] == 'code_pseudocode:storage_feature'
-    assert len([n for n,p in llm.calls if n=='code_pseudocode']) == 2
+    assert len([n for n,p in llm.calls if n=='code_pseudocode' and p['task']['id']=='storage_feature']) == 2
     assert not any(n in ('code_collation','code_foundation') for n,p in llm.calls)
     assert not (Path(manifest['work_dir'])/'COLLATED_PSEUDOCODE.json').exists()
     issue = json.loads((root/'output/code_planning_issue.json').read_text())
@@ -659,6 +690,7 @@ def test_supported_check_only_feature_can_keep_nonessential_questions(inputs):
     normal = llm.handlers['code_pseudocode']
     def pseudo(payload):
         result = normal(payload)
+        if payload['task']['id']!='storage_feature': return result
         result.update(stimulus_steps=[], coverage_steps=[],
                       questions=['Which optional regression seeds should be used?'])
         return result
@@ -666,4 +698,286 @@ def test_supported_check_only_feature_can_keep_nonessential_questions(inputs):
     result = design(llm, spec, definition, {'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},
                     root/'output', pseudocode_only=True)
     assert result['status']=='PSEUDOCODE_READY_NEEDS_REVIEW'
-    assert len([n for n,p in llm.calls if n=='code_pseudocode'])==1
+    assert len([n for n,p in llm.calls if n=='code_pseudocode' and p['task']['id']=='storage_feature'])==1
+
+
+def test_clock_reset_and_two_interfaces_use_identical_sequential_cycle(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    second=json.loads(json.dumps(contract['agents'][0]));second['id']='auxiliary'
+    second['bindings']={role:'aux_'+name for role,name in second['bindings'].items()}
+    contract['agents'].append(second)
+    originals={p['name']:p for p in definition['ports']}
+    definition['ports'] += [dict(originals[name],name='aux_'+name) for name in contract['agents'][0]['bindings'].values()]
+    llm=workflow_model(contract)
+    result=design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    assert len(result.agents)==2
+    manifest=json.loads((root/'output/code_work_manifest.json').read_text());work=Path(manifest['work_dir'])
+    execution=json.loads((work/'execution_plan.json').read_text())
+    assert [r['id'] for r in execution['steps']]==[
+        'foundation_clock','foundation_reset','interface_control','interface_auxiliary',
+        'assessment_control','collateral_control','assessment_auxiliary','collateral_auxiliary','storage_feature']
+    assert all(r['status']=='PASS' for r in execution['steps'])
+    assert all(r['cycle']==execution['cycle'] for r in execution['steps'] if not r['id'].startswith('assessment_'))
+    assert (work/'units/clock/clock_if.sv').is_file()
+    assert (work/'units/reset/reset_if.sv').is_file()
+    for agent in ('control','auxiliary'):
+        assert (work/f'units/{agent}/uvm/{agent}_driver.svh').is_file()
+        assert (work/f'units/{agent}/uvm/{agent}_monitor.svh').is_file()
+    names=[n for n,p in llm.calls]
+    assert names.index('code_clock')<names.index('code_reset')<names.index('code_interface_base')<names.index('code_interface')<names.index('code_grouping')
+    assert names.count('code_dependencies')==1
+    assert (work/'dependency_handling.json').is_file()
+
+
+def test_clock_failure_stops_before_reset_and_preserves_execution_checkpoint(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    llm=workflow_model(contract,code_clock=lambda p:dict(top='peripheral',clock='not_a_port',facts=contract['facts']))
+    with pytest.raises(ValueError,match='scalar DUT input'):
+        design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    assert not any(n in ('code_reset','code_interfaces','code_grouping') for n,p in llm.calls)
+    manifest=json.loads((root/'output/code_work_manifest.json').read_text())
+    execution=json.loads((Path(manifest['work_dir'])/'execution_plan.json').read_text())
+    assert execution['status']=='BLOCKED' and execution['steps'][0]['status']=='BLOCKED'
+    assert execution['steps'][1]['status']=='PENDING'
+
+
+def test_code_build_defers_simulator_by_default(inputs,monkeypatch):
+    root,_,_,_,rtl=inputs
+    def forbidden(*a,**kw): pytest.fail('Generation must not invoke Xezim')
+    monkeypatch.setattr('dv_agent.codegen.build.compile_project',forbidden)
+    result=build_project(root/'plan.json',root/'interface.json',root/'output',
+                         contract_path=root/'contract.json',rtl_files=[rtl])
+    assert result['compile']['status']=='NOT_RUN'
+
+
+def test_typed_sequence_extension_and_p_sequencer_configuration_render(inputs):
+    _,spec,definition,contract,_=inputs
+    contract['sequencer_variables']=[dict(id='payload_value',agent='control',width=8,default=37,fact_ids=['behavior'])]
+    extended=json.loads(json.dumps(contract['sequences'][0]));extended.update(id='extended_access',extends='storage_access',
+        controls=[dict(operation=0,field='data',variable='payload_value')])
+    # Put the child first to verify base-before-child package ordering.
+    contract['sequences'].insert(0,extended)
+    contract['tests'][0]['sequencer_settings']=[dict(variable='payload_value',value=73)]
+    plan=CodePlan.model_validate(contract)
+    ports=validate(plan,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']})
+    artifacts,_=render(plan,ports)
+    assert "env.control.sqr.payload_value=64'h49;" in artifacts['tests/basic_functional.svh']
+    assert 'extends storage_access' in artifacts['sequences/extended_access.svh']
+    assert 'super.body();' in artifacts['sequences/extended_access.svh']
+    assert '`uvm_declare_p_sequencer(control_sequencer)' in artifacts['sequences/extended_access.svh']
+    assert 'tr.data=p_sequencer.payload_value;' in artifacts['sequences/extended_access.svh']
+    assert "payload_value=64'h25" in artifacts['uvm/control_sequencer.svh']
+    package=artifacts['peripheral_verification_pkg.sv']
+    assert package.index('sequences/storage_access.svh')<package.index('sequences/extended_access.svh')
+
+
+@pytest.mark.parametrize('error',['cycle','unknown_variable','width','unbounded_count'])
+def test_sequence_dependency_controls_are_validated(inputs,error):
+    _,spec,definition,contract,_=inputs
+    contract['sequencer_variables']=[dict(id='payload_value',agent='control',width=8,default=37,fact_ids=['behavior'])]
+    contract['sequences'][0]['controls']=[dict(operation=0,field='data',variable='payload_value')]
+    if error=='cycle': contract['sequences'][0]['extends']='storage_access'
+    elif error=='unknown_variable': contract['sequences'][0]['controls'][0]['variable']='unknown'
+    elif error=='width': contract['sequencer_variables'][0]['width']=32
+    else:
+        contract['sequences'][0]['controls'][0]['field']='count'
+        contract['sequencer_variables'][0]['width']=32
+    with pytest.raises(ValueError):
+        validate(CodePlan.model_validate(contract),spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']})
+
+
+def test_dedicated_dependency_pass_drives_sequence_extension_and_controls(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    spec['sections'][0]['entries']*=2
+    tasks=[dict(id=tid,title=tid,category='feature',goal='Storage access',interface_id='control',
+                plan_pointers=[f'/sections/0/entries/{i}'],depends_on=[],queries=['storage control'])
+           for i,tid in enumerate(('base_access','configured_access'))]
+    original=workflow_model(contract).handlers['code_feature']
+    def feature(payload):
+        result=json.loads(json.dumps(original(payload)))
+        if payload['task_id']=='configured_access':
+            assert {d['mechanism'] for d in payload['dependency_handling']}=={'sequence_extension','p_sequencer_config'}
+            result['sequences'][0].update(id='configured_sequence',extends='storage_access',
+                controls=[dict(operation=0,field='data',variable='payload_value')])
+            result['step_implementations'][0]['component_ids']=['configured_sequence']
+            result['sequencer_variables']=[dict(id='payload_value',agent='control',width=8,default=42,fact_ids=['behavior'])]
+        return result
+    tests=json.loads(json.dumps(contract['tests']));tests[0]['stages']=[['configured_sequence']]
+    llm=workflow_model(contract,
+        code_grouping=lambda p:dict(understanding='Group one interface feature at a time',tasks=tasks,questions=[]),
+        code_dependencies=lambda p:dict(understanding='Reuse base and parameterize shared sequencer',dependencies=[
+            dict(task_id='configured_access',requires='base_access',reason='Reuse bringup actions',mechanism='sequence_extension'),
+            dict(task_id='configured_access',requires='base_access',reason='Select legal payload',mechanism='p_sequencer_config',controls=['payload_value'])],questions=[]),
+        code_feature=feature,
+        code_collation=lambda p:dict(shared_setup=['Reuse reset'],execution_order=[['base_access'],['configured_access']],
+            stimulus_approach=['Extend base'],check_approach=['Compare observations'],coverage_approach=['Monitor transfers'],questions=[]),
+        code_integration=lambda p:dict(tests=tests,questions=[]))
+    result=design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    assert result.sequences[-1].extends=='storage_access' and result.sequencer_variables[0].id=='payload_value'
+    work=Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])
+    assert len(json.loads((work/'dependency_handling.json').read_text())['dependencies'])==2
+    calls=[(n,p.get('task',{}).get('id') or p.get('task_id')) for n,p in llm.calls]
+    assert calls.index(('code_feature','base_access')) < calls.index(('code_pseudocode','configured_access'))
+
+
+def test_infrastructure_prompt_and_schema_do_not_require_functional_verification(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    llm=workflow_model(contract)
+    original=llm._call
+    seen=[]
+    def call(name,instructions,payload,schema):
+        if name in ('code_infrastructure','code_clock','code_reset','code_interface_base','code_interface'):
+            assert 'Each test must observe at least one scoreboard comparison' not in instructions
+            assert 'current infrastructure unit' in instructions
+            if name=='code_infrastructure':
+                assert 'actions' in schema['properties'] and 'stimulus_steps' not in schema['properties']
+                assert 'check_steps' not in schema['properties'] and 'coverage_steps' not in schema['properties']
+                seen.append(payload['profile'])
+        return original(name,instructions,payload,schema)
+    llm._call=call
+    original_plan=llm.handlers['code_infrastructure']
+    def minimal(payload):
+        result=original_plan(payload)
+        result['questions']=['DUT sampling edge is not documented; resolve before protocol monitoring']
+        return result
+    llm.handlers['code_infrastructure']=minimal
+    result=design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    assert result.clock=='tick' and {p['kind'] for p in seen}>={'clock','reset','protocol','collateral'}
+    work=Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])
+    clock=json.loads((work/'foundation_clock.pseudocode.json').read_text())
+    assert clock['actions'] and clock['questions'] and 'check_steps' not in clock
+    assert (work/'base_interfaces/control_if.sv').is_file()
+
+
+def test_all_interface_bases_precede_collateral_and_utility_does_not_need_monitor(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    definition['ports'].append(dict(name='status_flag',direction='output',width=1))
+    spec['sections'][0]['entries'][0]['text']+=' The status output is a utility observation.'
+    spec['evidence_index']['CH-spec']['excerpt']+=' The status output is a utility observation.'
+    llm=workflow_model(contract)
+    inventory=llm.handlers['code_interfaces']
+    def groups(payload):
+        result=inventory(payload)
+        result['interfaces'].append(dict(id='status_observation',title='Utility status',signals=['status_flag'],
+                                         queries=['status output'],kind='utility'))
+        return result
+    llm.handlers['code_interfaces']=groups
+    collateral=llm.handlers['code_interface']
+    llm.handlers['code_interface']=lambda p:dict(facts=contract['facts']) if p['task_id']=='collateral_status_observation' else collateral(p)
+    design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    names=[n for n,p in llm.calls]
+    assert max(i for i,n in enumerate(names) if n=='code_interface_base')<names.index('code_interface')
+    work=Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])
+    assert (work/'base_interfaces/status_observation_if.sv').is_file()
+    utility=json.loads((work/'infrastructure_needs/status_observation.json').read_text())
+    assert utility['level']=='scaffold_only'
+    assert not (work/'collateral_status_observation.implementation.json').exists()
+    assert not (work/'units/status_observation').exists()
+
+
+def test_clock_scoreboard_blocker_is_repaired_with_infrastructure_scope(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    llm=workflow_model(contract);normal=llm.handlers['code_infrastructure'];seen=[]
+    def answer(payload):
+        result=normal(payload)
+        if payload['task']['id']=='foundation_clock':
+            seen.append(payload)
+            if len(seen)==1: result['blockers']=['No runnable clock oracle or scoreboard route']
+            else:
+                assert 'no scoreboard' in payload['repair_feedback']
+                assert payload['profile']['kind']=='clock'
+                result['questions']=['Sampling edge deferred to protocol behavior']
+        return result
+    llm.handlers['code_infrastructure']=answer
+    result=design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    assert result.clock=='tick' and len(seen)==2
+
+
+def test_interface_assessment_is_required_before_any_collateral(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    llm=workflow_model(contract)
+    assessment=llm.handlers['code_interface_needs'];seen=[]
+    def decide(payload):
+        seen.append(payload)
+        assert payload['base']['ports'] and payload['evidence']['source_excerpts']
+        return assessment(payload)
+    llm.handlers['code_interface_needs']=decide
+    design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    names=[n for n,p in llm.calls]
+    assert names.index('code_interface_base')<names.index('code_interface_needs')<names.index('code_interface')
+    work=Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])
+    decision=json.loads((work/'infrastructure_needs/control.json').read_text())
+    assert decision['level']=='full_agent' and decision['provenance']=='INFERRED_IMPLEMENTATION_CHOICE'
+    execution=json.loads((work/'execution_plan.json').read_text())
+    row=next(r for r in execution['steps'] if r['id']=='assessment_control')
+    assert row['decision']['level']=='full_agent' and row['status']=='PASS'
+
+
+def test_assessment_cannot_leave_inputs_unowned_or_build_unselected_agent(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    llm=workflow_model(contract,code_interface_needs=lambda p:dict(level='scaffold_only',reason='No work',
+        responsibilities=['Ports only'],facts=contract['facts']))
+    with pytest.raises(ValueError,match='explicit source-backed ownership'):
+        design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    assert not any(n=='code_interface' for n,p in llm.calls)
+
+
+def test_assessed_passive_output_interface_omits_active_and_coverage_components(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    definition['ports'].append(dict(name='status_flag',direction='output',width=1))
+    spec['sections'][0]['entries'][0]['text']+=' The status output is a utility observation.'
+    spec['evidence_index']['CH-spec']['excerpt']+=' The status output is a utility observation.'
+    llm=workflow_model(contract);groups=llm.handlers['code_interfaces'];decide=llm.handlers['code_interface_needs'];build_unit=llm.handlers['code_interface']
+    def inventory(p):
+        result=groups(p);result['interfaces'].append(dict(id='status',title='Status',signals=['status_flag'],queries=['status output'],kind='utility'));return result
+    llm.handlers['code_interfaces']=inventory
+    llm.handlers['code_interface_needs']=lambda p:dict(level='passive_agent',reason='Observe status only',responsibilities=['Sample status'],coverage=False,facts=contract['facts']) if p['task_id']=='status' else decide(p)
+    llm.handlers['code_interface']=lambda p:dict(agents=[dict(id='status',protocol='custom',bindings={'status':'status_flag'},active=False,coverage_enabled=False,fact_ids=['behavior'])],
+        hooks=[dict(id='status_monitor',target='status',slot='monitor.body',purpose='Observe status',fact_ids=['behavior'])],facts=contract['facts']) if p['task_id']=='collateral_status' else build_unit(p)
+    result=design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    ports=validate(result,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']})
+    files,_=render(result,ports)
+    assert 'uvm/status_monitor.svh' in files
+    for component in ('driver','sequencer','coverage'):
+        assert f'uvm/status_{component}.svh' not in files
+    assert '_driver' not in files['uvm/status_agent.svh'] and '.cov' not in files['uvm/status_agent.svh']
+
+
+def test_generated_components_must_match_assessed_minimum(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    llm=workflow_model(contract,code_interface_needs=lambda p:dict(level='full_agent',reason='Active bus needed',
+        responsibilities=['Drive transfers'],coverage=False,facts=contract['facts']))
+    with pytest.raises(ValueError,match='Coverage must match'):
+        design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    work=Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])
+    assert (work/'base_interfaces/control_if.sv').exists()
+    assert not (work/'units/control').exists()
+
+
+def test_utility_configuration_builds_supported_tieoff_without_uvm_agent(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    text='The utility enable input is held at zero during normal operation.'
+    definition['ports'].append(dict(name='enable_static',direction='input',width=1))
+    spec['sections'][0]['entries'][0]['text']+=' '+text
+    spec['evidence_index']['CH-spec']['excerpt']+=' '+text
+    contract['facts'].append(dict(id='enable_idle',statement=text,quote=text,source_id='CH-spec',plan_pointer='/sections/0/entries/0'))
+    llm=workflow_model(contract);groups=llm.handlers['code_interfaces'];decide=llm.handlers['code_interface_needs'];collateral=llm.handlers['code_interface']
+    def inventory(p):
+        result=groups(p);result['interfaces'].append(dict(id='enable_config',title='Utility enable',signals=['enable_static'],queries=['utility enable input'],kind='utility'));return result
+    llm.handlers['code_interfaces']=inventory
+    llm.handlers['code_interface_needs']=lambda p:dict(level='utility_config',reason='Fixed documented input',responsibilities=['Apply supported idle value'],facts=contract['facts']) if p['task_id']=='enable_config' else decide(p)
+    llm.handlers['code_interface']=lambda p:dict(tie_offs=[dict(id='enable_tie',signal='enable_static',value=0,fact_ids=['enable_idle'])],facts=contract['facts']) if p['task_id']=='collateral_enable_config' else collateral(p)
+    result=design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    assert len(result.agents)==1 and result.tie_offs[0].signal=='enable_static'
+    assert not any(a.id=='enable_config' for a in result.agents)

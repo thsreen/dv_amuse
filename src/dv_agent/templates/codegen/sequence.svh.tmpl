@@ -1,5 +1,6 @@
-class {{SEQUENCE}} extends uvm_sequence #(cg_item);
+class {{SEQUENCE}} extends {{BASE}};
   `uvm_object_utils({{SEQUENCE}})
+{{SEQUENCER}}
   function new(string name="{{SEQUENCE}}"); super.new(name); endfunction
   task body();
     cg_item tr;

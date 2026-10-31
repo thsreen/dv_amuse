@@ -37,13 +37,13 @@ def validate(plan, specification, definition, sources):
     for name in (plan.clock, plan.reset):
         if name not in ports or ports[name]["direction"] != "input" or ports[name]["width"] != 1:
             raise ValueError("Clock/reset binding must be an explicit scalar DUT input")
-    for category in (plan.facts, plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.routes, plan.checks, plan.tests, plan.hooks,plan.coverage):
+    for category in (plan.facts, plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.sequencer_variables, plan.routes, plan.checks, plan.tests, plan.hooks,plan.coverage):
         ids = [identifier(item.id) for item in category]
         if len(ids) != len(set(ids)):
             raise ValueError("Duplicate code-plan IDs")
     facts = {f.id: f for f in plan.facts}
     validate_facts(plan.facts,specification,sources)
-    for category in (plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.routes, plan.checks, plan.tests, plan.hooks,plan.coverage):
+    for category in (plan.agents, plan.tie_offs, plan.registers, plan.sequences, plan.sequencer_variables, plan.routes, plan.checks, plan.tests, plan.hooks,plan.coverage):
         for item in category:
             if not set(item.fact_ids) <= facts.keys():
                 raise ValueError(f"Unknown evidence for {item.id}")
@@ -111,6 +111,43 @@ def validate(plan, specification, definition, sources):
         if r.width > ports[agents[r.agent].bindings['rdata']]['width']:
             raise ValueError('Register exceeds bus data width')
     sequences = {s.id: s for s in plan.sequences}
+    variables={v.id:v for v in plan.sequencer_variables}
+    for var in variables.values():
+        if var.agent not in agents or var.default>=1<<var.width or var.id in {'cfg','req','rsp','m_sequencer','p_sequencer'}:
+            raise ValueError('Invalid sequencer variable owner, name or default width')
+    for seq in plan.sequences:
+        seen={seq.id};base=seq.extends
+        while base:
+            if base not in sequences or base in seen or sequences[base].agent!=seq.agent:
+                raise ValueError('Sequence extension requires an acyclic base on the same agent')
+            seen.add(base);base=sequences[base].extends
+        bindings=set()
+        for control in seq.controls:
+            var=variables.get(control.variable)
+            key=(control.operation,control.field)
+            if key in bindings or control.operation>=len(seq.operations) or var is None or var.agent!=seq.agent:
+                raise ValueError('Invalid p_sequencer control binding')
+            bindings.add(key)
+            op=seq.operations[control.operation]
+            agent=agents.get(seq.agent)
+            width=(ports[agent.bindings['addr']]['width'] if control.field=='address' and agent and agent.protocol=='wishbone' else
+                   ports[agent.bindings['wdata']]['width'] if control.field=='data' and agent and agent.protocol=='wishbone' else
+                   agent.data_bits if control.field=='data' and agent else 64)
+            if var.width>width or control.field in ('count','cycles') and (var.width>10 or var.default<1):
+                raise ValueError('Sequencer control exceeds operation width or bounded execution limits')
+            if control.field=='data' and op.kind.startswith('random_'):
+                raise ValueError('Random data and explicit sequencer data control conflict')
+    for test in plan.tests:
+        configured=set()
+        for setting in test.sequencer_settings:
+            var=variables.get(setting.variable)
+            if (var is None or var.id in configured or setting.value>=1<<var.width
+                    or not agents[var.agent].active):
+                raise ValueError('Invalid per-test sequencer setting')
+            configured.add(var.id)
+            if setting.value==0 and any(b.variable==var.id and b.field in ('count','cycles')
+                                       for seq in plan.sequences for b in seq.controls):
+                raise ValueError('Sequencer execution count must be positive')
     for seq in plan.sequences:
         if seq.agent not in agents or not agents[seq.agent].active:
             raise ValueError("Sequence needs an active agent")
@@ -188,6 +225,8 @@ def validate(plan, specification, definition, sources):
         if goal.sample_address is not None and (agent.protocol!='wishbone' or goal.sample_address>=1<<ports[agent.bindings['addr']]['width']):
             raise ValueError('Coverage address filter requires a valid bus address')
     for hook in plan.hooks:
+        if hook.slot=='coverage.sample' and hook.target in agents and not agents[hook.target].coverage_enabled:
+            raise ValueError('Coverage hook requires selected coverage infrastructure')
         if hook.slot=='scoreboard.compare':
             if hook.target not in {r.id for r in plan.routes}: raise ValueError('Scoreboard hook requires a route target')
         elif hook.target not in agents:

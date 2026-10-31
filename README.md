@@ -24,6 +24,12 @@ Spec ingestion → dependency GraphRAG → traceable lineage, for any design rep
 python3 -m venv .venv && .venv/bin/pip install -e '.[test]'
 cp .env.example .env   # add MODEL_API_KEY and optional Langfuse keys
 ```
+Langfuse mirrors span names, timings and token counts only. Prompts, specification text and model output stay in
+the local `trace.jsonl` unless you set `LANGFUSE_CAPTURE_CONTENT=1`.
+
+`tools/xezim` (simulator) and `tools/e2e_sim` (ephemeral cloud simulation nodes) are optional git submodules.
+Planning, retrieval and code generation do not need them; clone without `--recurse-submodules` and initialise only
+what you use, for example `git submodule update --init tools/xezim`.
 
 ## Use
 ```
@@ -68,7 +74,7 @@ source chunk, and logs that list on a `lineage:SVA-0001` span (Langfuse + `trace
 ## Retrieval and test plans
 - `query` fuses BM25 and dense scores (dense only when `META_EMBED_MODEL` and `MODEL_API_KEY` are set), then propagates with Personalized PageRank; each evidence item lists components, a graph path and an explanation.
 - `plan REQ-...` runs bounded multi-hop retrieval (rerank + sufficiency + dependency expansion), writes `test_plan.json`, and records each item in the graph with its requirement and chunk lineage. Items are always `NEEDS_REVIEW`.
-- `dv_agent/src/dv_agent/retrieval/evaluate.py` computes recall@k and MRR for a labeled case file (`load_cases`); no CLI yet.
+- `dv-agent evaluate --out runs/<run> --ablate --table` computes recall@k and MRR on `eval/uart_cases.json` (`src/dv_agent/retrieval/evaluate.py`), with and without graph propagation. No model call.
 
 ## Reuse and `--force`
 Each stage reuses its saved output when inputs are unchanged, so repeat runs do no work and spend no tokens:

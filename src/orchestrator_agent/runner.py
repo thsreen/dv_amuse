@@ -359,9 +359,20 @@ def run_flow(flow_path: Path | str, *, out_dir: Path | str, variables: dict,
                     progress.set_event_sink(None)
             try:
                 if tool in ("dv_build_graph", "dv_testplan"):
-                    # Model stages have bounded API retries and durable checkpoints.
-                    # Wait rather than leave a timed-out background writer.
-                    outcome, value = "ok", invoke()
+                    # Model stages have bounded API retries and durable checkpoints. Wait rather than
+                    # leave a timed-out background writer, but do not let one run past the global budget:
+                    # at the deadline the model client starts no further calls, the stage ends with what
+                    # it saved, and the run reverts to the owner at the next step boundary.
+                    token = threading.Event()
+                    watchdog = threading.Timer(max(1.0, policy["global_timeout_s"] - (time.monotonic() - started)), token.set)
+                    watchdog.daemon = True
+                    watchdog.start()
+                    try:
+                        outcome, value = "ok", cancel.in_scope(token, invoke)()
+                    finally:
+                        watchdog.cancel()
+                    if token.is_set():
+                        emit("budget_exhausted", what="global_timeout", step=step_id, detail="model stage stopped at the deadline")
                 else:
                     outcome, value = call_with_timeout(invoke, step["timeout_s"])
             except KeyboardInterrupt:

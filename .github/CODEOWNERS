@@ -1,0 +1,6 @@
+# Owner review is required for the files agents must not change on their own (docs/PROTECTED_FILES.md).
+# GitHub enforces this only with branch protection ("Require review from Code Owners") on the default branch.
+/src/dv_agent/templates/methodology_rules_v0.json         @thsreen
+/src/dv_agent/templates/methodology_rules_v0.json.sha256  @thsreen
+/.claude/settings.json                                    @thsreen
+/.github/CODEOWNERS                                       @thsreen

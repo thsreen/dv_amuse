@@ -1,15 +1,23 @@
 # Feature understanding, dependencies and pseudocode
 
-`/code` now follows this order:
+`/code` executes small units in this order:
 
-1. Read brief stimulus/check/coverage intentions and the high-level strategy.
-2. Group related intentions into feature work packages and identify dependencies.
-3. Retrieve relevant specification excerpts for each package and write its understanding
-   and pseudocode. Complete **all** feature pseudocode before generating components.
-4. Collate the understanding into one implementation approach and dependency order.
-5. Build the shared foundation, translate each feature pseudocode into typed components,
-   then assemble cohesive tests and virtual sequences.
-6. Validate/review the combined contract, render reusable templates and compile.
+1. Clock: retrieve its contract, understand it, write pseudocode, create configuration and clock UVC sources, validate and checkpoint.
+2. Reset: repeat that same cycle using the completed clock configuration.
+3. Identify physical interface groups and classify each as protocol or utility infrastructure. Finish **all interface bases first**: port names, widths, directions, documented roles and SV declarations. Then assess the minimum required infrastructure and build only the selected ownership/protocol configuration, one group at a time. Functional monitor/driver/coverage implementation follows these base checkpoints.
+4. Group remaining verification work by one interface or one feature, at most two related intention pointers per task.
+5. Run a **dedicated dependency analysis**, even for one grouping batch. Record whether each dependency requires execution ordering, extending a base sequence, or typed `p_sequencer` configuration.
+6. For each feature in dependency order: retrieve → understand/pseudocode → implement → validate → checkpoint. Finish that feature before starting the next. Completed dependency signatures are available for reuse.
+7. Collate the actual completed algorithms and compose tests. Validate/review and publish the assembled sources.
+
+Generation does **not** launch Xezim. `/run` and `/regress` compile and simulate later.
+The standalone `build-code --compile` remains an explicit opt-in outside `/code`.
+
+`CODE_EXECUTION_PLAN.md` in the run directory shows the ordered queue and current phase.
+`code_work/<fingerprint>/execution_plan.json` records the common cycle, unit statuses and
+whether this is planning or generation. A failed unit blocks its successors; completed
+source documents and API checkpoints stay available for recovery. The clock/reset queue
+exists before execution; interface and feature queues are expanded after discovery.
 
 The model no longer receives the entire testplan and specification in one design request.
 Planning batches contain brief ideas; feature requests contain the selected intentions,
@@ -29,8 +37,12 @@ Artifacts are under `<run>/code_work/<fingerprint>/`, indexed by
 | `<feature>.context.json` | Selected plan intentions, documented records, exact excerpt text and offsets |
 | `<feature>.md`, `<feature>.pseudocode.json` | Understanding, preconditions, stimulus/check/coverage pseudocode, completion, questions and essential blockers |
 | `<feature>.recovery.context.json` | Focused evidence fetch and feedback used for one incomplete-feature repair |
-| `COLLATED_PSEUDOCODE.md`, `.json` | Overall implementation approach, shared setup and ordered feature composition, written before code |
-| `foundation.json` | Shared bindings, configuration, agent contracts and supported register mirrors |
+| `COLLATED_PSEUDOCODE.md`, `.json` | Overall implementation approach, shared setup and ordered feature composition, after incremental implementation |
+| `foundation.json` | Shared bindings assembled from separately validated clock/reset/interface units |
+| `foundation_clock.*`, `foundation_reset.*`, `interface_<id>.*` | Per-unit context, pseudocode, implementation contract and explanation |
+| `units/clock/`, `units/reset/`, `units/<interface>/` | Checkpointed reusable UVC/interface sources during generation |
+| `dependency_handling.json` | Dedicated pass: ordering, sequence extension or sequencer controls, with reasons and control names |
+| `execution_plan.json` | Mutable execution queue, common cycle and unit progress |
 | `<feature>.fragment.json` | Typed feature components and mappings from pseudocode steps to components/questions |
 | `COLLATED_UNDERSTANDING.md`, `collated_understanding.json` | Component index and final integration recipe |
 
@@ -65,7 +77,8 @@ Shared setup, stimulus, checks/scoreboard and coverage approaches must all conta
 an inapplicable area needs an explicit explanation. Empty sections receive one repair and
 then block readiness. Feature inclusion and dependency ordering are checked at every level.
 A later `/code` or `build-code` in the same run reuses matching
-planning responses and continues into the foundation and feature implementations.
+planning responses and incrementally generates the unit and feature implementations. Planning-only mode
+records resolved foundation contracts but writes no SystemVerilog; its checkpoints are labeled PLANNED.
 The orchestrator commands remain `/plan`, `/code`, `/run`, `/regress` (plus existing
 session controls). No new terminal command is needed to get the intermediate documents.
 
@@ -113,3 +126,69 @@ generation run and review.
 Final independent review also works in bounded component batches, with shared interface
 signatures and only their cited facts; repeated quotes are stored once. It does not
 reintroduce a whole-specification request after feature generation.
+
+## Reusing sequences and sequencer configuration
+
+The dependency pass outputs `mechanism`: `ordering`, `sequence_extension`, or
+`p_sequencer_config`, plus a reason and any required control names. These are implementation
+choices, not new specification facts. Cycles and unknown task/interface references are refused.
+
+`Sequence.extends` names a same-agent base sequence. The renderer orders bases before children
+and invokes `super.body()` before the extension's operations. Integration recognizes inherited
+setup, so it does not require executing the same base as a separate preceding test stage.
+Cross-agent dependencies use ordered virtual-sequence composition, not cross-agent inheritance.
+
+`CodePlan.sequencer_variables` declares typed, source-backed per-agent configuration fields.
+`Sequence.controls` binds an operation index and its data/address/count/cycles field to a variable.
+The sequence declares its typed `p_sequencer` and reads that field; per-test `sequencer_settings`
+can assign values before the virtual sequence starts. Validation checks ownership, physical width,
+positive bounded counts, unknown variables, inheritance cycles, and conflicting random data controls.
+No arbitrary model-written p_sequencer/VIF code is inserted. Unimplemented dependency mechanisms
+need explicit questions; all generated behavior still needs review and subsequent simulation.
+
+## Infrastructure completion is separate from verification completion
+
+Clock, reset, interface declarations and utility/sideband signals use a dedicated prompt and
+`InfrastructurePlan`: understanding, required actions, completion, documented facts, questions
+and essential blockers. This schema has no stimulus/check/coverage sections. It does not inherit
+the functional-contract requirement for a runnable test or scoreboard comparison.
+
+Profiles in `templates/codegen/infrastructure_profiles.json` declare required artifacts, completion
+criteria and deferred work. Clock needs a supported scalar binding and bounded testbench clock
+configuration; missing DUT sampling edge is deferred to protocol work. Reset still requires a
+supported binding and documented active polarity. Utility profiles avoid invented protocol agents
+or monitors. Essential missing bindings/ownership remain blockers; later functional questions do not.
+
+Every interface gets a `base_interfaces/<id>_if.sv` declaration and a saved base contract before
+any interface collateral is attempted. These base files are intermediate scaffolding, separate
+from final role-based interfaces. Deferred questions stay in execution metadata and foundation
+questions. Existing reusable clock/reset UVC library files are retained; no new functional clock
+or reset monitor/scoreboard test is demanded from the model. Functional feature validation
+continues to require supported algorithms, completion and source-backed expectations.
+
+## Detailed per-interface decision and build process
+
+After clock/reset and **all** interface scaffolds are saved, process one interface at a time:
+
+1. Select the next interface and load its saved port/role scaffold.
+2. Retrieve relevant source excerpts and documented plan items for that interface.
+3. Ask the LLM what infrastructure is needed, without generating code yet.
+4. Validate source references, the selected level, required ownership and optional coverage.
+5. Save the decision, responsibilities, rationale and questions in `infrastructure_needs/<id>.json`.
+6. If the scaffold is sufficient, retain it and skip collateral generation. Otherwise write a short infrastructure action plan for the selected level.
+7. Generate only the selected components, validate that they match the decision, and checkpoint their contracts and source files.
+8. Move to the next interface. After these decisions/builds, group functional features, analyze dependencies and implement the verification work.
+
+| Selected level | Generated infrastructure |
+| --- | --- |
+| `scaffold_only` | Existing port/role declarations; no agent build request |
+| `utility_config` | Source-supported ownership/tie-offs and configuration, with no protocol agent |
+| `passive_agent` | Configuration and monitor container; no driver or sequencer |
+| `full_agent` | Configuration, driver, sequencer, monitor and agent |
+
+Builtin monitor-fed coverage is generated only when requested by the assessment. Later explicit
+feature coverage goals remain separate. Decisions are inferred implementation choices requiring
+review; their supporting DUT facts retain documented source lineage. Input ownership cannot be
+omitted to make a scaffold-only decision pass. Passive observation also needs source-supported
+input ownership wherever inputs are present. Architecture assessment has its own `assess` step
+in `execution_plan.json` and the terminal dashboard. Xezim remains deferred.
