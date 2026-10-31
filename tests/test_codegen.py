@@ -32,6 +32,8 @@ def inputs(tmp_path):
     directions={r:'output' if r in ('rdata','ack') else 'input' for r in names}
     ports=[dict(name='tick',direction='input',width=1),dict(name='clear',direction='input',width=1)]
     ports += [dict(name=n,direction=directions[r],width=3 if r=='addr' else 8 if r in ('wdata','rdata') else 1) for r,n in names.items()]
+    # Independent specification inventory for the pre-generation comparison gate.
+    plan['interfaces']['signals']=[dict(p,chunk_id='CH-spec',width_documented=True,direction_documented=True) for p in ports]
     definition=dict(sources=['unit.sv'],direction_reference='DUT',parameters=[],ports=ports)
     contract=dict(top='peripheral',clock='tick',reset='clear',reset_active='high',
                   facts=[dict(id='behavior',statement=text,source_id='CH-spec',quote=text,plan_pointer='/sections/0/entries/0')],
@@ -545,7 +547,7 @@ def test_workflow_emits_real_feature_phases_in_execution_order(inputs):
         build_project(root/'plan.json', root/'interface.json', root/'output',
                       llm=workflow_model(contract), rtl_files=[rtl], compile=False)
     starts = [e['id'] for e in events if e['kind']=='substep_start']
-    assert starts == ['code_binding','code_common','code_interfaces',
+    assert starts == ['code_port_comparison','code_port_validation','code_binding','code_common','code_interfaces',
         'code_infrastructure:interface_control','code_interface_base:interface_control',
         'code_interface_needs:control','code_infrastructure:collateral_control','code_interface:collateral_control',
         'code_grouping','code_dependencies','code_pseudocode:storage_feature',

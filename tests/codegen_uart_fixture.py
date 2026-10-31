@@ -1,5 +1,6 @@
 """UART acceptance data only. Production generator/templates remain design-agnostic."""
 import json
+import re
 from pathlib import Path
 
 from pypdf import PdfReader
@@ -60,7 +61,21 @@ def create(directory):
     for route in contract['routes']:
         route['when']=[dict(agent='register_bus',address=3,mask=128,value=0,initial_value=3)]
     definition=interface_definition(extract_interface([repo/'rtl/verilog/uart_top.v'],'uart_top',defines={'DATA_BUS_WIDTH_8':'1'}))
-    for name,value in [('testplan.json',dict(source_authority='DOCUMENTED',sections=[dict(id='feature_description',entries=entries)],evidence_index=sources)),
+    # Parse the independent specification table, not the RTL port list.
+    table=text[text.index('2 IO ports'):text.index('3 Clocks')]
+    signals=[dict(name=m[1],width=m[2],direction=m[3].lower(),chunk_id='spec_ports',width_documented=True,
+                  direction_documented=True,availability='UART_HAS_BAUDRATE_OUTPUT' if m[1]=='BAUD_O' else '')
+             for m in re.finditer(r'\b([A-Z][A-Z0-9_]+)\s+(\d+(?:\s+or\s+\d+)?)\s+(Input|Output)\b',table)]
+    sources['spec_ports']=dict(path='doc/UART_spec.pdf',excerpt=table)
+    specification=dict(source_authority='DOCUMENTED',interfaces=dict(status='PASS',signals=signals),sections=[dict(id='feature_description',entries=entries)],evidence_index=sources)
+    from dv_agent.quality.human_review import sha
+    output=directory/'output';output.mkdir(exist_ok=True)
+    decisions=dict(spec_hash=sha(specification['interfaces']),rtl_hash=sha(definition),reviewer='Acceptance integration fixture',
+                   reason='Explicit DATA_BUS_WIDTH_8 fixture wiring; original spec aliases and conditional baud output.',
+                   mappings={'CLK':'wb_clk_i','WB_ADDR_I':'wb_adr_i'},width_choices={'WB_ADDR_I':3,'WB_DAT_I':8,'WB_DAT_O':8},
+                   inactive_spec_ports={'BAUD_O':'UART_HAS_BAUDRATE_OUTPUT is not selected in this fixture'})
+    (output/'interface_port_mapping.json').write_text(json.dumps(decisions))
+    for name,value in [('testplan.json',specification),
                        ('interface.json',definition),('code_contract.json',contract)]:
         (directory/name).write_text(json.dumps(value,indent=2)+'\n')
     return repo

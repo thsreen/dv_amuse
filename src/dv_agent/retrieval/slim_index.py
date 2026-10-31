@@ -20,8 +20,8 @@ INDEX_FILE = "slim_index.json"
 
 MENTION_PATTERNS = (
     re.compile(r"`([^`]{1,64})`"),                       # `backticked` terms
-    re.compile(r"\b[A-Z][A-Z0-9_]{1,31}\b"),              # WB_CLK_I, THRE
-    re.compile(r"\b[a-z]+(?:_[a-z0-9]+){2,}\b"),          # wb_clk_i, uart_top
+    re.compile(r"\b[A-Z][A-Z0-9_]{1,31}\b"),              # uppercase identifiers
+    re.compile(r"\b[a-z]+(?:_[a-z0-9]+){2,}\b"),          # underscore-separated identifiers
 )
 MENTION_BOOST = 3  # mention tokens repeat this often in the indexed doc
 

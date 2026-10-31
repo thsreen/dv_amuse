@@ -1,6 +1,6 @@
 """Conservative, source-cited RTL specification draft from a saved RTL graph.
 
-The UART reference supplies the section order, never its design-specific facts.
+The generic template supplies section order; selected source evidence supplies all design facts.
 Every generated claim stays INFERRED until an RTL engineer validates the draft.
 """
 import hashlib
@@ -68,7 +68,7 @@ def load_template(path: Path | None = None) -> dict:
     value = json.loads((path or TEMPLATE).read_text(encoding="utf-8"))
     sections = value.get("sections", [])
     if [s.get("id") for s in sections] != list(SECTION_IDS) or any(not s.get("heading") for s in sections):
-        raise RTLExtractionError("RTL specification template needs the seven ordered UART-inspired sections")
+        raise RTLExtractionError("RTL specification template must contain the required ordered sections: "+', '.join(SECTION_IDS))
     return value
 
 

@@ -62,7 +62,8 @@ fixed input.
 - Clock operating bands are no longer extracted by a model. They exist only when a person (or an isolated
   quick-testing run) approves them, so the plan still asks for them in "Questions to Designers".
 - Mapping a specification name such as `CLK` to a port such as `wb_clk_i` is not guessed from the name. It
-  is asked once.
+  requires a reviewed alias in the mandatory [spec/RTL port comparison](INTERFACE_PORT_COMPARISON.md).
+  A passing comparison supplies that alias to common binding so it is not asked again.
 - Verified: the UART acceptance project compiles and passes both tests under Xezim with UVM 2020.3.1
   (`DV_AGENT_TEST_SIMULATION=1 pytest tests/test_codegen.py -k real_uart`).
 

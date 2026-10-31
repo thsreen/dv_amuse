@@ -3,6 +3,9 @@ from contextlib import contextmanager
 
 from ..core.progress import emit_event
 
+PORT_STEPS=[('code_port_comparison','Compare specification ports with RTL ports'),
+            ('code_port_validation','Independently validate specification/RTL comparison')]
+
 STEPS=[
     ('code_selection','Select saved plan and RTL interface'),
     ('code_binding','Clock and reset: bind ports, reset level and timing (no model call)'),
@@ -42,7 +45,7 @@ def skip(*stage_ids):
 
 
 def feature_steps(waves,tasks,unit_rows=()):
-    steps=[STEPS[0]]
+    steps=[STEPS[0]]+PORT_STEPS
     for row in unit_rows:
         tid=row['id']
         if not tid.startswith(('foundation_','interface_','collateral_','assessment_')): continue

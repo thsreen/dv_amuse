@@ -100,7 +100,7 @@ def _main(argv: list[str] | None) -> int:
     parser.add_argument("--mode", choices=("basic", "graph"),
                         help="basic (default): lexical RAG demo; graph: model-built knowledge graph")
     parser.add_argument('--quick-testing-auto-approve-inferences',action='store_true',
-                        help='QUICK TESTING ONLY: evaluate and auto approve infrastructure inferences in an isolated run; never human sign-off')
+                        help='QUICK TESTING ONLY: approve copied inferred testplan items and evaluate infrastructure inferences in an isolated run; never human sign-off')
     parser.add_argument('--hitl-demo-pause-seconds',type=float,default=None,
                         help='Keep review question/response visible before continuing (default 2; 0 disables)')
     sub = parser.add_subparsers(dest="cmd", required=False)

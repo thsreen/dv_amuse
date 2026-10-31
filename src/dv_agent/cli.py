@@ -259,6 +259,7 @@ def _main(argv: list[str] | None) -> int:
     pcode.add_argument("--llm", choices=LLM_MODES, default="auto")
     pcode.add_argument("--compile", action="store_true", help="explicit standalone compile; generation normally defers simulation")
     pcode.add_argument("--no-compile", action="store_true", help="record compilation as NOT_RUN")
+    pcode.add_argument("--demo", action="store_true", help="connectivity-only testbench that simulates; no model call, no DUT behaviour checked")
 
     prun = sub.add_parser('run-code', help='compile and simulate saved functional verification code; no model calls')
     prun.add_argument('--out',type=Path,required=True,help='run directory containing code_manifest.json')
@@ -297,9 +298,11 @@ def _main(argv: list[str] | None) -> int:
             plan=json.loads((args.out/'dv/testplan_doc.json').read_text())
             definition=json.loads((args.out/'rtl/interface_definition.json').read_text())
             with project_lock(args.out), plan_location(args.out/'dv/testplan_doc.json'), review_handler(ReviewClient(llm=llm)):
+                from .codegen.port_comparison import enforce
                 for clarification in range(8):
                     plan=json.loads((args.out/'dv/testplan_doc.json').read_text())
                     try:
+                        enforce(plan,definition,args.out)
                         result=plan_work(llm,plan,definition,load_sources(plan,args.out/'dv/graph.json'),args.out,pseudocode_only=True)
                         break
                     except PlanUpdated: continue
@@ -328,6 +331,12 @@ def _main(argv: list[str] | None) -> int:
         set_global_sink(stderr_sink)
         llm, _ = _models_for(args.llm)
         try:
+            if args.demo:
+                from .codegen import build_demo
+                result = build_demo(args.testplan,args.interface,args.out,rtl_files=args.rtl_file,expected_top=args.top,
+                                    compile=args.compile and not args.no_compile)
+                print(json.dumps(result,indent=2))
+                return 0 if result['compile']['status'] in ('PASS','NOT_RUN') else 1
             with review_handler(ReviewClient(llm=llm)):
                 result = build_project(args.testplan,args.interface,args.out,llm=llm,contract_path=args.contract,
                                        rtl_files=args.rtl_file,expected_top=args.top,compile=args.compile and not args.no_compile)

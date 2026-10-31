@@ -21,7 +21,7 @@ from .saved_runs import latest_successful, matches_current_run
 from .code_run import execute as execute_code, preview as code_preview
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
-HELP = "Commands: /plan  /code  /run  /regress  /fresh  (Ctrl-D to leave)"
+HELP = "Commands: /plan  /code  /code demo  /run  /regress  /fresh  (Ctrl-D to leave)"
 
 
 def _builtin_flow() -> Path:
@@ -57,7 +57,7 @@ def ask_card(flow: dict, flow_path: Path, variables: dict, requirement: str,
         "dv_build_graph": "Extract requirements and their relationships into an evidence graph.",
         "rtl_extract": "Read the top RTL module and build its JSON port interface.",
         "rtl_build_graph": "Analyze connected RTL modules, clocks, resets and dependencies.",
-        "rtl_build_spec": "Draft a UART-inspired specification from RTL; all claims need RTL engineer review.",
+        "rtl_build_spec": "Draft a specification from the selected RTL using the generic template; all claims need RTL engineer review.",
         "dv_testplan": "Recover registers and configurable controls, write the verification strategy and RTL observations, then save JSON, Markdown and HTML testplans.",
     }
     lines = ["--- testplan preview ---", f"request: {requirement or '(describe a design repository)'}",
@@ -257,6 +257,9 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
             return 0
         if not line:
             continue
+        demo_code = line == "/code demo"  # a connectivity-only testbench that still simulates, built without a model
+        if demo_code:
+            line = "/code"
         if line == "/fresh":
             fresh()
             continue
@@ -309,17 +312,25 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                     out = prepare_run(out)
                     show(WARNING)
                     show(f'Isolated quick-testing output: {out}')
-                for notice in code_notice(json.loads((out / "dv" / "testplan_doc.json").read_text(encoding="utf-8"))):
+                if demo_code:
+                    from dv_agent.codegen.demo_contract import DEMO_NOTE
+                    show("--- demo testbench ---")
+                    show(DEMO_NOTE + " Clock and reset come from the port mapping or names; confirm them before relying on it.")
+                for notice in ([] if demo_code else code_notice(json.loads((out / "dv" / "testplan_doc.json").read_text(encoding="utf-8")))):
                     show(notice)
                 if abort_requested(interactive=input_fn is None):
                     show("Code aborted before it started; nothing was generated.")
                     continue
                 show(code_preview(out))
                 code_llm, _ = models()
-                result = execute_code(build_code, out, variables, llm=code_llm, show=show,
-                                      dashboard=use_dashboard, ansi=interactive)
+                result = execute_code(build_code, out, dict(variables, code_demo=True) if demo_code else variables, llm=code_llm,
+                                      show=show, dashboard=use_dashboard, ansi=interactive)
                 if result.get('status')=='WAITING_HUMAN':
                     show(result['reason'])
+                    continue
+                if result.get('demo'):
+                    show(f"Demo testbench: {result['code_dir']}")
+                    show(f"Built tests: {', '.join(t['name'] for t in result['tests'])}. Run it with /run. Nothing about the DUT's behaviour is checked.")
                     continue
                 policy = result["policy"]
                 if result.get('contract'):
@@ -340,6 +351,8 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                 show("Code interrupted; saved checkpoints are kept. Use /code to retry.")
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 show(f"Code blocked: {exc}")
+                if not demo_code:
+                    show("To get a simulation that only needs to run, type /code demo (connectivity only, no model call).")
                 if (out/'code_work_manifest.json').is_file():
                     show(f"Partial feature documents: {out/'code_work_manifest.json'}")
         elif line in ("/run", "/regress"):

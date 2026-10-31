@@ -63,8 +63,11 @@ def request_review(out, plan, definition, unit, blockers, evidence, context=None
     if not unit.startswith(('foundation_','interface_','collateral_')):
         raise ValueError('Human binding review is limited to infrastructure units')
     fields=(['clock','clock_period_ns','clock_period_ranges'] if unit=='foundation_clock' else
-            ['reset','reset_active','reset_cycles'] if unit=='foundation_reset' else ['roles','tie_offs'])
+            ['reset','reset_active','reset_cycles'] if unit=='foundation_reset' else
+            ['mappings','width_choices','inactive_spec_ports'] if unit=='interface_port_alignment' else ['roles','tie_offs'])
     identity=dict(plan_hash=sha(plan),interface_hash=sha(definition),unit=unit,blockers=blockers,review_contract_hash=sha(fields))
+    alignment=(context or {}).get('alignment_context')
+    if alignment is not None: identity['alignment_contract_hash']=sha(alignment)
     rid=sha(identity)[:20];folder=out/'human_review'/rid
     path=folder/'request.json'
     if path.exists(): request=json.loads(path.read_text())
@@ -73,11 +76,12 @@ def request_review(out, plan, definition, unit, blockers, evidence, context=None
                      ports=definition['ports'],evidence=evidence,bindings_scope='infrastructure_only',
                      question='Resolve infrastructure ambiguity: '+'; '.join(blockers),
                      allowed_fields=fields)
+        if alignment is not None: request['alignment_context']=alignment
         from .human_dialogue import brief, format_review
         request['review_brief'] = brief(plan,definition,unit,blockers,evidence,context)
         write(path,request)
         atomic_write_text(folder/'review.md',format_review(request,markdown=True)+'\n')
-    emit_event('human_review',id='code_infrastructure:'+unit,status='WAITING_HUMAN',request_id=rid,question=request['question'])
+    emit_event('human_review',id='code_port_comparison' if unit=='interface_port_alignment' else 'code_infrastructure:'+unit,status='WAITING_HUMAN',request_id=rid,question=request['question'])
     handler=getattr(_state,'handler',None)
     if not (folder/'approval.json').exists() and handler:
         handler(folder,request)
@@ -91,6 +95,10 @@ def request_review(out, plan, definition, unit, blockers, evidence, context=None
 def validate_bindings(request, bindings):
     if not isinstance(bindings,dict) or not bindings or not set(bindings)<=set(request['allowed_fields']):
         raise ValueError('Approval must contain only requested infrastructure fields')
+    if request.get('unit')=='interface_port_alignment':
+        from ..codegen.port_reconciliation import validate_proposal
+        validate_proposal(request,bindings)
+        return
     ports={p['name']:p for p in request['ports']}
     for key,value in bindings.items():
         if key=='clock_period_ranges':

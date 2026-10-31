@@ -24,7 +24,8 @@ def documented_plan(plan: dict) -> tuple[dict, dict]:
     kept = 0
     skipped = 0
     def eligible(item):
-        return (item.get("provenance") == "DOCUMENTED"
+        from dv_agent.quality.quick_testing import test_item_allowed
+        return ((item.get("provenance") == "DOCUMENTED" or test_item_allowed(plan,item))
                 and bool(item.get("cited_req_ids") or item.get("cited_chunk_ids")))
     for section in filtered.get("sections", []):
         for field in ("entries", "configurations"):
@@ -108,17 +109,31 @@ def build_code(out: Path, variables: dict, *, llm=None) -> dict:
     if plan.get("source_authority") == "RTL_INFERRED":
         raise ValueError("/code requires RTL engineer validation of the RTL-derived specification; all current checks are INFERRED")
     contract=variables.get("code_contract")
+    if variables.get("code_demo"):
+        from dv_agent.codegen import build_demo
+        return build_demo(plan_path,interface_path,out,rtl_files=variables.get("rtl_graph_files", []),
+                          expected_top=variables.get("rtl_top"),compile=False)
     if llm is not None or contract:
         from dv_agent.codegen import build_project
         return build_project(plan_path,interface_path,out,llm=llm,contract_path=contract,
                              rtl_files=variables.get("rtl_graph_files", []),expected_top=variables.get("rtl_top"),compile=False)
     definition = json.loads(interface_path.read_text(encoding="utf-8"))
+    from dv_agent.codegen.port_comparison import enforce
+    from dv_agent.codegen.events import stage
+    with stage('code_port_comparison', 'Compare specification ports with RTL ports'):
+        from dv_agent.quality.human_review import PlanUpdated
+        try:
+            port_comparison = enforce(plan,definition,out)
+        except PlanUpdated:
+            plan=json.loads(plan_path.read_text())
+            port_comparison = enforce(plan,definition,out)
     rtl_files = [Path(p).resolve() for p in variables.get("rtl_graph_files", [])]
     if not rtl_files or any(not p.is_file() for p in rtl_files):
         raise ValueError("the saved RTL source list is missing; name the repository again")
     clock, reset, active = _clock_reset(definition, rtl_files)
     filtered, policy = documented_plan(plan)
     digest = hashlib.sha256((json.dumps(filtered, sort_keys=True) + json.dumps(definition, sort_keys=True)
+                             + json.dumps(port_comparison, sort_keys=True)
                              + "documented-code-v1").encode()).hexdigest()[:12]
     code_dir = out / "code" / digest
     manifest_path = out / CODE_MANIFEST
@@ -139,7 +154,7 @@ def build_code(out: Path, variables: dict, *, llm=None) -> dict:
     manifest = dict(status="BUILT_NEEDS_REVIEW", source_plan=str(plan_path), interface=str(interface_path),
                     code_dir=str(code_dir), top=variables["rtl_top"], clock=clock, reset=reset,
                     reset_active=active, rtl_files=[str(p) for p in rtl_files], policy=policy,
-                    uvm_status=uvm_manifest["status"],
+                    uvm_status=uvm_manifest["status"], interface_port_comparison=port_comparison,
                     tests=[dict(name="basic_smoke", kind="rtl_smoke", top="orchestrator_smoke_tb",
                                 source=str(code_dir / "orchestrator_smoke_tb.sv"),
                                 scope="compile, clock and reset only; no functional checks")])

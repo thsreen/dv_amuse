@@ -50,6 +50,13 @@ def test_a_name_that_matches_nothing_asks_one_precise_question_instead_of_guessi
     assert question["excerpts"][0]["text"] == QUOTE
 
 
+def test_reviewed_comparison_alias_binds_without_repeat_question():
+    p = plan(group('timebase', 'clock', 'SYSCLK'), group('init', 'reset', 'RST_N', level=('high', True)))
+    result = resolve(definition(), p, SOURCES, port_mapping={'SYSCLK': 'CLK'})
+    assert result['questions'] == []
+    assert result['clock'].clock == 'CLK'
+
+
 def test_missing_polarity_and_missing_groups_each_become_a_question():
     undocumented = resolve(definition(), plan(group("timebase", "clock", "CLK"), group("init", "reset", "rst_n")), SOURCES)
     assert [(q["unit"], q["kind"]) for q in undocumented["questions"]] == [("foundation_reset", "reset_polarity")]

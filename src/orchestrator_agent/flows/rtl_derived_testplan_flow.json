@@ -10,7 +10,7 @@
      "description": "Build the source-backed hierarchy, control, clock and reset graph.",
      "args": {"files": "${rtl_graph_files}", "top": "${rtl_top}", "out": "${out}/rtl_graph"}},
     {"id": "rtl_spec", "tool": "rtl_build_spec", "agent": "rtl",
-     "description": "Draft the UART-inspired specification from RTL; every claim is inferred and needs RTL engineer review.",
+     "description": "Draft a specification from the selected RTL using the generic template; every claim is inferred and needs RTL engineer review.",
      "args": {"graph": "${out}/rtl_graph/rtl_graph.json", "out": "${out}/rtl_spec"}},
     {"id": "spec_ingest", "tool": "dv_ingest", "agent": "dv",
      "description": "Ingest the inferred RTL-derived draft while preserving its source authority.",

@@ -149,7 +149,7 @@ def test_interactive_preview_and_offline_draft_for_rtl_only_repo(tmp_path, monke
     shown = []
     assert terminal.repl(input_fn=read, output_fn=shown.append, llm_mode="off") == 0
     preview = "\n".join(shown)
-    assert "Draft a UART-inspired specification from RTL" in preview
+    assert "Draft a specification from the selected RTL using the generic template" in preview
     assert "All draft-derived checks remain INFERRED" in preview
     assert "ready: yes" in preview
     assert "The inferred specification draft is ready" in preview

@@ -155,11 +155,14 @@ class Evidence:
                 self.windows[f'{sid}@{start}']=dict(source_id=sid,start=start,end=min(len(text),start+1600),text=text[start:start+1600])
         self.window_index=BM25({k:tokenize(v['text']) for k,v in self.windows.items()},1.5,0.75)
 
-    def fetch(self, queries, source_ids=(), *, item_limit=16, focus=False):
+    def fetch(self, queries, source_ids=(), *, item_limit=16, focus=False, plan_pointers=(), quote_hints=()):
         query=tokenize(' '.join(queries))
         scores=self.index.score(query)
-        ranked=sorted(range(len(self.items)),key=lambda i:(-scores.get(str(i),0),self.items[i]['plan_pointer']))
-        selected=[self.items[i] for i in ranked[:item_limit] if scores.get(str(i),0)>0]
+        def pinned(i):
+            path=self.items[i]['plan_pointer']
+            return any(path==p or path.startswith(p+'/') for p in plan_pointers)
+        ranked=sorted(range(len(self.items)),key=lambda i:(not pinned(i),-scores.get(str(i),0),self.items[i]['plan_pointer']))
+        selected=[self.items[i] for i in ranked[:item_limit] if pinned(i) or scores.get(str(i),0)>0]
         wanted=set(source_ids)|{sid for item in selected for sid in item['source_ids']}
         ranks=self.window_index.score(query)
         direct=set(source_ids)
@@ -174,6 +177,15 @@ class Evidence:
             if per_source.get(w['source_id'],0)>=2: continue
             windows.append(w);per_source[w['source_id']]=per_source.get(w['source_id'],0)+1
             if len(windows)==8: break
+        pinned_windows=[]
+        for sid,quote in quote_hints:
+            text=self.sources.get(sid,'');span=locate_quote(text,quote)
+            if span:
+                start=span[0];end=min(span[1],start+1600)
+                window=dict(source_id=sid,start=start,end=end,text=text[start:end])
+                if window not in pinned_windows: pinned_windows.append(window)
+            if len(pinned_windows)==8: break
+        windows=(pinned_windows+[w for w in windows if w not in pinned_windows])[:8]
         if not selected:
             found={w['source_id'] for w in windows}
             selected=[self.items[i] for i in ranked if found & set(self.items[i]['source_ids'])][:item_limit]
@@ -314,10 +326,16 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
     intentions,strategy=inventory(plan)
     if not intentions: raise ValueError('No stimulus/check/coverage implementation intentions in saved plan')
     directory=Path(directory)
+    from .port_comparison import compare
+    from .interface_context import scoped as relation_scope, source_ids as relation_sources, plan_pointers as relation_pointers, quote_hints as relation_quotes
+    comparison_path=directory/'interface_port_comparison.json'
+    previous_comparison=json.loads(comparison_path.read_text()) if comparison_path.is_file() else {}
+    comparison=compare(plan,definition,previous_comparison.get('review_decisions'))
     from .render import template_hash
     from .units import foundation as build_foundation, CYCLE, InfrastructurePlan, InterfaceBase, infrastructure_profile, INFRASTRUCTURE_INSTRUCTIONS, PROFILE_PATH
-    work=directory/'code_work'/digest([plan,definition,llm.model,INSTRUCTIONS,Path(__file__).read_text(),
-                                    Path(__file__).with_name('units.py').read_text(),PROFILE_PATH.read_text(),template_hash(),feedback])[:16]
+    work=directory/'code_work'/digest([plan,definition,comparison,llm.model,INSTRUCTIONS,Path(__file__).read_text(),
+                                    Path(__file__).with_name('units.py').read_text(),Path(__file__).with_name('interface_context.py').read_text(),
+                                    PROFILE_PATH.read_text(),template_hash(),feedback])[:16]
     work.mkdir(parents=True,exist_ok=True)
     evidence=Evidence(plan,sources)
     client=CheckpointLLM(llm,directory/'llm_cache'/'code_work',stage='code_work')
@@ -328,6 +346,14 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
     _write(directory/'code_work_manifest.json',work_manifest)
     with Tracer(directory/'trace.jsonl','code_work',metadata={'model':llm.model}) as tracer:
         def request(name,payload,model,rules,check=lambda result:None,recover=None):
+            scope=payload.get('interface',{})
+            ports=scope.get('ports',payload.get('ports',[]))
+            interface_id=payload.get('task',{}).get('interface_id')
+            if interface_id:
+                names={n for a in assembled.agents if a.id==interface_id for n in a.bindings.values()}
+                ports=[p for p in ports if p['name'] in names]
+            if ports:
+                payload['spec_rtl_relation']=relation_scope(comparison,[p['name'] for p in ports])
             issue=None
             for attempt in range(2):
                 if len(json.dumps(payload))>48000: raise ValueError(f'{name}: work package too large; split this package')
@@ -420,8 +446,12 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             return row
         def run_unit(tid,title,goal,queries,model,check,dependencies,rules,scoped=None):
             row=unit_row(tid,title)
+            scope=scoped or definition
+            relation=relation_scope(comparison,[p['name'] for p in scope.get('ports',[])])
+            aliases=[p['spec_name']+' '+p['rtl_name'] for p in relation.get('ports',[])]
             def fetch_unit(queries):
-                context=evidence.fetch(queries,item_limit=8,focus=True)
+                context=evidence.fetch(queries+aliases,source_ids=relation_sources(relation),item_limit=8,focus=True,
+                                       plan_pointers=relation_pointers(relation),quote_hints=relation_quotes(relation))
                 # Human decisions are exact scoped inputs, not merely lexical hints.
                 for approval in plan.get('human_approvals',[])+plan.get('quick_test_approvals',[]):
                     if approval['unit']!=tid: continue
@@ -449,7 +479,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             row['profile']=profile
             task=dict(id=tid,title=title,goal=goal,category='infrastructure',plan_pointers=[],depends_on=[],queries=queries)
             payload=dict(task=task,evidence=selected,interface=scope,dependencies=dependencies,profile=profile,
-                         approved_bindings=approved_bindings)
+                         approved_bindings=approved_bindings,spec_rtl_relation=relation)
             _write(work/(tid+'.context.json'),payload)
             try:
                 row.update(status='RUN',phase='understand_and_pseudocode');save_execution()
@@ -532,7 +562,9 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             rows=[unit_row('foundation_clock','Clock'),unit_row('foundation_reset','Reset')]
             for row in rows: row.update(status='RUN',phase='bind');save_execution()
             try:
-                result=resolve(definition,plan,sources,top=top)
+                from .port_validation import validated
+                alignment={r['spec']:r['rtl'] for r in comparison['rows'] if r['status']=='PASS'} if validated(comparison) else {}
+                result=resolve(definition,plan,sources,top=top,port_mapping=alignment)
                 _write(work/'common_binding.json',dict(steps=result['steps'],questions=[q['text'] for q in result['questions']]))
                 if result['questions']:
                     unit=result['questions'][0]['unit']
@@ -564,7 +596,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
         try:
             foundation=build_foundation(run_unit,call,definition,evidence,unit_facts,save_unit,
                                        lambda candidate,scope:validate(candidate,plan,scope,sources),
-                                       render_units=not pseudocode_only,bind=bind_common)
+                                       render_units=not pseudocode_only,bind=bind_common,comparison=comparison)
         except (Exception,KeyboardInterrupt) as exc:
             execution['status']=getattr(exc,'status','BLOCKED');save_execution()
             work_manifest.update(status=getattr(exc,'status','BLOCKED'),reason=str(exc) if isinstance(exc,ValueError) else type(exc).__name__)
@@ -750,7 +782,8 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                     'Provide steps for each assigned stimulus/checks/coverage intention; unused categories may be empty. '
                     'Use algorithmic IF/FOR/WAIT/SAMPLE/COMPARE steps with termination and cleanup. '
                     'Testbench timeouts are operational limits, not DUT requirements. '
-                    'Supply exact documented facts for behavior; INFERRED/ASSUMED intentions guide architecture only. '
+                    'Supply exact source-backed facts for behavior; explicitly TEST_AUTO_APPROVED inferred plan items '
+                    'may be used only in isolated quick testing. Other INFERRED/ASSUMED intentions guide architecture only. '
                     'Use symbolic references to supported settings if concrete bindings are unresolved, without inventing values. '
                     'Questions record missing or ambiguous details; blockers list ONLY essential gaps preventing ALL supported '
                     'work in this feature. Questions alone are not pseudocode. Inspect supplied documented items and excerpts '

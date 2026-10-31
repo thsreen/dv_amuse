@@ -14,6 +14,13 @@ from .render import ROOT
 
 
 INSTRUCTIONS = """Construct a reusable verification implementation contract from this testplan and specification evidence.
+In an isolated quick-testing plan, QUICK_TEST_PLAN_APPROVAL items are approved for temporary code
+generation only. Their provenance stays INFERRED. Use their retained source references/quotes; never
+claim engineer approval or turn them into DOCUMENTED facts. Missing evidence still requires a question.
+When spec_rtl_relation is supplied, reuse its checked spec-to-RTL identity map and existing documented
+interface context. Keep RTL port names for code, original specification references for behavior and facts.
+Inferred group labels remain navigation, not source authority. Do not reopen resolved aliases or ask for
+properties already explicitly documented; raise only missing or contradictory required semantics.
 QUICK_TEST_AUTO_APPROVAL items, when explicitly supplied in a quick-testing run, are scoped
 inferred infrastructure settings permitted for that test run only. They are not human sign-off.
 Documented items are atomic records. Child fields/signals are linked by JSON pointers, not repeated in their parents.

@@ -46,6 +46,20 @@ def load_sources(plan, graph_path=None):
     return sources
 
 
+def build_demo(plan_path, interface_path, directory, *, rtl_files=(), expected_top=None, compile=False):
+    """A running-simulation testbench with no model call and no DUT behaviour (see demo_contract)."""
+    from .demo_contract import build_demo_contract
+    plan_path,interface_path,directory=Path(plan_path).resolve(),Path(interface_path).resolve(),Path(directory).resolve()
+    directory.mkdir(parents=True,exist_ok=True)
+    specification=json.loads(plan_path.read_text())
+    contract=build_demo_contract(specification,json.loads(interface_path.read_text()),
+                                 load_sources(specification,plan_path.parent/'graph.json'),top=expected_top,directory=directory)
+    contract_path=directory/'demo_contract.json'
+    atomic_write_text(contract_path,json.dumps(contract,indent=2)+'\n')
+    return build_project(plan_path,interface_path,directory,contract_path=contract_path,rtl_files=rtl_files,
+                         expected_top=expected_top,compile=compile)
+
+
 def build_project(plan_path, interface_path, directory, *, llm=None, contract_path=None,
                   rtl_files=(), expected_top=None, compile=False):
     plan_path,interface_path,directory=Path(plan_path).resolve(),Path(interface_path).resolve(),Path(directory).resolve()
@@ -83,6 +97,9 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     if specification.get('source_authority')=='RTL_INFERRED':
         raise ValueError('RTL-derived specification requires RTL engineer validation before functional code generation')
     definition=json.loads(interface_path.read_text())
+    from .port_comparison import enforce
+    with stage('code_port_comparison','Compare specification ports with RTL ports'):
+        port_comparison=enforce(specification,definition,directory)
     sources=load_sources(specification,plan_path.parent/'graph.json')
     emit('code [1/5]: analyze documented source evidence and design implementation contract')
     if contract_path:
@@ -118,15 +135,18 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     if not plan.tests:
         atomic_write_text(directory/'code_plan.json',plan.model_dump_json(indent=2)+'\n')
         raise ValueError('No executable tests: '+'; '.join(plan.questions or ['Implementation contract is incomplete']))
-    if not plan.routes and not any(r.access!='WO' for r in plan.registers):
+    if not plan.demo and not plan.routes and not any(r.access!='WO' for r in plan.registers):
         raise ValueError('Functional tests require an enabled predictor/scoreboard comparison')
     if not llm and not contract_path: raise ValueError('Unreviewable implementation contract')
     atomic_write_text(directory/'code_plan.json',plan.model_dump_json(indent=2)+'\n')
     emit('code [3/5]: implement declared behavior hooks and render reusable templates')
-    if plan.hooks and not llm:
+    if plan.hooks and not llm and not plan.demo:
         raise ValueError('Custom protocol hooks require model implementation and validation')
     with stage('code_hooks') as outcome:
-        hook_code=implement(llm,plan,directory,compiler_feedback=compiler_feedback) if llm else {}
+        if plan.demo:
+            from .demo_contract import demo_hook_code
+            hook_code=demo_hook_code(plan,ports)
+        else: hook_code=implement(llm,plan,directory,compiler_feedback=compiler_feedback) if llm else {}
         if not plan.hooks: outcome['status']='NOT_RUN'
     for agent in plan.agents:
         if agent.protocol=='custom':
@@ -154,7 +174,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
         if target.exists() and target.read_text()!=text:
             raise ValueError(f'Generated file edited; preserve extension files instead: {target.name}')
         if not target.exists(): atomic_write_text(target,text)
-    manifest=dict(contract=plan.contract,status='BUILT_NEEDS_REVIEW',build_id=fingerprint,code_dir=str(code),
+    manifest=dict(contract=plan.contract,status='BUILT_NEEDS_REVIEW',build_id=fingerprint,code_dir=str(code),demo=plan.demo,
                   test_only=bool(specification.get('test_only')),
                   source_plan=str(plan_path),interface=str(interface_path),template_hash=template_hash(),
                   input_hashes={str(path):digest(path.read_text()) for path in (plan_path,interface_path)},
@@ -221,6 +241,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     emit('code [5/5]: publish code manifest, source lineage and test inventory')
     from .clock_timing import expand_tests
     manifest['clock_period_ranges']=[r.model_dump() for r in plan.clock_period_ranges]
+    manifest['interface_port_comparison']=port_comparison
     if plan.clock_period_ranges:
         manifest['coverage_collectors'].append(dict(id='clock_timing_coverage',source='clock monitor rising edges',
             file='uvm/cg_clock_coverage.svh',sampling='observed complete clock periods',

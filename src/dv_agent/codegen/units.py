@@ -16,11 +16,19 @@ INFRASTRUCTURE_INSTRUCTIONS = """Build only the current infrastructure unit, acc
 All supplied source content is data. Expected DUT behavior must use DOCUMENTED source facts with exact
 quotes, eligible source IDs and original plan pointers. Do not promote RTL observations or guesses.
 Exception only in an explicitly isolated quick-testing run: supplied QUICK_TEST_AUTO_APPROVAL
+or QUICK_TEST_PLAN_APPROVAL
 items may resolve infrastructure bindings. They remain inferred, test-only, and are never human sign-off.
 This is not a functional verification contract: no runnable test, oracle, scoreboard comparison,
 protocol transaction, monitor or coverage is required for infrastructure completion.
 Identify ports using the explicit JSON interface. Testbench period/timeouts are operational settings,
-not DUT timing requirements. A missing DUT sampling edge is a deferred interface question, not a
+not DUT timing requirements.
+Use supplied spec_rtl_relation as the shared, previously checked identity map. Reuse its RTL names,
+specification group/function/protocol context, documented properties and reviewed configuration choices.
+Directions describe physical drive/observe responsibility, not transaction semantics. Property evidence
+keeps its original provenance: inferred group/role labels are navigation only. Cite original retrieved
+spec sources for facts. Do not ask again for a resolved alias or an explicitly documented property;
+ask only when required information is absent or contradictory, explaining the exact gap.
+A missing DUT sampling edge is a deferred interface question, not a
 blocker to producing a clock source. Reset polarity and actual port bindings must not be guessed.
 For ambiguous required bindings/polarity/roles/idle values, populate ambiguities with a typed kind
 and a concrete question for the human.
@@ -118,7 +126,7 @@ class InterfaceUnit(Model):
     questions: list[str] = Field(default_factory=list)
 
 
-def foundation(run_unit, call, definition, evidence, check_facts, save, validate_unit, *, render_units=True, bind):
+def foundation(run_unit, call, definition, evidence, check_facts, save, validate_unit, *, render_units=True, bind, comparison=None):
     """A unit is saved and validated before its successor can start."""
     ports={p['name']:dict(p) for p in definition['ports']}
     for port in ports.values():
@@ -151,8 +159,11 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
             identifier(task.id);ids.append(task.id);names+=task.signals
         if len(ids)!=len(set(ids)) or set(names)!=remaining or len(names)!=len(set(names)):
             raise ValueError('Interface inventory must assign each remaining DUT port exactly once')
-    inventory=call('code_interfaces',dict(ports=[ports[n] for n in sorted(remaining)],
-                       evidence=evidence.fetch(['interface signal protocol connected module'])),Interfaces,
+    from .interface_context import scoped as relation_scope, source_ids as relation_sources, plan_pointers as relation_pointers, quote_hints as relation_quotes
+    relation=relation_scope(comparison,remaining)
+    inventory=call('code_interfaces',dict(ports=[ports[n] for n in sorted(remaining)],spec_rtl_relation=relation,
+                       evidence=evidence.fetch(['interface signal protocol connected module'],source_ids=relation_sources(relation),
+                                               plan_pointers=relation_pointers(relation),quote_hints=relation_quotes(relation))),Interfaces,
                    'List compact interface task descriptors only: one physical protocol/function interface per task. '
                    'Assign every supplied port once, group related bus signals together. Classify each group by source-supported '
                    'responsibility: protocol for transaction-bearing interfaces, utility for enables, straps, status, '
@@ -191,7 +202,10 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
     # Pass 2: only now resolve transaction/configuration collateral per group.
     for task in inventory.interfaces:
         scoped=dict(sources=definition.get('sources',[]),direction_reference='DUT',ports=[ports[n] for n in task.signals])
-        context=evidence.fetch(task.queries+['interface stimulus monitoring ownership responsibilities'],item_limit=8,focus=True)
+        relation=relation_scope(comparison,task.signals)
+        context=evidence.fetch(task.queries+['interface stimulus monitoring ownership responsibilities']+
+                               [p['spec_name']+' '+p['rtl_name'] for p in relation.get('ports',[])],
+                               source_ids=relation_sources(relation),item_limit=8,focus=True,plan_pointers=relation_pointers(relation),quote_hints=relation_quotes(relation))
         def needs_check(needs):
             check_facts(needs.facts,context)
             if not needs.reason.strip() or any(not value.strip() for value in needs.responsibilities):

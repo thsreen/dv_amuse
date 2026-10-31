@@ -37,7 +37,7 @@ def add_graph_commands(sub):
     spec = sub.add_parser("build-spec", help="draft a review-required specification from a saved RTL graph")
     spec.add_argument("--graph", type=Path, required=True)
     spec.add_argument("--out", type=Path, required=True)
-    spec.add_argument("--template", type=Path, help="UART-inspired specification template JSON")
+    spec.add_argument("--template", type=Path, help="Generic RTL specification template JSON")
 
 
 def _write(G, path: Path, obj: dict, protected: list[Path]):

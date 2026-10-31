@@ -3,7 +3,8 @@ import json
 import time
 from datetime import datetime, timezone
 
-from dv_agent.codegen.events import STEPS, stage, skip
+from dv_agent.codegen.events import STEPS as GENERATION_STEPS, PORT_STEPS, stage, skip
+STEPS=GENERATION_STEPS[:1]+PORT_STEPS+GENERATION_STEPS[1:]
 from dv_agent.core.fsutil import atomic_write_text
 from dv_agent.core.progress import reporting
 from dv_agent.quality.human_review import HumanReviewPending, ReviewClient, review_handler
@@ -51,7 +52,7 @@ def execute(build, out, variables, *, llm, show, dashboard=False, ansi=False):
                 if not (out / 'dv/testplan_doc.json').is_file():
                     raise ValueError('No saved testplan; run /plan first')
             if llm is None and not variables.get('code_contract'):
-                skip(*(sid for sid, _ in STEPS[1:] if sid != 'code_render'))
+                skip(*(sid for sid, _ in STEPS[1:] if sid not in ('code_render', 'code_port_comparison','code_port_validation')))
                 with stage('code_render'):
                     result = build(out, variables, llm=llm)
             else:

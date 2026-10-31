@@ -19,6 +19,9 @@ def _inputs(tmp_path):
             {"text": "inferred", "provenance": "INFERRED", "cited_req_ids": ["REQ-1"]},
             {"text": "uncited", "provenance": "DOCUMENTED", "cited_req_ids": []}]},
         {"id": "configurations", "configurations": []}]}
+    plan['interfaces'] = dict(status='PASS', signals=[
+        dict(name=name, direction=direction, width=1, chunk_id='CH-spec')
+        for name, direction in [('clk', 'input'), ('reset', 'input'), ('data', 'input'), ('q', 'output')]])
     (out / "dv" / "testplan_doc.json").write_text(json.dumps(plan))
     definition = {"sources": ["chip_top.sv"], "direction_reference": "DUT", "parameters": [],
                   "ports": [{"direction": "input", "width": 1, "name": "clk"},

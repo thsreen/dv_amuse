@@ -91,7 +91,7 @@ def _excerpt(group, signal=None):
     return dict(source_id=signal.get("chunk_id", ""), start=0, end=len(text), text=text)
 
 
-def resolve(definition, plan, sources, *, top=None):
+def resolve(definition, plan, sources, *, top=None, port_mapping=None):
     """Return clock/reset units when every binding is decided, else the questions that remain.
 
     {clock, reset, questions: [{unit, kind, text, excerpts}], steps: [...]}. Pure: no model, no file access.
@@ -119,7 +119,8 @@ def resolve(definition, plan, sources, *, top=None):
         if len(groups_for_unit) == 1 and len(groups_for_unit[0][1]["signals"]) == 1:
             index, group = groups_for_unit[0]
             signal = group["signals"][0]
-            exact = [n for n in options if _norm(n) == _norm(signal["name"])]
+            mapped=(port_mapping or {}).get(signal['name'])
+            exact = [n for n in options if n==mapped] if mapped else [n for n in options if _norm(n) == _norm(signal["name"])]
             if len(exact) == 1:
                 fact = _group_fact(plan, index, group, f"{kind}_binding",
                                    f"The specification defines {signal['name']} as the testbench-supplied {kind}")
