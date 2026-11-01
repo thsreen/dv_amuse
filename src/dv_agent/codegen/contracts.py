@@ -31,6 +31,7 @@ class Agent(Model):
     stop_bits: int = Field(default=1, ge=1, le=2)
     active: bool = True
     coverage_enabled: bool = True
+    idle_values: dict[str,int] = Field(default_factory=dict)
 
 
 class Register(Model):

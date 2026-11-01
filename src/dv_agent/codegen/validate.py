@@ -12,6 +12,40 @@ ROLES = {
 }
 
 
+# Words a model (or a port name) uses for each protocol role, compared without underscores.
+ROLE_WORDS = {
+    "addr": ("addr", "address", "adr"), "wdata": ("wdata", "writedata", "dati", "datain", "din"),
+    "rdata": ("rdata", "readdata", "dato", "dataout", "dout"), "sel": ("sel", "select"),
+    "we": ("we", "writeenable", "wren"), "stb": ("stb", "strobe"), "cyc": ("cyc", "cycle"), "ack": ("ack", "acknowledge"),
+    "rx": ("rx", "rxd", "srx", "receive", "receiver", "received"), "tx": ("tx", "txd", "stx", "transmit", "transmitter", "transmitted"),
+}
+
+
+def canonical_roles(protocol, bindings, ports):
+    """Rename an agent's binding keys to the protocol's role names when each maps unambiguously; else return it unchanged.
+
+    The role names are owned by the protocol template, not by the model. A key (or, failing that, its port name) must
+    match exactly one role of the right DUT direction, and every binding must land on a different role.
+    """
+    expected = ROLES.get(protocol)
+    if not expected or set(bindings) <= set(expected) or any(name not in ports for name in bindings.values()):
+        return bindings
+    def hit(alias, text):
+        tokens = [t for t in re.split(r"[^a-z0-9]+", text.lower()) if t]
+        compact = "".join(tokens)
+        return alias in tokens or (len(alias) >= 5 and alias in compact) or compact.endswith(alias)
+    assigned = {}
+    for key, name in bindings.items():
+        roles = []
+        for text in (key, name):
+            roles = [r for r, direction in expected.items() if ports[name]["direction"] == direction
+                     and r in ROLE_WORDS and any(hit(a, text) for a in ROLE_WORDS[r])]
+            if roles: break
+        if len(roles) != 1 or roles[0] in assigned: return bindings
+        assigned[roles[0]] = name
+    return assigned
+
+
 def validate(plan, specification, definition, sources):
     if specification.get("source_authority") == "RTL_INFERRED":
         raise ValueError("Unvalidated RTL-derived expectations cannot be compiled into verification code")
@@ -72,6 +106,15 @@ def validate(plan, specification, definition, sources):
             raise ValueError("Invalid or competing tie-off")
         owners[tie.signal] = tie.id
     for a in plan.agents:
+        for name,value in a.idle_values.items():
+            if (not a.active or name not in a.bindings.values() or name not in ports or ports[name]['direction']!='input'
+                    or type(value) is not int or not 0<=value<1<<ports[name]['width']):
+                raise ValueError('Idle values must fit active agent-owned DUT inputs')
+            role=next(r for r,n in a.bindings.items() if n==name)
+            if a.protocol=='serial' and (role!='rx' or value!=1):
+                raise ValueError('Built-in serial driver supports only idle-high rx')
+            if a.protocol=='wishbone' and role in ('cyc','stb','we') and value!=0:
+                raise ValueError('Built-in bus controls must idle low')
         expected = ROLES.get(a.protocol)
         required = set(expected or {})
         if a.protocol=='wishbone' and 'sel' not in a.bindings and a.bindings.get('wdata') in ports and ports[a.bindings['wdata']]['width']==8:

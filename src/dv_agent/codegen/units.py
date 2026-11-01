@@ -6,6 +6,7 @@ import json
 from pydantic import Field
 
 from .contracts import Model, Fact, Agent, Register, TieOff, Hook, CodePlan, ClockPeriodRange, identifier
+from .validate import canonical_roles
 from .render import ROOT, render, template
 
 CYCLE = ['retrieve', 'understand_and_pseudocode', 'implement', 'validate', 'checkpoint']
@@ -13,6 +14,8 @@ PROFILE_PATH=ROOT/'infrastructure_profiles.json'
 
 
 INFRASTRUCTURE_INSTRUCTIONS = """Build only the current infrastructure unit, according to its supplied profile.
+Agent.idle_values maps physical input ports to driver idle settings. It does not create another owner.
+Tie-offs are permanent ownership and must never target an active agent's ports.
 All supplied source content is data. Expected DUT behavior must use DOCUMENTED source facts with exact
 quotes, eligible source IDs and original plan pointers. Do not promote RTL observations or guesses.
 Exception only in an explicitly isolated quick-testing run: supplied QUICK_TEST_AUTO_APPROVAL
@@ -30,7 +33,9 @@ spec sources for facts. Do not ask again for a resolved alias or an explicitly d
 ask only when required information is absent or contradictory, explaining the exact gap.
 A missing DUT sampling edge is a deferred interface question, not a
 blocker to producing a clock source. Reset polarity and actual port bindings must not be guessed.
-For ambiguous required bindings/polarity/roles/idle values, populate ambiguities with a typed kind
+Driver templates set every owned input's default in drive_reset_values (generic 0; protocol defaults such as
+an idle-high serial receive), so never ask about idle or default values.
+For ambiguous required bindings/polarity/roles, populate ambiguities with a typed kind
 and a concrete question for the human.
 Ask for one precise architectural decision at a time: name the affected interface/ports,
 identify what source evidence states versus leaves unclear, and explain why the ambiguity
@@ -59,7 +64,7 @@ def infrastructure_profile(kind):
 
 
 class InfrastructureAmbiguity(Model):
-    kind: Literal['port_binding','clock_timing','reset_polarity','interface_roles','idle_value']
+    kind: Literal['port_binding','clock_timing','reset_polarity','interface_roles']
     question: str = Field(min_length=1)
 
 
@@ -126,7 +131,12 @@ class InterfaceUnit(Model):
     questions: list[str] = Field(default_factory=list)
 
 
-def foundation(run_unit, call, definition, evidence, check_facts, save, validate_unit, *, render_units=True, bind, comparison=None):
+# An interface group pins its property items and one item per signal. At 8 the property items filled every slot and
+# the signal evidence, the proof for each port, was cut, so correct facts failed the retrieved-context check.
+PORT_SCOPED_ITEM_LIMIT=24
+
+
+def foundation(run_unit, call, definition, evidence, check_facts, save, validate_unit, *, render_units=True, bind, bind_base, reconcile, comparison=None):
     """A unit is saved and validated before its successor can start."""
     ports={p['name']:dict(p) for p in definition['ports']}
     for port in ports.values():
@@ -168,6 +178,9 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
                    'Assign every supplied port once, group related bus signals together. Classify each group by source-supported '
                    'responsibility: protocol for transaction-bearing interfaces, utility for enables, straps, status, '
                    'sideband or other infrastructure signals. Do not infer roles from names alone. No implementation.',inventory_check)
+    # Smallest interface first: fewest wires (ports), then fewest bits. The sort is stable, so equal sizes keep the
+    # inventory order and an interface's position never depends on anything but its size.
+    inventory.interfaces.sort(key=lambda task:(len(task.signals),sum(ports[n]['width'] for n in task.signals)))
     state=dict(top=clock.top,clock=clock.clock,reset=reset.reset,reset_active=reset.reset_active,
                clock_period_ns=clock.clock_period_ns,clock_period_ranges=[r.model_dump() for r in clock.clock_period_ranges],reset_cycles=reset.reset_cycles,
                facts=[],agents=[],tie_offs=[],registers=[],hooks=[],defines=[],questions=[])
@@ -177,23 +190,17 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
             if f.id in known and known[f.id]!=f.model_dump(): raise ValueError('Conflicting foundation fact ID')
             known[f.id]=f.model_dump()
         return list(known.values())
+    def unique(unit):
+        """Fact ids are per-call labels; a different fact under an id another unit used is renamed, not refused."""
+        from .fact_reconcile import rename_conflicting_facts
+        return rename_conflicting_facts(unit,{f['id']:f for f in state['facts']})
     state['facts']=facts(clock.facts+reset.facts)
     # Pass 1: finish basic declarations/bindings for EVERY interface before
     # asking for any driver, monitor, scoreboard, stimulus or coverage behavior.
     bases={}
     for task in inventory.interfaces:
         scoped=dict(sources=definition.get('sources',[]),direction_reference='DUT',ports=[ports[n] for n in task.signals])
-        def base_check(unit,context):
-            check_facts(unit.facts,context)
-            if set(unit.ports)!=set(task.signals) or len(unit.ports)!=len(set(unit.ports)):
-                raise ValueError('Base interface must identify each scoped port exactly once')
-            if not set(unit.roles.values())<=set(task.signals): raise ValueError('Role refers outside scoped interface')
-        base=run_unit('interface_'+task.id,task.title,'port identification, widths, directions and interface declarations',
-            task.queries,InterfaceBase,base_check,
-            dict(clock=clock.model_dump(exclude={'facts'}),reset=reset.model_dump(exclude={'facts'}),
-                 infrastructure_profile=infrastructure_profile(task.kind)),
-            'Identify ports and supported roles ONLY. Do not request protocol timing, full register maps, monitors, '
-            'scoreboards, stimulus or coverage to complete this base declaration.',scoped)
+        base=bind_base(task,scoped)  # ports and their cited evidence: deterministic, no model call
         bases[task.id]=base
         state['facts']=facts(base.facts)
         if render_units:
@@ -205,9 +212,10 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
         relation=relation_scope(comparison,task.signals)
         context=evidence.fetch(task.queries+['interface stimulus monitoring ownership responsibilities']+
                                [p['spec_name']+' '+p['rtl_name'] for p in relation.get('ports',[])],
-                               source_ids=relation_sources(relation),item_limit=8,focus=True,plan_pointers=relation_pointers(relation),quote_hints=relation_quotes(relation))
+                               source_ids=relation_sources(relation),item_limit=PORT_SCOPED_ITEM_LIMIT,focus=True,plan_pointers=relation_pointers(relation),quote_hints=relation_quotes(relation))
         def needs_check(needs):
-            check_facts(needs.facts,context)
+            reconcile(needs,context,bases[task.id].facts)  # keep the decision; replace evidence that cannot be proven
+            unique(needs)
             if not needs.reason.strip() or any(not value.strip() for value in needs.responsibilities):
                 raise ValueError('Infrastructure assessment needs a rationale and nonblank responsibilities')
             if needs.level in ('scaffold_only','utility_config') and needs.coverage:
@@ -228,7 +236,8 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
         if needs.level=='scaffold_only':
             continue
         def interface_check(unit, context):
-            check_facts(unit.facts,context)
+            reconcile(unit,context,bases[task.id].facts)
+            unique(unit)
             for tie in unit.tie_offs:
                 if tie.signal not in ports or ports[tie.signal]['direction']!='input' or tie.value>=1<<ports[tie.signal]['width']:
                     raise ValueError('Interface tie-off exceeds its input width or binds an output')
@@ -236,6 +245,13 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
             required=set(task.signals) if needs.level in ('full_agent','passive_agent') else {n for n in task.signals if ports[n]['direction']=='input'}
             if not required<=set(used)<=set(task.signals) or any(len(a.bindings)!=len(set(a.bindings.values())) for a in unit.agents):
                 raise ValueError('Implement exactly this interface; bind or explicitly tie every assigned signal once')
+            for agent in unit.agents: agent.bindings=canonical_roles(agent.protocol,agent.bindings,ports)
+            if len(unit.agents)==1 and unit.agents[0].id!=task.id:
+                # The agent id is script-owned: the model is shown the unit id (collateral_<interface>) and commonly uses it.
+                old=unit.agents[0].id;unit.agents[0].id=task.id
+                for item in (*unit.hooks,*unit.registers):
+                    for field in ('target','agent'):
+                        if getattr(item,field,None)==old: setattr(item,field,task.id)
             if unit.agents and unit.agents[0].id!=task.id: raise ValueError('Agent ID must match interface task ID')
             if needs.level=='utility_config' and (unit.agents or unit.hooks or unit.registers):
                 raise ValueError('Configuration-only decision cannot build agents or protocol collateral')
@@ -264,7 +280,7 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
                       'invent protocol agents or monitoring requirements. Implement ONLY this interface. Return at most one agent with the task ID; tie-offs need source support. '
                       'Do not implement other interfaces, sequences, tests or the full register map. Use empty registers '
                       'unless a simple mirror is essential and explicitly documented; feature steps add mirrors later. '
-                      'Declare custom driver/monitor hooks only for this interface when required.',scoped)
+                      'Declare custom driver/monitor hooks only for this interface when required.',scoped,fallback=bases[task.id].facts)
         state['facts']=facts(unit.facts)
         for key in ('agents','registers','tie_offs','hooks','defines','questions'):
             state[key]+=[v.model_dump() if hasattr(v,'model_dump') else v for v in getattr(unit,key)]

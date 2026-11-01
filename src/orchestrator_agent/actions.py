@@ -112,7 +112,7 @@ def build_code(out: Path, variables: dict, *, llm=None) -> dict:
     if variables.get("code_demo"):
         from dv_agent.codegen import build_demo
         return build_demo(plan_path,interface_path,out,rtl_files=variables.get("rtl_graph_files", []),
-                          expected_top=variables.get("rtl_top"),compile=False)
+                          expected_top=variables.get("rtl_top"),compile=False,max_interfaces=variables.get("code_demo_limit"))
     if llm is not None or contract:
         from dv_agent.codegen import build_project
         return build_project(plan_path,interface_path,out,llm=llm,contract_path=contract,

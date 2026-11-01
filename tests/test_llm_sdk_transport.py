@@ -79,3 +79,34 @@ def test_authentication_failure_is_not_retried_and_leaks_nothing():
     with pytest.raises(LLMError) as caught:
         client_for(handler).structured(name="demo", instructions="i", payload={}, schema=SCHEMA)
     assert caught.value.kind == "auth" and len(calls) == 1 and "test-key" not in str(caught.value)
+
+
+def test_a_refused_request_keeps_a_short_scrubbed_reason_in_the_attempt_record():
+    from dv_agent.core.llm import LLMError, _error_detail
+    body = {'error': {'message': 'Invalid schema at https://api.meta.test/v1/x: minimum not supported ' + 'k9' * 20 + ' ' + 'z' * 400}}
+    detail = _error_detail(type('E', (), {'body': body})())
+    assert 'minimum not supported' in detail and 'https://' not in detail and 'k9' * 20 not in detail and len(detail) <= 300
+    assert _error_detail(type('E', (), {'body': None})()) == ''
+
+
+def test_a_400_is_not_retried_and_its_reason_reaches_the_attempt_record():
+    from dv_agent.core.llm import LLMError
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(400, json={"error": {"message": "schema keyword 'anyOf' is not supported", "type": "invalid_request_error"}})
+
+    try:
+        client_for(handler).structured(name="demo", instructions="i", payload={}, schema=SCHEMA)
+    except LLMError as exc:
+        assert exc.kind == 'http' and len(calls) == 1
+        assert exc.attempts[-1]['http_status'] == 400 and "'anyOf' is not supported" in exc.attempts[-1]['error_detail']
+    else:
+        raise AssertionError('expected LLMError')
+
+
+def test_schema_words_survive_while_key_like_tokens_are_redacted():
+    from dv_agent.core.llm import _error_detail
+    detail = _error_detail(type('E', (), {'body': {'message': "key additionalProperties must be false; Bearer abc.def sk-abcdefgh1234 id a1b2c3d4e5f6g7h8i9j0k1l2m3"}})())
+    assert 'additionalProperties' in detail and 'abc.def' not in detail and 'sk-abcdefgh1234' not in detail and 'a1b2c3d4e5f6' not in detail

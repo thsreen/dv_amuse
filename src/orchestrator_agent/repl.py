@@ -21,7 +21,7 @@ from .saved_runs import latest_successful, matches_current_run
 from .code_run import execute as execute_code, preview as code_preview
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
-HELP = "Commands: /plan  /code  /code demo  /run  /regress  /fresh  (Ctrl-D to leave)"
+HELP = "Commands: /plan  /code  /code demo [N|all]  /run  /regress  /fresh  (Ctrl-D to leave)"
 
 
 def _builtin_flow() -> Path:
@@ -257,7 +257,11 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
             return 0
         if not line:
             continue
-        demo_code = line == "/code demo"  # a connectivity-only testbench that still simulates, built without a model
+        # A connectivity-only testbench that still simulates, built without a model: "/code demo [N|all]" builds the N
+        # interfaces with the fewest wires (default 2); the others are tied off and listed as pending.
+        demo_match = re.fullmatch(r"/code demo(?:\s+(\d+|all))?", line)
+        demo_code = demo_match is not None
+        demo_limit = None if demo_match and demo_match[1] == "all" else int(demo_match[1] or 2) if demo_match else None
         if demo_code:
             line = "/code"
         if line == "/fresh":
@@ -323,7 +327,7 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                     continue
                 show(code_preview(out))
                 code_llm, _ = models()
-                result = execute_code(build_code, out, dict(variables, code_demo=True) if demo_code else variables, llm=code_llm,
+                result = execute_code(build_code, out, dict(variables, code_demo=True, code_demo_limit=demo_limit) if demo_code else variables, llm=code_llm,
                                       show=show, dashboard=use_dashboard, ansi=interactive)
                 if result.get('status')=='WAITING_HUMAN':
                     show(result['reason'])
@@ -331,6 +335,11 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                 if result.get('demo'):
                     show(f"Demo testbench: {result['code_dir']}")
                     show(f"Built tests: {', '.join(t['name'] for t in result['tests'])}. Run it with /run. Nothing about the DUT's behaviour is checked.")
+                    if result.get('pending_interfaces'):
+                        show("Pending (not in this prototype; inputs held at 0, outputs open):")
+                        for item in result['pending_interfaces']:
+                            show(f"  - {item['interface']} ({len(item['ports'])} ports)")
+                        show("After the simulation is checked, type /code to build everything. List: " + str(out / 'demo_pending.json'))
                     continue
                 policy = result["policy"]
                 if result.get('contract'):

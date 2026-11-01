@@ -46,6 +46,7 @@ def skip(*stage_ids):
 
 def feature_steps(waves,tasks,unit_rows=()):
     steps=[STEPS[0]]+PORT_STEPS
+    groups={}   # interface name -> its title and steps, in execution (smallest-first) order
     for row in unit_rows:
         tid=row['id']
         if not tid.startswith(('foundation_','interface_','collateral_','assessment_')): continue
@@ -55,12 +56,20 @@ def feature_steps(waves,tasks,unit_rows=()):
             continue
         if tid.startswith('interface_') and not any(sid=='code_interfaces' for sid,_ in steps):
             steps.append(('code_interfaces','Identify interface groups'))
-        if tid.startswith('assessment_'):
-            steps.append(('code_interface_needs:'+tid.removeprefix('assessment_'),'Assess '+row['title']))
-            continue
-        steps.append(('code_infrastructure:'+tid,'Plan infrastructure '+row['title']))
-        sid=('code_interface_base:' if tid.startswith('interface_') else 'code_interface:')+tid
-        steps.append((sid,'Implement and validate '+row['title']))
+        name=tid.split('_',1)[1]
+        group=groups.setdefault(name,dict(title=row['title'].removesuffix(' collateral'),steps={}))
+        if tid.startswith('assessment_'): group['steps']['needs']=('code_interface_needs:'+name,'Assess what the testbench needs')
+        elif tid.startswith('interface_'): group['steps']['base']=('code_interface_base:'+tid,'Bind ports and their evidence')
+        else:
+            group['steps']['infra']=('code_infrastructure:'+tid,'Plan the collateral')
+            group['steps']['build']=('code_interface:'+tid,'Build and validate the collateral')
+    parent={}
+    for name,group in groups.items():
+        header=('group:'+name,'Interface '+group['title'])
+        steps.append(header)
+        for key in ('base','needs','infra','build'):
+            if key in group['steps']:
+                steps.append(group['steps'][key]);parent[group['steps'][key][0]]=header[0]
     if not unit_rows: steps+=STEPS[1:5]
     elif not any(sid=='code_interfaces' for sid,_ in steps): steps.append(('code_interfaces','Identify interface groups'))
     for sid,label in STEPS[5:]:
@@ -73,4 +82,4 @@ def feature_steps(waves,tasks,unit_rows=()):
         elif sid=='code_feature':
             if not tasks: steps.append((sid,label))
         else: steps.append((sid,label))
-    emit_event('substeps_configured',steps=[dict(id=sid,label=label) for sid,label in steps])
+    emit_event('substeps_configured',steps=[dict(id=sid,label=label,**({'parent':parent[sid]} if sid in parent else {})) for sid,label in steps])

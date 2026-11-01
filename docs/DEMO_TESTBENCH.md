@@ -4,8 +4,10 @@ A simulation that compiles, applies reset, drives and runs, with **no model call
 Use it for a quick demo when the full code stage is blocked or too slow. It is not verification.
 
 ```text
-/code demo                                   # in the orchestrator terminal, then /run
-dv-agent build-code --demo --testplan ... --interface ... --rtl-file ... --top ... --out ... [--compile]
+/code demo                                   # the 2 interfaces with the fewest wires; then /run
+/code demo 1                                 # just one (a prototype needs one that drives the DUT, so an output-only one gets the next added)
+/code demo all                               # every interface, as before
+dv-agent build-code --demo [--max-interfaces N] --testplan ... --interface ... --rtl-file ... --top ... --out ... [--compile]
 ```
 
 ## What it builds (`codegen/demo_contract.py`)
@@ -18,6 +20,16 @@ dv-agent build-code --demo --testplan ... --interface ... --rtl-file ... --top .
 - **One test:** idle sequences for 64 cycles, then the normal completion marker.
 - **Nothing else:** no scoreboards, registers, routes, checks or coverage. `minimum_comparisons` is 0, and the
   simulator does not demand functional-coverage or scoreboard evidence from a `demo` contract.
+
+## Building only some interfaces (prototype first)
+
+`/code demo [N|all]` builds the N interfaces with the fewest wires (default 2; ports, then bits). Every other
+interface is **pending**: its inputs are held at 0 in the testbench top, its outputs are left open, and it is listed
+at the end of the command output and in `demo_pending.json` (and in the contract's questions). If the chosen interfaces
+drive nothing, the next smallest one that does is added so the simulation has stimulus. Check the simulation with
+`/run`, then type `/code` to build everything. Verified with the real Xezim + UVM run on the UART fixture: two interfaces
+built, the bus and modem interfaces tied off and pending, compile PASS, run PASS
+(`DV_AGENT_TEST_SIMULATION=1 pytest tests/test_demo_contract.py -k two_interfaces`).
 
 ## Why it exists
 

@@ -63,6 +63,26 @@ def _error_types(error):
     return types
 
 
+ERROR_DETAIL_LIMIT = 300
+
+
+def _error_detail(exc) -> str:
+    """The provider's short reason for a refused request, scrubbed of URLs and key-like tokens and truncated."""
+    import re
+    body = getattr(exc, 'body', None)
+    message = body.get('message') if isinstance(body, dict) else None
+    if not message and isinstance(body, dict) and isinstance(body.get('error'), dict):
+        message = body['error'].get('message')
+    if not isinstance(message, str):
+        return ''
+    message = re.sub(r'https?://\S+', '<url>', message)
+    message = re.sub(r'(?i)\bbearer\s+\S+', 'Bearer <redacted>', message)
+    message = re.sub(r'\bsk-[A-Za-z0-9_\-]{8,}', '<redacted>', message)
+    # Key-like: long runs that mix letters and digits. Schema words such as additionalProperties have no digits.
+    message = re.sub(r'\b(?=[A-Za-z0-9_\-]*\d)(?=[A-Za-z0-9_\-]*[A-Za-z])[A-Za-z0-9_\-]{24,}\b', '<redacted>', message)
+    return ' '.join(message.split())[:ERROR_DETAIL_LIMIT]
+
+
 class LLMError(RuntimeError):
     def __init__(self, kind: str, message: str, *, usage: dict | None = None,
                  response_id: str | None = None, token_exhausted: bool = False):
@@ -374,8 +394,10 @@ class MetaClient(_Base):
                     sampling_supported = False
                     attempts.append(completed('unsupported_temperature', http_status=400))
                     continue
-                # Exception text may echo request details; keep only the status code.
-                attempts.append(completed('http', http_status=exc.status_code))
+                # Exception text may echo request details; keep the status code and a short scrubbed reason.
+                detail = _error_detail(exc)
+                attempts.append(completed('http', http_status=exc.status_code, **(dict(error_detail=detail) if detail else {})))
+                if detail: emit(f"model request {request_id}: status {exc.status_code}: {detail}")
                 error = LLMError('http', f'status {exc.status_code}'); error.attempts=attempts
                 raise error from None
             except BaseException as exc:

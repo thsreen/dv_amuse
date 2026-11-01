@@ -17,7 +17,7 @@ from ..core.progress import emit, emit_event
 from ..retrieval.retrieval import BM25, tokenize
 from ..core.trace import Tracer
 from .contracts import Model, CodePlan, Fact, Sequence, Route, Check, Hook, Test, CoverageGoal, Register, SequencerVariable, digest, identifier, normalize_fact_ids, IDENTIFIER_RULE, pointer
-from .reasoning import INSTRUCTIONS, compact_items, eligible_items, strict_schema
+from .reasoning import INSTRUCTIONS, compact_items, eligible_items, restore_maps, strict_schema
 from .validate import validate,validate_facts
 from .events import stage, skip, feature_steps
 from ..quality.human_review import HumanReviewPending, PlanUpdated, request_review, current_plan_path
@@ -320,6 +320,9 @@ def _document(task, pseudo, independent):
     return '\n'.join(lines)
 
 
+RELATION_BUDGET=32000  # characters of payload plus full relation above which the compact relation is sent
+
+
 def design(llm, plan, definition, sources, directory, *, previous=None, feedback=None,pseudocode_only=False,top=None):
     """Generate one foundation and feature fragments, not a whole-document request."""
     if plan.get('source_authority')=='RTL_INFERRED': raise ValueError('Unvalidated RTL-derived expectations are not executable')
@@ -327,7 +330,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
     if not intentions: raise ValueError('No stimulus/check/coverage implementation intentions in saved plan')
     directory=Path(directory)
     from .port_comparison import compare
-    from .interface_context import scoped as relation_scope, source_ids as relation_sources, plan_pointers as relation_pointers, quote_hints as relation_quotes
+    from .interface_context import scoped as relation_scope, source_ids as relation_sources, plan_pointers as relation_pointers, quote_hints as relation_quotes, compact as relation_compact
     comparison_path=directory/'interface_port_comparison.json'
     previous_comparison=json.loads(comparison_path.read_text()) if comparison_path.is_file() else {}
     comparison=compare(plan,definition,previous_comparison.get('review_decisions'))
@@ -335,6 +338,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
     from .units import foundation as build_foundation, CYCLE, InfrastructurePlan, InterfaceBase, infrastructure_profile, INFRASTRUCTURE_INSTRUCTIONS, PROFILE_PATH
     work=directory/'code_work'/digest([plan,definition,comparison,llm.model,INSTRUCTIONS,Path(__file__).read_text(),
                                     Path(__file__).with_name('units.py').read_text(),Path(__file__).with_name('interface_context.py').read_text(),
+                                    [Path(__file__).with_name(n+'.py').read_text() for n in ('interface_base','fact_reconcile','demo_contract')],
                                     PROFILE_PATH.read_text(),template_hash(),feedback])[:16]
     work.mkdir(parents=True,exist_ok=True)
     evidence=Evidence(plan,sources)
@@ -353,16 +357,20 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 names={n for a in assembled.agents if a.id==interface_id for n in a.bindings.values()}
                 ports=[p for p in ports if p['name'] in names]
             if ports:
-                payload['spec_rtl_relation']=relation_scope(comparison,[p['name'] for p in ports])
+                relation_full=relation_scope(comparison,[p['name'] for p in ports])
+                # Leave room for a repair attempt (feedback, its own earlier answer, recovered evidence).
+                payload['spec_rtl_relation']=(relation_full if len(json.dumps(payload))+len(json.dumps(relation_full))<=RELATION_BUDGET
+                                              else relation_compact(relation_full))
             issue=None
             for attempt in range(2):
                 if len(json.dumps(payload))>48000: raise ValueError(f'{name}: work package too large; split this package')
                 emit(f'code work: {name}, {len(json.dumps(payload))} characters'+(' (repair)' if attempt else ''))
                 result=client.structured(name=name,instructions=(INFRASTRUCTURE_INSTRUCTIONS if name in {'code_infrastructure','code_clock','code_reset','code_interfaces','code_interface_base','code_interface','code_interface_needs'} else INSTRUCTIONS)+'\n'+rules,payload=payload,
                                          schema=strict_schema(model),tracer=tracer)
-                renamed=normalize_fact_ids(result.data)
-                if renamed: emit(f'code work: {name}: renamed {len(renamed)} fact id(s) to valid identifiers')
                 try:
+                    result.data=restore_maps(model,result.data)
+                    renamed=normalize_fact_ids(result.data)
+                    if renamed: emit(f'code work: {name}: renamed {len(renamed)} fact id(s) to valid identifiers')
                     typed=model.model_validate(result.data);check(typed)
                 except (HumanReviewPending,PlanUpdated):
                     raise
@@ -374,7 +382,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                     sid=name
                     if name in ('code_infrastructure','code_pseudocode'): sid+=':'+payload['task']['id']
                     elif name in ('code_interface','code_interface_base','code_interface_needs','code_feature'): sid+=':'+payload['task_id']
-                    emit_event('substep_retry',id=sid,status='FAIL',attempt=attempt+2)
+                    emit_event('substep_retry',id=sid,status='FAIL',attempt=attempt+2,reason=str(exc)[:300])
                     # The model sees the rule, the refusal and its own refused answer, not just the first bad value.
                     refused=result.data if len(json.dumps(result.data))<=12000 else None
                     payload=payload|dict(repair_feedback=str(exc),repair_rules=dict(identifiers=IDENTIFIER_RULE),
@@ -444,17 +452,24 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             execution['steps'].append(row);save_execution()
             feature_steps([],{},execution['steps'])
             return row
-        def run_unit(tid,title,goal,queries,model,check,dependencies,rules,scoped=None):
+        def run_unit(tid,title,goal,queries,model,check,dependencies,rules,scoped=None,fallback=()):
             row=unit_row(tid,title)
             scope=scoped or definition
             relation=relation_scope(comparison,[p['name'] for p in scope.get('ports',[])])
             aliases=[p['spec_name']+' '+p['rtl_name'] for p in relation.get('ports',[])]
+            # Human decisions are exact scoped inputs, not merely lexical hints. Quick-test answers to repeated rounds
+            # supersede each other: only the latest enters the evidence, so rounds do not grow the request or push
+            # specification excerpts out of the capped lists.
+            quick=[a for a in plan.get('quick_test_approvals',[]) if a['unit']==tid]
+            in_context=[a for a in plan.get('human_approvals',[]) if a['unit']==tid]+quick[-1:]
+            superseded={a.get('source_id','HUMAN-'+a['request_id']) for a in quick[:-1]}
             def fetch_unit(queries):
                 context=evidence.fetch(queries+aliases,source_ids=relation_sources(relation),item_limit=8,focus=True,
                                        plan_pointers=relation_pointers(relation),quote_hints=relation_quotes(relation))
-                # Human decisions are exact scoped inputs, not merely lexical hints.
-                for approval in plan.get('human_approvals',[])+plan.get('quick_test_approvals',[]):
-                    if approval['unit']!=tid: continue
+                # Lexical retrieval also finds superseded answers through their plan sections; drop them as well.
+                context['documented_items']=[i for i in context['documented_items'] if not superseded&set(i['source_ids'])]
+                context['source_excerpts']=[w for w in context['source_excerpts'] if w['source_id'] not in superseded]
+                for approval in in_context:
                     sid=approval.get('source_id','HUMAN-'+approval['request_id'])
                     items=[i for i in evidence.items if sid in i['source_ids']]
                     context['documented_items']=(items+[i for i in context['documented_items'] if i not in items])[:16]
@@ -467,6 +482,10 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             approvals=[a for a in plan.get('human_approvals',[])+plan.get('quick_test_approvals',[]) if a['unit']==tid]
             approved_bindings={key:value for a in approvals for key,value in a['bindings'].items()}
             for approval in approvals:
+                idle=approval['bindings'].get('idle_values',{})
+                if idle and 'tie_offs' in approved_bindings:
+                    approved_bindings['tie_offs']={k:v for k,v in approved_bindings['tie_offs'].items() if k not in idle}
+            for approval in approvals:
                 if approval['bindings'].get('clock_period_ranges'):
                     from .clock_timing import reviewed_ranges
                     approved_bindings['clock_period_ranges']=reviewed_ranges(approval['bindings']['clock_period_ranges'],
@@ -476,6 +495,15 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             if tid.startswith('collateral_'):
                 profile=dict(kind='collateral',required=['source-supported ownership and required protocol configuration'],
                              deferred=['scoreboard','functional tests','full register map'])
+            active_ports=[p['name'] for p in scope.get('ports',[]) if p['direction']=='input'] if dependencies.get('infrastructure_needs',{}).get('level')=='full_agent' else []
+            review_context=dict(active_agent_ports=active_ports,profile=profile)
+            if set(approved_bindings.get('tie_offs',{})) & set(active_ports):
+                request,receipt=request_review(directory,plan,scope,tid,
+                    ['The active agent must own these inputs. Replace the earlier permanent tie-off decision with idle_values for the driver; do not approve a second driver.'],
+                    selected,context=review_context)
+                from ..plan.approved_clarifications import apply_approval
+                apply_approval(current_plan_path(directory),request,receipt)
+                raise PlanUpdated('Driver idle settings require revised approval')
             row['profile']=profile
             task=dict(id=tid,title=title,goal=goal,category='infrastructure',plan_pointers=[],depends_on=[],queries=queries)
             payload=dict(task=task,evidence=selected,interface=scope,dependencies=dependencies,profile=profile,
@@ -484,15 +512,20 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             try:
                 row.update(status='RUN',phase='understand_and_pseudocode');save_execution()
                 def pseudo_check(p):
-                    _facts_in_context(p.facts,selected);validate_facts(p.facts,plan,sources)
+                    reconcile(p,selected,fallback)
                     if any(not text.strip() for text in p.actions+p.completion):
                         raise ValueError('Infrastructure needs nonblank actions and bounded completion')
                     if p.ambiguities:
-                        permitted={'port_binding','clock_timing'} if tid=='foundation_clock' else {'port_binding','reset_polarity'} if tid=='foundation_reset' else {'interface_roles','idle_value','port_binding'}
+                        permitted={'port_binding','clock_timing'} if tid=='foundation_clock' else {'port_binding','reset_polarity'} if tid=='foundation_reset' else {'interface_roles','port_binding'}
                         if any(a.kind not in permitted for a in p.ambiguities):
                             raise ValueError('Ambiguity type does not belong to this infrastructure unit')
+                    if p.ambiguities and tid.startswith('collateral_'):
+                        from ..quality.quick_testing import settle_ambiguities
+                        p.ambiguities,assumed=settle_ambiguities(directory,tid,p.ambiguities)
+                        p.questions+=['Quick-test assumption, not asked again: '+a.question for a in assumed]
+                    if p.ambiguities:
                         request,receipt=request_review(directory,plan,scope,tid,[a.question for a in p.ambiguities],selected,
-                                                       context=dict(understanding=p.understanding, profile=profile))
+                                                       context=dict(understanding=p.understanding, **review_context))
                         from ..plan.approved_clarifications import apply_approval
                         apply_approval(current_plan_path(directory),request,receipt)
                         raise PlanUpdated('Approved clarification saved; reload updated plan and resume generation')
@@ -521,7 +554,14 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 row.update(phase='implement');save_execution()
                 def validate_unit(result):
                     row.update(phase='validate');save_execution()
+                    for name,value in approved_bindings.get('idle_values',{}).items():
+                        owners=[a for a in getattr(result,'agents',[]) if a.active and name in a.bindings.values()]
+                        if len(owners)!=1: raise ValueError('Approved idle value requires exactly one active agent owner')
+                        agent=owners[0]
+                        if name in agent.idle_values and agent.idle_values[name]!=value: raise ValueError('Generated driver idle value conflicts with approval')
+                        agent.idle_values[name]=value
                     for key,value in approved_bindings.items():
+                        if key=='idle_values': continue
                         if not hasattr(result,key): continue
                         actual=getattr(result,key)
                         if key=='clock_period_ranges': actual=[r.model_dump() for r in actual]
@@ -530,8 +570,8 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                             matches=all(actual.get(n)==v for n,v in value.items())
                         elif key=='roles': matches=all(actual.get(n)==v for n,v in value.items())
                         else: matches=actual==value
-                        if not matches: raise ValueError('Generated infrastructure must honor human-approved '+key)
-                    for approval in approvals:
+                        if not matches: raise ValueError('Generated infrastructure must honor recorded approval for '+key)
+                    for approval in in_context:
                         sid=approval.get('source_id','HUMAN-'+approval['request_id'])
                         item=next(i for i in selected['documented_items'] if sid in i['source_ids'])
                         if not any(f.source_id==sid for f in result.facts):
@@ -593,10 +633,36 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 for row in rows:
                     if row['status']=='RUN': row.update(status=getattr(exc,'status','BLOCKED'))
                 save_execution();raise
+        def reconcile(unit,context,fallback=()):
+            """Keep the model's decision; drop cited facts that cannot be proven and cite the interface's own instead."""
+            from .fact_reconcile import reconcile_facts
+            def provable(fact):
+                _facts_in_context([fact],context);validate_facts([fact],plan,sources)
+            from ..quality.quick_testing import enabled
+            if not (enabled() and plan.get('test_only') is True and (directory/'quick_testing.json').is_file()):
+                for fact in unit.facts: provable(fact)
+                return []
+            dropped=reconcile_facts(unit,provable,fallback)
+            if dropped: emit(f'code work: replaced {len(dropped)} unprovable fact(s): {", ".join(dropped)}')
+            return dropped
+        def bind_interface_base(task,scoped):
+            """The ports an interface owns and their documented evidence; no model call."""
+            from .interface_base import interface_base
+            tid='interface_'+task.id
+            row=unit_row(tid,task.title);row.update(status='RUN',phase='bind');save_execution()
+            try:
+                with stage('code_interface_base:'+tid,'Implement and validate '+task.title):
+                    unit=interface_base(plan,task,sources,directory)
+                    validate_facts(unit.facts,plan,sources)
+                _write(work/(tid+'.implementation.json'),unit.model_dump())
+                row.update(phase='checkpoint',status='PLANNED' if pseudocode_only else 'PASS');save_execution()
+                return unit
+            except (Exception,KeyboardInterrupt) as exc:
+                row.update(status=getattr(exc,'status','BLOCKED'));execution['status']=getattr(exc,'status','BLOCKED');save_execution();raise
         try:
             foundation=build_foundation(run_unit,call,definition,evidence,unit_facts,save_unit,
                                        lambda candidate,scope:validate(candidate,plan,scope,sources),
-                                       render_units=not pseudocode_only,bind=bind_common,comparison=comparison)
+                                       render_units=not pseudocode_only,bind=bind_common,bind_base=bind_interface_base,reconcile=reconcile,comparison=comparison)
         except (Exception,KeyboardInterrupt) as exc:
             execution['status']=getattr(exc,'status','BLOCKED');save_execution()
             work_manifest.update(status=getattr(exc,'status','BLOCKED'),reason=str(exc) if isinstance(exc,ValueError) else type(exc).__name__)

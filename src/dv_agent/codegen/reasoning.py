@@ -59,19 +59,64 @@ Return exactly the schema object, including empty arrays for unused lists.
 """
 
 
+def _is_map(node):
+    return isinstance(node, dict) and node.get('type')=='object' and 'properties' not in node and isinstance(node.get('additionalProperties'), dict)
+
+
 def strict_schema(model):
     schema = model.model_json_schema()
-    # The compatible API accepts JSON schema maps; don't force closed empty map schemas.
-    def visit(node):
-        if isinstance(node, dict):
+    # Strict structured output refuses any object whose additionalProperties is not false (HTTP 400, verified against
+    # the API), so a free-form map is sent as a list of key/value pairs; restore_maps turns the answer back into a map.
+    def visit(node, names=False):
+        # names: this dict maps field names to schemas, so a field called `default` is data, not the keyword.
+        if isinstance(node, dict) and names:
+            for value in node.values(): visit(value)
+        elif isinstance(node, dict):
             node.pop('default', None)
+            if _is_map(node):
+                value = node.pop('additionalProperties')
+                title = node.get('title')
+                node.clear()
+                node.update(type='array', items=dict(type='object', additionalProperties=False, required=['key', 'value'],
+                                                     properties=dict(key=dict(type='string'), value=value)))
+                if title: node['title'] = title
             if node.get('type')=='object' and 'properties' in node:
                 node['additionalProperties']=False; node['required']=list(node['properties'])
-            for value in node.values(): visit(value)
+            for key, value in node.items(): visit(value, names=key == 'properties')
         elif isinstance(node, list):
             for value in node: visit(value)
     visit(schema)
     return schema
+
+
+def restore_maps(model, data):
+    """Turn the key/value pair lists strict_schema introduced back into maps, guided by the model's own schema."""
+    schema = model.model_json_schema()
+    defs = schema.get('$defs', {})
+    def resolve(node):
+        while isinstance(node, dict) and '$ref' in node:
+            node = defs[node['$ref'].rsplit('/', 1)[-1]]
+        return node
+    def walk(node, value):
+        node = resolve(node)
+        if not isinstance(node, dict): return value
+        for option in node.get('anyOf', []):
+            if resolve(option).get('type') not in (None, 'null'): node = resolve(option); break
+        if _is_map(node) and isinstance(value, list):
+            result={}
+            for pair in value:
+                if not isinstance(pair,dict) or set(pair)!={'key','value'} or not isinstance(pair['key'],str):
+                    raise ValueError('Strict map entries require a string key and value')
+                if pair['key'] in result: raise ValueError('Duplicate strict map key: '+pair['key'])
+                result[pair['key']]=walk(node['additionalProperties'],pair['value'])
+            return result
+        if node.get('type')=='object' and isinstance(value, dict):
+            props = node.get('properties', {})
+            return {k: walk(props[k], v) if k in props else v for k, v in value.items()}
+        if node.get('type')=='array' and isinstance(value, list):
+            return [walk(node.get('items', {}), v) for v in value]
+        return value
+    return walk(schema, data)
 
 
 def eligible_items(plan, sources):

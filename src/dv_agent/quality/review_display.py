@@ -30,12 +30,23 @@ def pause(show, *, sleep=time.sleep):
         sleep(seconds)
 
 
-def show_response(show, request, bindings, reason, assumptions, *, valid=True):
+def compose_reply(bindings, reason):
+    """A plain-English reply from the decided settings, for when the evaluator gave none."""
     from .human_dialogue import describe
-    title='Generated response — QUICK TESTING ONLY' if valid else 'Generated response — NOT APPROVED'
-    body='\n'.join([title,describe(bindings) if bindings else 'No valid binding was proposed.',
-                    '', 'Reasoning',reason,'','Assumptions',
-                    *(['- '+value for value in assumptions] or ['- None stated.']),
-                    '', 'This is an automated inference, not a human approval.'])
-    show('\nQuestion\n'+request['question']+'\n\n'+body)
+    settings = describe(bindings).replace('\n  - ', '; ').replace('\n- ', '\n').splitlines()
+    spoken = 'I would set it like this: ' + ' '.join(line.lstrip('- ').rstrip('.') + '.' for line in settings if line.strip())
+    return (spoken + ' ' + reason.strip()).strip()
+
+
+def show_response(show, request, bindings, reason, assumptions, *, valid=True, reply=''):
+    """Show the generated answer as a reply to the question, then exactly what it sets. Never an approval."""
+    from .human_dialogue import describe
+    if valid:
+        body = '\n'.join(['Reply (generated for quick testing, not from a person)', '',
+                          (reply or '').strip() or compose_reply(bindings, reason), '',
+                          'This sets', describe(bindings), '', 'Assumptions I made',
+                          *(['- ' + value for value in assumptions] or ['- None.'])])
+    else:
+        body = 'No reply could be produced for this request, so nothing was approved.'
+    show('\nQuestion\n' + request['question'] + '\n\n' + body)
     return body

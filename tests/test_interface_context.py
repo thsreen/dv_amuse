@@ -63,12 +63,12 @@ def test_interface_stages_receive_shared_relation_and_saved_context(inputs):
     llm=workflow_model(contract)
     build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[source],compile=False)
     for stage,payload in llm.calls:
-        if stage not in ('code_interfaces','code_interface_base','code_interface_needs','code_interface'): continue
+        if stage not in ('code_interfaces','code_interface_needs','code_interface'): continue
         relation=payload['spec_rtl_relation']
         assert relation['groups'][0]['properties']['protocol']=='WISHBONE'
         assert not {'tick','clear'} & {p['rtl_name'] for p in relation['ports']}
         assert any(i['plan_pointer'].startswith('/interfaces/groups/2/') for i in payload['evidence']['documented_items'])
-    saved=list((root/'output/code_work').glob('*/interface_control.context.json'))
+    saved=list((root/'output/code_work').glob('*/collateral_control.context.json'))
     assert saved and json.loads(saved[0].read_text())['spec_rtl_relation']['ports']
 
 
@@ -77,3 +77,19 @@ def test_markdown_includes_source_context(inputs):
     enforce(grouped(plan),definition,root)
     text=(root/'interface_port_comparison.md').read_text()
     assert 'Control bus' in text and 'Acknowledge completes a transfer' in text
+
+
+def test_compact_relation_keeps_the_identity_map_and_drops_the_evidence_text(inputs):
+    """Run …0744…: a feature request with all 19 ports carried a 32 KB relation and passed the 48,000-character cap."""
+    from dv_agent.codegen.interface_context import compact
+    _,plan,definition,_,_=inputs
+    plan=grouped(plan)
+    full=scoped(compare(plan,definition),[p['name'] for p in definition['ports']])
+    small=compact(full)
+    assert [(p['spec_name'],p['rtl_name'],p['dut_direction'],p['width']) for p in small['ports']]==\
+           [(p['spec_name'],p['rtl_name'],p['dut_direction'],p['width']) for p in full['ports']]
+    assert small['groups'][0]['properties']==full['groups'][0]['properties'] and small['groups'][0]['property_provenance']
+    assert 'source_quotes' not in small and 'review_decisions' not in small and 'compacted' in small
+    assert all('quote' not in str(p['specification']) and 'description' not in p['specification'] for p in small['ports'])
+    assert len(json.dumps(small))<len(json.dumps(full))
+    assert compact({})=={}

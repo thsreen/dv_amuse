@@ -3,8 +3,11 @@ class {{AGENT}}_driver extends uvm_driver #(cg_item);
   {{AGENT}}_cfg cfg;
   function new(string name, uvm_component parent); super.new(name, parent); endfunction
   task bit_time(); repeat(cfg.bit_cycles) @(negedge cfg.vif.clk); endtask
+  virtual function void drive_reset_values();
+{{RESET_ASSIGNMENTS}}
+  endfunction
   task run_phase(uvm_phase phase);
-    cfg.vif.rx = 1;
+    drive_reset_values();
     forever begin
       seq_item_port.get_next_item(req);
       if (req.kind == 0) repeat(req.cycles) @(posedge cfg.vif.clk);

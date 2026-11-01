@@ -149,7 +149,7 @@ def test_model_design_and_review_checkpoint_without_extra_calls(inputs):
     for _ in range(2):
         build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[rtl],compile=False)
     assert [name for name,_ in llm.calls]==[
-        'code_interfaces','code_infrastructure','code_interface_base','code_interface_needs','code_infrastructure','code_interface','code_grouping','code_dependencies',
+        'code_interfaces','code_interface_needs','code_infrastructure','code_interface','code_grouping','code_dependencies',
         'code_pseudocode','code_feature','code_collation','code_integration','code_review']
     assert (root/'output/contract_review.json').is_file()
 
@@ -522,6 +522,8 @@ def test_real_uart_simulation_opt_in(tmp_path,monkeypatch):
     if capability['status']!='PASS': pytest.fail(str(capability))
     repo=create(tmp_path)
     contract=json.loads((tmp_path/'code_contract.json').read_text())
+    for agent in contract['agents']:
+        if agent['protocol']=='serial': agent['idle_values']={agent['bindings']['rx']:1}
     contract['coverage']=[dict(id='line_format',agent='register_bus',fact_ids=['fact_2'],sample_kinds=[1,2],sample_address=3,
         points=[dict(name='word_length',field='data',mask=3,bins=[dict(name='eight_bits',values=[3])]),
                 dict(name='access',field='kind',mask=3,bins=[dict(name='writes',values=[1]),dict(name='reads',values=[2])])],
@@ -548,7 +550,7 @@ def test_workflow_emits_real_feature_phases_in_execution_order(inputs):
                       llm=workflow_model(contract), rtl_files=[rtl], compile=False)
     starts = [e['id'] for e in events if e['kind']=='substep_start']
     assert starts == ['code_port_comparison','code_port_validation','code_binding','code_common','code_interfaces',
-        'code_infrastructure:interface_control','code_interface_base:interface_control',
+        'code_interface_base:interface_control',
         'code_interface_needs:control','code_infrastructure:collateral_control','code_interface:collateral_control',
         'code_grouping','code_dependencies','code_pseudocode:storage_feature',
         'code_feature:storage_feature','code_collation','code_integration',
@@ -737,7 +739,8 @@ def test_clock_reset_and_two_interfaces_use_identical_sequential_cycle(inputs):
         assert (work/f'units/{agent}/uvm/{agent}_monitor.svh').is_file()
     names=[n for n,p in llm.calls]
     assert 'code_clock' not in names and 'code_reset' not in names  # clock and reset are bound without the model
-    assert names.index('code_interface_base')<names.index('code_interface')<names.index('code_grouping')
+    assert 'code_interface_base' not in names  # interface bases are bound without the model
+    assert names.index('code_interfaces')<names.index('code_interface_needs')<names.index('code_interface')<names.index('code_grouping')
     assert names.count('code_dependencies')==1
     assert (work/'dependency_handling.json').is_file()
 
@@ -859,7 +862,7 @@ def test_infrastructure_prompt_and_schema_do_not_require_functional_verification
         return original(name,instructions,payload,schema)
     llm._call=call
     result=design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
-    assert result.clock=='tick' and {p['kind'] for p in seen}>={'protocol','collateral'}
+    assert result.clock=='tick' and {p['kind'] for p in seen}>={'collateral'}
     work=Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])
     binding=json.loads((work/'common_binding.json').read_text())
     assert [s['id'] for s in binding['steps']]==['inventory','clock','reset','timing'] and binding['questions']==[]
@@ -884,7 +887,9 @@ def test_all_interface_bases_precede_collateral_and_utility_does_not_need_monito
     llm.handlers['code_interface']=lambda p:dict(facts=contract['facts']) if p['task_id']=='collateral_status_observation' else collateral(p)
     design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
     names=[n for n,p in llm.calls]
-    assert max(i for i,n in enumerate(names) if n=='code_interface_base')<names.index('code_interface')
+    assert 'code_interface_base' not in names
+    rows=[r['id'] for r in json.loads((Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])/'execution_plan.json').read_text())['steps']]
+    assert max(i for i,r in enumerate(rows) if r.startswith('interface_'))<min(i for i,r in enumerate(rows) if r.startswith('assessment_'))  # every base first
     work=Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])
     assert (work/'base_interfaces/status_observation_if.sv').is_file()
     utility=json.loads((work/'infrastructure_needs/status_observation.json').read_text())
@@ -923,7 +928,7 @@ def test_interface_assessment_is_required_before_any_collateral(inputs):
     llm.handlers['code_interface_needs']=decide
     design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
     names=[n for n,p in llm.calls]
-    assert names.index('code_interface_base')<names.index('code_interface_needs')<names.index('code_interface')
+    assert 'code_interface_base' not in names and names.index('code_interface_needs')<names.index('code_interface')
     work=Path(json.loads((root/'output/code_work_manifest.json').read_text())['work_dir'])
     decision=json.loads((work/'infrastructure_needs/control.json').read_text())
     assert decision['level']=='full_agent' and decision['provenance']=='INFERRED_IMPLEMENTATION_CHOICE'
@@ -1127,3 +1132,20 @@ def test_generated_testbench_instantiates_the_common_environment_and_compiles_it
     assert 'common_env common_infra' not in test
     agent=(code/'common_uvc/common/common_agent.svh').read_text()
     assert 'clock_agent::type_id::create("clk_agent"' in agent and 'reset_agent::type_id::create("rst_agent"' in agent
+
+
+def test_interfaces_run_from_fewest_wires_to_most(inputs):
+    from dv_agent.codegen.workplan import design
+    root,spec,definition,contract,_=inputs
+    names=list(contract['agents'][0]['bindings'].values())
+    llm=workflow_model(contract)
+    # The model lists the seven-wire interface first; the build must still start with the one-wire interface.
+    llm.handlers['code_interfaces']=lambda p:dict(interfaces=[
+        dict(id='control',title='control',signals=names[:-1],queries=['interface']),
+        dict(id='narrow',title='narrow',signals=names[-1:],queries=['interface'])])
+    try: design(llm,spec,definition,{'CH-spec':spec['evidence_index']['CH-spec']['excerpt']},root/'output')
+    except Exception: pass  # later units of this synthetic split may not validate; only the order is under test
+    manifest=json.loads((root/'output/code_work_manifest.json').read_text())
+    steps=[r['id'] for r in json.loads((Path(manifest['work_dir'])/'execution_plan.json').read_text())['steps']]
+    assert [i for i in steps if i.startswith('interface_')]==['interface_narrow','interface_control']
+    assert [i for i in steps if i.startswith('assessment_')][:1]==['assessment_narrow']

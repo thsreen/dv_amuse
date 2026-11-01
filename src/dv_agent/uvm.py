@@ -268,6 +268,7 @@ def _render(prefix: str, ports: list[dict], clock: str, reset: str | None,
              f"    longint unsigned config_{_slug(c['field_id'])}_value = 0;")),
         "DRIVE_ASSIGNMENTS": "\n".join(
             f"      if (cfg.drive_{p['name']}) cfg.vif.{p['name']} <= tr.{p['name']};" for p in driven),
+        "DRIVER_RESET_ASSIGNMENTS": "\n".join(f"      if (cfg.drive_{p['name']}) cfg.vif.{p['name']} = '0;" for p in driven),
         "MONITOR_ASSIGNMENTS": "\n".join(
             f"      tr.{p['name']} = cfg.vif.{p['name']};" for p in driven + observed),
         "MONITOR_X_CHECKS": _monitor_x_checks(driven, observed, reset, reset_active),

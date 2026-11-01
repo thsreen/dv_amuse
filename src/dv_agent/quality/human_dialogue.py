@@ -45,7 +45,12 @@ def brief(plan, definition, unit, blockers, evidence, context=None):
                 scope='Only this infrastructure clarification is approved; other behavior remains unchanged.')
 
 
-def format_review(request, *, markdown=False):
+QUICK_TEST_ANSWER = ['How this is answered',
+                     'This question is answered automatically for quick testing; no person is asked.',
+                     'The generated reply and the exact settings follow. They are test-only assumptions, not an approval.']
+
+
+def format_review(request, *, markdown=False, quick_test=False):
     data = request.get('review_brief')
     if not data:
         data = brief({}, dict(ports=request.get('ports', [])), request.get('unit', ''),
@@ -67,10 +72,13 @@ def format_review(request, *, markdown=False):
         if source['start'] is not None:
             lines.append(f"  Excerpt offsets: {source['start']}–{source['end']}")
         lines += ['  > ' + line for line in source['quote'].splitlines()]
-    lines += ['', 'Your decision', 'Reply in your own words with the intended setting and, if available, its reason.',
-              'I will restate the binding for you to confirm before recording approval.', data['scope']]
+    if quick_test:
+        lines += ['', *QUICK_TEST_ANSWER, data['scope']]
+    else:
+        lines += ['', 'Your decision', 'Reply in your own words with the intended setting and, if available, its reason.',
+                  'I will restate the binding for you to confirm before recording approval.', data['scope']]
     if markdown:
-        headings = {'Decision needed', 'Why this came up', 'Architecture and impact', 'Quick references', 'Your decision'}
+        headings = {'Decision needed', 'Why this came up', 'Architecture and impact', 'Quick references', 'Your decision', QUICK_TEST_ANSWER[0]}
         lines = [part for line in lines for part in (['## ' + line, ''] if line in headings else [line])]
     return '\n'.join(lines)
 
@@ -115,6 +123,7 @@ def interpret(request, text, llm=None):
             'from RTL, source excerpts, port naming, or the question. Do not approve. '
             'Return bindings_json containing only allowed fields; reset_active uses high/low. '
             'For clock_period_ranges return a list of name/min_ps/max_ps/optional nominal_ps objects. '
+            'idle_values maps agent-driven input ports to their stated idle integers; tie_offs means permanent driving of unowned inputs. Never conflate the two. '
             'For port alignment, mappings maps spec names to exact RTL names, width_choices maps spec names '
             'to selected documented integer widths, inactive_spec_ports maps explicitly disabled conditional '
             'spec names to the human-stated reason. Resolve only what the human actually states. '
@@ -140,7 +149,7 @@ def describe(bindings):
     labels = {'reset': 'Reset input', 'reset_active': 'Reset asserted level', 'reset_cycles': 'Reset duration (cycles)',
               'clock': 'Clock input', 'clock_period_ns': 'Testbench clock period (ns)',
               'clock_period_ranges':'Clock operating bands (periods in ps)',
-              'roles': 'Interface role bindings', 'tie_offs': 'Input idle values',
+              'roles': 'Interface role bindings', 'tie_offs': 'Permanent input tie-offs', 'idle_values':'Agent-driven idle values',
               'mappings':'Spec to RTL port mappings','width_choices':'Selected port widths',
               'inactive_spec_ports':'Disabled conditional ports'}
     lines = []

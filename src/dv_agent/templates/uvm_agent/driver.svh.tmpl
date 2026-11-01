@@ -3,12 +3,16 @@
     {{UVC_NAME}}_cfg cfg;
 {{CUSTOM_DRIVER_DECLARATIONS}}
     function new(string name, uvm_component parent); super.new(name, parent); endfunction
+    virtual function void drive_reset_values();
+{{DRIVER_RESET_ASSIGNMENTS}}
+    endfunction
     virtual task drive_item({{UVC_NAME}}_item tr);
       @(negedge cfg.vif.{{CLOCK_SIGNAL}});
 {{DRIVE_ASSIGNMENTS}}
 {{CUSTOM_DRIVER_DRIVE}}
     endtask
     task run_phase(uvm_phase phase);
+      drive_reset_values();
       forever begin
         seq_item_port.get_next_item(req);
         drive_item(req);

@@ -77,8 +77,17 @@ def render(plan, ports, hooks=None):
             add(f"uvm/{a.id}_{component}.svh", template(component + '.svh',
                 VARIABLES='\n'.join(f'  bit [{v.width-1}:0] {v.id}={sv(v.default)};' for v in plan.sequencer_variables if v.agent==a.id), **values))
         for component in (('driver','monitor') if a.active else ('monitor',)):
-            add(f"uvm/{a.id}_{component}.svh", template(a.protocol + '_' + component + '.svh',
-                DRIVER_HOOK=hook(a.id, 'driver.body'), MONITOR_HOOK=hook(a.id, 'monitor.body'), **values))
+            defaults={name:(1 if a.protocol=='serial' and role=='rx' else 0) for role,name in a.bindings.items() if ports[name]['direction']=='input'}
+            defaults.update(a.idle_values)
+            reset_assignments='\n'.join(f'    cfg.vif.{role} = {sv(defaults[name])};' for role,name in a.bindings.items() if name in defaults)
+            if a.protocol=='wishbone' and 'sel' not in a.bindings: reset_assignments+="\n    cfg.vif.sel = '0;"
+            text=template(a.protocol + '_' + component + '.svh',
+                RESET_ASSIGNMENTS=reset_assignments,
+                MONITOR_SIGNAL_DECLARATIONS='\n'.join(f'  logic [{w-1}:0] sampled_{r};' for r,w in widths.items()),
+                MONITOR_RESET_ASSIGNMENTS='\n'.join(f"    sampled_{r} = '0;" for r in widths),
+                MONITOR_SIGNAL_ASSIGNMENTS='\n'.join(f'    sampled_{r} = cfg.vif.{r};' for r in widths),
+                DRIVER_HOOK=hook(a.id, 'driver.body'), MONITOR_HOOK=hook(a.id, 'monitor.body'), **values)
+            add(f"uvm/{a.id}_{component}.svh",text)
         regs = [r for r in plan.registers if r.agent == a.id]
         bins = '\n'.join(f"bins {r.id}={{{i+1}}};" for i, r in enumerate(regs)) or 'bins not_register={0};'
         classes = '\n'.join(f"    if(observed.address=={sv(r.address)}) address_class={i+1};" for i, r in enumerate(regs))

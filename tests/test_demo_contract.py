@@ -39,7 +39,7 @@ def test_every_remaining_port_gets_an_agent_with_an_idle_driver_and_a_passive_mo
     ports = {p['name']: p for p in definition['ports']}
     code = demo_hook_code(plan, ports)
     driver = next(v for k, v in code.items() if k.endswith('_driver_hook'))
-    assert "cfg.vif.writing <= '0;" in driver and 'cfg.vif.pull' not in driver and 'repeat (req.cycles) @(posedge cfg.vif.clk);' in driver  # inputs only
+    assert 'cfg.vif' not in driver.replace('cfg.vif.clk', '') and 'repeat (req.cycles) @(posedge cfg.vif.clk);' in driver  # defaults come from drive_reset_values
     assert next(v for k, v in code.items() if k.endswith('_monitor_hook')).strip().startswith('// demo')
 
 
@@ -139,3 +139,127 @@ def test_real_uart_demo_simulation_opt_in(tmp_path, monkeypatch):
     assert manifest['compile']['status'] == 'PASS', manifest['compile']
     result = run_project(manifest, regress=True, timeout=120)
     assert result['status'] == 'PASS', [(t['name'], t['reason']) for t in result['tests']]
+
+
+def with_two_interfaces(spec, definition):
+    """The plan's clock/reset groups plus a wide bus (7 ports) listed before a narrow one (1 output)."""
+    spec = json.loads(json.dumps(spec))
+    quote = 'Acknowledge completes a transfer'
+    directions = {p['name']: p['direction'] for p in definition['ports']}
+    widths = {p['name']: p['width'] for p in definition['ports']}
+    evidence = dict(provenance='DOCUMENTED', quote=quote, cited_chunk_ids=['CH-spec'], inference_reason='')
+
+    def group(name, names):
+        return dict(name=name, category='bus', function='Transfers', cited_chunk_ids=['CH-spec'], property_evidence=dict(function=evidence),
+                    signals=[dict(name=n, direction=directions[n], width=widths[n], width_documented=True, direction_documented=True,
+                                  active_level='high', active_level_documented=True, quote=quote, chunk_id='CH-spec') for n in names])
+    spec['interfaces']['groups'] += [group('wide', ['index', 'push', 'pull', 'lanes', 'writing', 'request', 'cycle']), group('narrow', ['ready'])]
+    return spec
+
+
+def test_only_the_requested_number_of_interfaces_are_built_smallest_first_and_the_rest_are_pending(inputs):
+    root, spec, definition, _, _ = inputs
+    spec = with_two_interfaces(spec, definition)
+    sources = {'CH-spec': spec['evidence_index']['CH-spec']['excerpt']}
+    pending = []
+    contract = build_demo_contract(spec, definition, sources, top='peripheral', limit=1, pending=pending)
+    plan = CodePlan.model_validate(contract)
+    # 'narrow' is one output, so it cannot drive the DUT; the next smallest interface is added so the simulation has stimulus.
+    assert [a.id for a in plan.agents] == ['demo_narrow', 'demo_wide']
+    assert pending == []  # nothing is left over, so nothing is pending
+    both = build_demo_contract(spec, definition, sources, top='peripheral', limit=2, pending=pending)
+    assert [a['id'] for a in both['agents']] == ['demo_narrow', 'demo_wide'] and not both['tie_offs']
+
+
+def test_deferred_interface_inputs_are_held_at_zero_with_outputs_open_and_listed_at_the_end(inputs):
+    root, spec, definition, _, _ = inputs
+    spec = with_two_interfaces(spec, definition)
+    sources = {'CH-spec': spec['evidence_index']['CH-spec']['excerpt']}
+    # Split the wide bus so that one part is deferred.
+    wide = next(g for g in spec['interfaces']['groups'] if g['name'] == 'wide')
+    wide['signals'], rest = wide['signals'][:3], wide['signals'][3:]
+    spec['interfaces']['groups'].append(dict(wide, name='later', signals=rest))
+    pending = []
+    contract = build_demo_contract(spec, definition, sources, top='peripheral', limit=2, pending=pending)
+    plan = CodePlan.model_validate(contract)
+    assert len(plan.agents) == 2 and pending
+    deferred = {p['interface']: p for p in pending}
+    assert set(deferred) <= {'wide', 'later'}
+    tied = {t.signal for t in plan.tie_offs}
+    for item in pending:
+        assert tied >= set(item['inputs_held_at_zero']) and not tied & set(item['outputs_left_open'])
+    owned = {n for a in plan.agents for n in a.bindings.values()} | tied
+    assert {p['name'] for p in definition['ports'] if p['direction'] == 'input'} - {'tick', 'clear'} <= owned  # every input has an owner
+    assert any(q.startswith('PENDING, not built in this prototype:') for q in contract['questions'])
+
+
+def test_build_demo_records_the_pending_interfaces_and_the_testbench_still_renders(inputs):
+    root, spec, definition, _, rtl = inputs
+    (root / 'plan.json').write_text(json.dumps(with_two_interfaces(spec, definition)))
+    result = build_demo(root / 'plan.json', root / 'interface.json', root / 'output', rtl_files=[rtl], expected_top='peripheral', max_interfaces=2)
+    assert result['demo'] is True and result['status'] == 'BUILT_NEEDS_REVIEW'
+    record = json.loads((root / 'output/demo_pending.json').read_text())
+    assert record['pending_interfaces'] == result['pending_interfaces']
+    top = (Path(result['code_dir']) / 'verification_top.sv').read_text()
+    assert 'dut_request' in top
+
+
+def test_real_uart_prototype_with_two_interfaces_simulates_while_the_rest_are_pending(tmp_path, monkeypatch):
+    """The point of the limit: a bus that is not built yet must not stop a running simulation."""
+    import os
+    if os.getenv('DV_AGENT_TEST_SIMULATION') != '1':
+        pytest.skip('Set DV_AGENT_TEST_SIMULATION=1 for real Xezim/UVM integration')
+    from codegen_uart_fixture import create
+    from dv_agent.codegen.simulator import discover, run_project
+    if not os.getenv('XEZIM_UVM_DIR'):
+        monkeypatch.setenv('XEZIM_UVM_DIR', str(Path(__file__).resolve().parents[1] / '.deps/uvm-core-2020.3.1/src'))
+    if discover()['status'] != 'PASS':
+        pytest.fail(str(discover()))
+    repo = create(tmp_path)
+    plan = json.loads((tmp_path / 'testplan.json').read_text())
+    definition = json.loads((tmp_path / 'interface.json').read_text())
+    directions = {p['name']: p['direction'] for p in definition['ports']}
+    quote = next(iter(plan['evidence_index'].values()))['excerpt'][:40]
+    chunk = next(iter(plan['evidence_index']))
+
+    def group(name, names):
+        return dict(name=name, category='bus', function='Transfers', cited_chunk_ids=[chunk],
+                    signals=[dict(name=n, direction=directions[n], quote=quote, chunk_id=chunk) for n in names])
+    plan['interfaces']['groups'] = [group('irq', ['int_o']), group('serial', ['stx_pad_o', 'srx_pad_i']),
+                                    group('bus', [n for n in directions if n.startswith('wb_') and n not in ('wb_clk_i', 'wb_rst_i')])]
+    # The grouped plan only decides which interfaces are built; compiling uses the fixture's own plan, whose port comparison passes.
+    from dv_agent.codegen import build_project
+    from dv_agent.codegen.build import load_sources
+    pending = []
+    contract = build_demo_contract(plan, definition, load_sources(plan, tmp_path / 'graph.json'), top=None, directory=tmp_path / 'output',
+                                   limit=2, pending=pending)
+    (tmp_path / 'output').mkdir(exist_ok=True)
+    (tmp_path / 'output/demo_contract.json').write_text(json.dumps(contract))
+    assert [p['interface'] for p in pending] == ['misc', 'bus'] and [a['id'] for a in contract['agents']] == ['demo_irq', 'demo_serial']
+    assert {t['signal'] for t in contract['tie_offs']} >= {'wb_adr_i', 'wb_stb_i', 'cts_pad_i'} and not {'srx_pad_i'} & {t['signal'] for t in contract['tie_offs']}
+    manifest = build_project(tmp_path / 'testplan.json', tmp_path / 'interface.json', tmp_path / 'output',
+                             contract_path=tmp_path / 'output/demo_contract.json', rtl_files=list((repo / 'rtl/verilog').glob('*.v')), compile=True)
+    top = (Path(manifest['code_dir']) / 'verification_top.sv').read_text()
+    assert 'assign dut_wb_adr_i=' in top and 'assign dut_cts_pad_i=' in top and 'assign dut_srx_pad_i=' not in top  # deferred inputs are held
+    assert manifest['compile']['status'] == 'PASS', manifest['compile']
+    result = run_project(manifest, regress=True, timeout=120)
+    assert result['status'] == 'PASS', [(t['name'], t['reason']) for t in result['tests']]
+
+
+def test_repl_code_demo_takes_an_interface_count_and_lists_pending_interfaces_at_the_end(tmp_path, monkeypatch):
+    from orchestrator_agent import repl as terminal
+    out = tmp_path / 'run'
+    (out / 'dv').mkdir(parents=True)
+    (out / 'dv' / 'testplan_doc.json').write_text('{"sections": []}')
+    monkeypatch.setattr(terminal, '_default_out', lambda: out)
+    limits = []
+    pending = [dict(interface='bus', ports=['a', 'b', 'c'], inputs_held_at_zero=['a'], outputs_left_open=['b', 'c'])]
+    monkeypatch.setattr(terminal, 'build_code', lambda directory, variables, **kw: limits.append(variables.get('code_demo_limit')) or
+                        dict(demo=True, code_dir='code', tests=[dict(name='demo_smoke')], pending_interfaces=pending))
+    commands = iter(['/code demo', '/code demo 1', '/code demo all'])
+    shown = []
+    terminal.repl(input_fn=lambda _p: next(commands, None) or (_ for _ in ()).throw(EOFError), output_fn=shown.append, llm_mode='off')
+    assert limits == [2, 1, None]  # default two interfaces; "all" means no limit
+    text = '\n'.join(shown)
+    assert text.count('Pending (not in this prototype; inputs held at 0, outputs open):') == 3 and '  - bus (3 ports)' in text
+    assert text.rindex('  - bus (3 ports)') < text.rindex('type /code to build everything')  # the pointer comes last

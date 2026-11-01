@@ -81,3 +81,19 @@ def quote_hints(context):
         ids=record.get('cited_chunk_ids',[]) or [record.get('chunk_id')]
         if quote: hints.extend((sid,quote) for sid in ids if sid)
     return list(dict.fromkeys(hints))
+
+
+def compact(relation):
+    """The identity map without the evidence text: names, directions, widths, group properties and where the evidence is.
+
+    A request that spans the whole interface (a feature step) does not need every port's description or quote, and the
+    full relation of a 19-port design is 32 KB. Evidence stays retrievable through the cited chunk ids and plan pointers.
+    """
+    if not relation: return relation
+    ports=[dict({k:p[k] for k in ('spec_name','rtl_name','status','match_basis','dut_direction','width','testbench_responsibility','groups') if k in p},
+                specification={k:p['specification'][k] for k in ('chunk_id','provenance') if k in p.get('specification',{})}) for p in relation.get('ports',[])]
+    groups=[dict(plan_pointer=g['plan_pointer'],properties=g.get('properties',{}),
+                 property_provenance={k:v.get('provenance') for k,v in g.get('property_evidence',{}).items()}) for g in relation.get('groups',[])]
+    return dict(authority=relation.get('authority'),spec_hash=relation.get('spec_hash'),rtl_hash=relation.get('rtl_hash'),
+                independent_validation=relation.get('independent_validation'),parameters=relation.get('parameters',[]),
+                ports=ports,groups=groups,compacted='Evidence text omitted to fit the request; use the cited chunk ids and plan pointers.')

@@ -46,18 +46,23 @@ def load_sources(plan, graph_path=None):
     return sources
 
 
-def build_demo(plan_path, interface_path, directory, *, rtl_files=(), expected_top=None, compile=False):
+def build_demo(plan_path, interface_path, directory, *, rtl_files=(), expected_top=None, compile=False, max_interfaces=None):
     """A running-simulation testbench with no model call and no DUT behaviour (see demo_contract)."""
     from .demo_contract import build_demo_contract
     plan_path,interface_path,directory=Path(plan_path).resolve(),Path(interface_path).resolve(),Path(directory).resolve()
     directory.mkdir(parents=True,exist_ok=True)
     specification=json.loads(plan_path.read_text())
+    pending=[]
     contract=build_demo_contract(specification,json.loads(interface_path.read_text()),
-                                 load_sources(specification,plan_path.parent/'graph.json'),top=expected_top,directory=directory)
+                                 load_sources(specification,plan_path.parent/'graph.json'),top=expected_top,directory=directory,
+                                 limit=max_interfaces,pending=pending)
     contract_path=directory/'demo_contract.json'
     atomic_write_text(contract_path,json.dumps(contract,indent=2)+'\n')
-    return build_project(plan_path,interface_path,directory,contract_path=contract_path,rtl_files=rtl_files,
+    atomic_write_text(directory/'demo_pending.json',json.dumps(dict(
+        note='Interfaces not built in this prototype; run /code again to build them.',pending_interfaces=pending),indent=2)+'\n')
+    result=build_project(plan_path,interface_path,directory,contract_path=contract_path,rtl_files=rtl_files,
                          expected_top=expected_top,compile=compile)
+    return dict(result,pending_interfaces=pending)
 
 
 def build_project(plan_path, interface_path, directory, *, llm=None, contract_path=None,

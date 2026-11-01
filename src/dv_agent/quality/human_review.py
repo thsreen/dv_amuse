@@ -64,7 +64,9 @@ def request_review(out, plan, definition, unit, blockers, evidence, context=None
         raise ValueError('Human binding review is limited to infrastructure units')
     fields=(['clock','clock_period_ns','clock_period_ranges'] if unit=='foundation_clock' else
             ['reset','reset_active','reset_cycles'] if unit=='foundation_reset' else
-            ['mappings','width_choices','inactive_spec_ports'] if unit=='interface_port_alignment' else ['roles','tie_offs'])
+            ['mappings','width_choices','inactive_spec_ports'] if unit=='interface_port_alignment' else ['roles','tie_offs','idle_values'])
+    if (context or {}).get('active_agent_ports'): fields=['roles','idle_values']
+    elif (context or {}).get('profile',{}).get('kind')=='collateral': fields=['roles','tie_offs']
     identity=dict(plan_hash=sha(plan),interface_hash=sha(definition),unit=unit,blockers=blockers,review_contract_hash=sha(fields))
     alignment=(context or {}).get('alignment_context')
     if alignment is not None: identity['alignment_contract_hash']=sha(alignment)
@@ -121,7 +123,7 @@ def validate_bindings(request, bindings):
             from ..codegen.contracts import identifier
             if not isinstance(value,dict) or not value or not all(isinstance(v,str) and v in ports for v in value.values()): raise ValueError('Roles must bind scoped ports')
             for name in value: identifier(name)
-        elif key=='tie_offs':
+        elif key in ('tie_offs','idle_values'):
             import re
             if not isinstance(value,dict): raise ValueError('Tie-offs must map inputs to integers')
             for name,number in value.items():

@@ -96,6 +96,7 @@ class Dashboard:
         elif self.substep_owner:
             self.substeps = testplan_substeps()
         self.substatus = {sid: "...." for sid, _ in self.substeps}
+        self.sub_parent: dict[str, str] = {}  # sub-step id -> id of the group header it is a bullet of
         self.status = {sid: "...." for sid in self.steps}
         self.summary = {}
         self.current: dict = {}
@@ -196,6 +197,7 @@ class Dashboard:
             self.task_detail='Notification: '+event.get('status','')
         elif kind == 'substeps_configured':
             self.substeps=[(s['id'],s['label']) for s in event['steps']]
+            self.sub_parent={s['id']:s['parent'] for s in event['steps'] if s.get('parent')}
             self.substatus={sid:self.substatus.get(sid,'....') for sid,label in self.substeps}
         elif kind == "run_start":
             self.active_substep = None
@@ -298,6 +300,15 @@ class Dashboard:
         item = next((s for s in self.flow.get("steps", []) if s["id"] == sid), None)
         return item.get("description", sid) if item else sid
 
+    def _group_status(self, header: str) -> str:
+        """A group header shows its sub-steps' combined state: the first problem, else running, else done."""
+        states = [self.substatus.get(sid, '....') for sid, parent in self.sub_parent.items() if parent == header]
+        problem = next((st for st in states if st not in ('PASS','NOT_RUN','SKIPPED','REUSED','PLAN_UPDATED','RUN','....','WAITING_HUMAN')), None)
+        if problem: return problem
+        if 'WAITING_HUMAN' in states: return 'WAITING_HUMAN'
+        if all(st in ('PASS','NOT_RUN','SKIPPED','REUSED','PLAN_UPDATED') for st in states) and states: return 'PASS'
+        return 'RUN' if any(st != '....' for st in states) else '....'
+
     def _substep_label(self, sid: str | None) -> str:
         return next((label for key, label in self.substeps if key == sid), sid or "")
 
@@ -358,9 +369,11 @@ class Dashboard:
             return f"[{event.get('status')}] {event['step']}: {event.get('summary', '')}"
         if kind == "substep_start":
             status=self._display_status(('sub',event.get('id')),'RUN')
-            return f"[{status if status!='RUN' else 'run'}] {event.get('label') or self._substep_label(event.get('id'))}"
+            bullet = '  - ' if event.get('id') in self.sub_parent else ''
+            return f"[{status if status!='RUN' else 'run'}] {bullet}{event.get('label') or self._substep_label(event.get('id'))}"
         if kind == "substep_done":
-            return f"[{event.get('status')}] {self._substep_label(event.get('id'))}"
+            bullet = '  - ' if event.get('id') in self.sub_parent else ''
+            return f"[{event.get('status')}] {bullet}{self._substep_label(event.get('id'))}"
         if kind in ('tool_retry','substep_retry','task_retry'):
             key=('tool',event['step']) if kind=='tool_retry' else ('sub',event.get('id') or self.active_substep)
             if key[1] is None and self.current: key=('tool',self.current['step'])
@@ -369,7 +382,10 @@ class Dashboard:
             return f"[progress] {event.get('message', '')}"
         if kind == "substeps_reused":
             return "[reused] saved testplan sections"
-        if kind == 'substeps_configured': return f"[steps] {len(event['steps'])} code tasks identified"
+        if kind == 'substeps_configured':
+            lines = [f"[steps] {len(event['steps'])} code tasks identified"]
+            lines += [('    - ' if s.get('parent') else '  * ') + s['label'] for s in event['steps'] if s.get('parent') or s['id'].startswith('group:')]
+            return '\n'.join(lines)
         if kind == "decider":
             decision = event.get("decision") or {}
             return f"[decider] {decision.get('action')} {decision.get('target_step', '')}".rstrip()
@@ -454,14 +470,16 @@ class Dashboard:
             lines.append(f"{mark} {_short(sid,label_width).ljust(label_width)} {display}")
             if sid == self.substep_owner:
                 for subid, label in self.substeps:
-                    substatus = self.substatus.get(subid, "....")
+                    child = subid in self.sub_parent
+                    substatus = self._group_status(subid) if subid in self.sub_parent.values() else self.substatus.get(subid, "....")
                     marker, color = MARK.get(substatus, ("?", DIM))
                     if self.ansi:
                         marker = f"{color}{marker}{RESET}"
-                    display=self._display_status(('sub',subid),substatus)
-                    label_width=max(1,width-len(display)-5)
+                    display=substatus if subid in self.sub_parent.values() else self._display_status(('sub',subid),substatus)
+                    indent = "    " if child else "  "   # sub-bullets sit under their group header
+                    label_width=max(1,width-len(display)-3-len(indent))
                     text = _short(label,label_width)
-                    lines.append(f"  {marker} {text.ljust(label_width)} {display}")
+                    lines.append(f"{indent}{marker} {text.ljust(label_width)} {display}")
         if self.substep_owner=='code':
             budget=max(18,shutil.get_terminal_size((120,30)).lines-4)
             if len(lines)>budget:
