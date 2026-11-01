@@ -7,10 +7,24 @@ is written into the unit's questions. Nothing here adds behaviour or evidence.
 """
 from .contracts import Agent, TieOff, safe_identifier
 from .fact_reconcile import rename_conflicting_facts
-from .validate import builtin_protocol, canonical_roles
+from .validate import agent_id_is_free, builtin_protocol, canonical_roles
 
 BODY_SLOTS = ("driver.body", "monitor.body")
 UNIT_PREFIXES = ("collateral_", "interface_", "assessment_")
+
+
+def safe_interface_ids(interfaces):
+    """An interface id becomes its agent id, so it must not collide with the environment. The script renames it here,
+    before any unit uses it; a repair could not fix it later because the agent id always follows the interface id."""
+    taken = {task.id for task in interfaces}
+    for task in interfaces:
+        if agent_id_is_free(task.id):
+            continue
+        name = task.id + "_if"
+        while name in taken or not agent_id_is_free(name):
+            name += "_x"
+        taken.add(name)
+        task.id = name
 
 
 def _fill_missing_agent(unit, task, ports, level):

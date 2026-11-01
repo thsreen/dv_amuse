@@ -1,6 +1,8 @@
 """Quick testing defers checks/coverage that name a nonexistent agent (the clock and reset are not agents)."""
 import json
 
+import pytest
+
 from dv_agent.codegen.defer_unsupported import defer_unknown_agents
 from dv_agent.codegen.workplan import Fragment, restore_maps  # noqa: F401
 from dv_agent.codegen.validate import validate
@@ -102,3 +104,89 @@ def test_a_scoreboard_hook_without_a_route_is_deferred_and_one_with_a_route_is_k
     assert any('internal state is not observable' in q for q in f.questions)
     untouched = fragment(hooks=[dict(id='h', target='nowhere', slot='scoreboard.compare', purpose='x', fact_ids=[FACT])])
     assert defer_unknown_agents(untouched, ['control']) == {} and len(untouched.hooks) == 1  # routes unknown: nothing is judged
+
+
+def _rule_check(fragment):
+    """Stand-ins for contract rules: every bad_ hook is refused by the same rule; a sequence needs its register."""
+    if any(h.id.startswith('bad_') for h in fragment.hooks):
+        raise ValueError('Coverage hook requires selected coverage infrastructure')
+    if fragment.sequences and not fragment.registers:
+        raise ValueError('register_write names a register that is not declared')
+
+
+def _hook(name):
+    return dict(id=name, target='control', slot='coverage.sample', purpose='x', fact_ids=[FACT])
+
+
+def _sequence():
+    return dict(id='seq', agent='control', purpose='p', fact_ids=[FACT], operations=[dict(kind='idle', cycles=1)])
+
+
+def _register():
+    return dict(id='reg', agent='control', address=1, width=8, access='WO', mask=255, fact_ids=[FACT])
+
+
+def test_several_items_breaking_one_rule_are_all_dropped_and_nothing_innocent_with_them():
+    """Run 1305: three hooks broke one rule, so removing any one changed nothing and a search blamed the register."""
+    from dv_agent.codegen.defer_unsupported import defer_until_valid
+    f = fragment(hooks=[_hook('bad_a'), _hook('bad_b'), _hook('good')], sequences=[_sequence()], registers=[_register()],
+                 step_implementations=[dict(step='coverage_steps/0', component_ids=['bad_a', 'good'], question=''),
+                                       dict(step='coverage_steps/1', component_ids=['bad_b'], question='')])
+    dropped = defer_until_valid(f, _rule_check)
+    assert set(dropped) == {'bad_a', 'bad_b'} and 'Coverage hook requires' in dropped['bad_a']
+    assert [h.id for h in f.hooks] == ['good'] and [r.id for r in f.registers] == ['reg'] and [s.id for s in f.sequences] == ['seq']
+    steps = {m.step: m for m in f.step_implementations}
+    assert steps['coverage_steps/0'].component_ids == ['good'] and not steps['coverage_steps/0'].question
+    assert steps['coverage_steps/1'].question.startswith('Deferred:') and any('bad_b' in q for q in f.questions)
+    _rule_check(f)  # the result is valid
+
+
+def test_an_item_needing_something_refused_goes_too_and_a_valid_answer_is_untouched():
+    from dv_agent.codegen.defer_unsupported import defer_until_valid
+    alone = fragment(sequences=[_sequence()])
+    assert list(defer_until_valid(alone, _rule_check)) == ['seq'] and alone.sequences == []
+    fine = fragment(sequences=[_sequence()], registers=[_register()], hooks=[_hook('good')])
+    assert defer_until_valid(fine, _rule_check) == {} and len(fine.hooks) == 1 and fine.questions == []
+
+
+def test_an_item_depending_on_a_later_one_in_the_same_group_is_kept_on_the_second_pass():
+    from dv_agent.codegen.defer_unsupported import defer_until_valid
+    def check(f):
+        ids = [s.id for s in f.sequences]
+        if 'child' in ids and 'base' not in ids:
+            raise ValueError('Unknown base sequence')
+        if 'wrong' in ids:
+            raise ValueError('Sequence needs an active agent')
+    f = fragment(sequences=[dict(_sequence(), id='child'), dict(_sequence(), id='base'), dict(_sequence(), id='wrong')])
+    assert list(defer_until_valid(f, check)) == ['wrong'] and {s.id for s in f.sequences} == {'child', 'base'}
+
+
+def test_a_contract_invalid_without_the_answer_is_left_for_the_normal_check():
+    from dv_agent.codegen.defer_unsupported import defer_until_valid
+    def broken(f):
+        raise ValueError('The foundation itself is invalid')
+    f = fragment(hooks=[_hook('good')])
+    assert defer_until_valid(f, broken) == {} and len(f.hooks) == 1
+
+
+def wrong_hook_feature(contract):
+    llm = workflow_model(contract)
+    normal = llm.handlers['code_feature']
+
+    def feature(payload):
+        return dict(normal(payload), hooks=[dict(id='storage_feature_hook', target='nowhere', slot='driver.body', purpose='x', fact_ids=['behavior'])])
+    llm.handlers['code_feature'] = feature
+    return llm
+
+
+def test_quick_testing_defers_any_item_the_contract_refuses_and_a_normal_build_still_refuses(inputs, monkeypatch):
+    from dv_agent.codegen import build_project
+    from test_quick_testing_rounds import quick_run
+    root, plan, definition, contract, rtl = inputs
+    with pytest.raises(ValueError, match='Agent hook requires an agent target'):
+        build_project(root / 'plan.json', root / 'interface.json', root / 'normal', llm=wrong_hook_feature(contract), rtl_files=[rtl], compile=False)
+    run, plan_path = quick_run(root, plan, monkeypatch)
+    result = build_project(plan_path, root / 'interface.json', run, llm=wrong_hook_feature(contract), rtl_files=[rtl], compile=False)
+    assert result['contract'] == 'verification_codegen_v1'
+    built = json.loads((run / 'code_plan.json').read_text())
+    assert built['hooks'] == [] and any('storage_feature_hook' in q and 'Agent hook requires' in q for q in built['questions'])

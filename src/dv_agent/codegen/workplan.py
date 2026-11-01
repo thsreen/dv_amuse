@@ -760,7 +760,9 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                     from .defer_unsupported import defer_unknown_agents
                     deferred=defer_unknown_agents(f,[a.id for a in assembled.agents],[r.id for r in (*assembled.routes,*f.routes)],
                                                   bus_ids=[a.id for a in assembled.agents if a.protocol=='wishbone'])
-                    if deferred: emit(f'code work: deferred {len(deferred)} item(s) naming an unknown agent: {", ".join(deferred)}')
+                    from .defer_unsupported import defer_until_valid
+                    deferred={**deferred,**defer_until_valid(f,lambda candidate:validate(_merge(assembled,candidate),plan,definition,sources))}
+                    if deferred: emit(f'code work: deferred {len(deferred)} unsupported item(s): {", ".join(deferred)}')
                 _facts_in_context(f.facts,selected)
                 validate(_merge(assembled,f),plan,definition,sources)
                 mapped=[m.step for m in f.step_implementations]

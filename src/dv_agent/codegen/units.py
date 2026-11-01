@@ -6,7 +6,7 @@ import json
 from pydantic import Field
 
 from .contracts import Model, Fact, Agent, Register, TieOff, Hook, CodePlan, ClockPeriodRange, identifier
-from .normalize import normalize_interface_unit
+from .normalize import normalize_interface_unit, safe_interface_ids
 from .render import ROOT, render, template
 
 CYCLE = ['retrieve', 'understand_and_pseudocode', 'implement', 'validate', 'checkpoint']
@@ -181,6 +181,7 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
     # Smallest interface first: fewest wires (ports), then fewest bits. The sort is stable, so equal sizes keep the
     # inventory order and an interface's position never depends on anything but its size.
     inventory.interfaces.sort(key=lambda task:(len(task.signals),sum(ports[n]['width'] for n in task.signals)))
+    safe_interface_ids(inventory.interfaces)
     state=dict(top=clock.top,clock=clock.clock,reset=reset.reset,reset_active=reset.reset_active,
                clock_period_ns=clock.clock_period_ns,clock_period_ranges=[r.model_dump() for r in clock.clock_period_ranges],reset_cycles=reset.reset_cycles,
                facts=[],agents=[],tie_offs=[],registers=[],hooks=[],defines=[],questions=[])

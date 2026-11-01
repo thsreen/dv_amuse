@@ -135,3 +135,14 @@ def test_real_uart_custom_agents_without_hooks_compile_and_simulate_beside_the_b
     result = run_project(manifest, regress=True, timeout=60)
     assert result['status'] == 'PASS', [(t['name'], t['reason']) for t in result['tests']]
     assert [t['scoreboard_comparisons'] for t in result['tests']] == [3, 4]
+
+
+def test_an_interface_name_that_would_collide_with_the_environment_is_renamed_before_any_unit_uses_it():
+    """Run 1328: modem_control_flow_control ends like the environment's <agent>_control members; no repair could fix it."""
+    from dv_agent.codegen.normalize import safe_interface_ids
+    from dv_agent.codegen.validate import agent_id_is_free
+    tasks = [SimpleNamespace(id=n) for n in ('modem_control_flow_control', 'sb', 'bus', 'x_control', 'x_control_if')]
+    safe_interface_ids(tasks)
+    names = [t.id for t in tasks]
+    assert names[:3] == ['modem_control_flow_control_if', 'sb_if', 'bus'] and names[3] == 'x_control_if_x'
+    assert all(agent_id_is_free(n) for n in names) and len(names) == len(set(names))
