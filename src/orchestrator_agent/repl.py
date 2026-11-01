@@ -21,7 +21,7 @@ from .saved_runs import latest_successful, matches_current_run
 from .code_run import execute as execute_code, preview as code_preview
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
-HELP = "Commands: /plan  /code  /code demo [N|all]  /run  /regress  /fresh  (Ctrl-D to leave)"
+HELP = "Commands: /plan  /code  /code demo [N|all|basic]  /run  /regress  /fresh  (Ctrl-D to leave)"
 
 
 def _builtin_flow() -> Path:
@@ -259,9 +259,10 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
             continue
         # A connectivity-only testbench that still simulates, built without a model: "/code demo [N|all]" builds the N
         # interfaces with the fewest wires (default 2); the others are tied off and listed as pending.
-        demo_match = re.fullmatch(r"/code demo(?:\s+(\d+|all))?", line)
+        demo_match = re.fullmatch(r"/code demo(?:\s+(\d+|all|basic))?", line)
         demo_code = demo_match is not None
-        demo_limit = None if demo_match and demo_match[1] == "all" else int(demo_match[1] or 2) if demo_match else None
+        demo_basic = bool(demo_match and demo_match[1] == "basic")  # register writes plus one packet each way, from demo_scripts/<top>.json
+        demo_limit = None if demo_match and demo_match[1] in ("all", "basic") else int(demo_match[1] or 2) if demo_match else None
         if demo_code:
             line = "/code"
         if line == "/fresh":
@@ -327,7 +328,7 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                     continue
                 show(code_preview(out))
                 code_llm, _ = models()
-                result = execute_code(build_code, out, dict(variables, code_demo=True, code_demo_limit=demo_limit) if demo_code else variables, llm=code_llm,
+                result = execute_code(build_code, out, dict(variables, code_demo=True, code_demo_limit=demo_limit, code_demo_script=demo_basic) if demo_code else variables, llm=code_llm,
                                       show=show, dashboard=use_dashboard, ansi=interactive)
                 if result.get('status')=='WAITING_HUMAN':
                     show(result['reason'])

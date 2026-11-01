@@ -134,7 +134,7 @@ def _split(groups, ports, limit):
     return built, deferred
 
 
-def build_demo_contract(plan, definition, sources, *, top=None, directory=".", limit=None, pending=None):
+def build_demo_contract(plan, definition, sources, *, top=None, directory=".", limit=None, pending=None, script=None):
     """Return the demo contract as a dict (validated later by the normal CodePlan checks).
 
     limit: build only this many interfaces, fewest wires first. The others are deferred: their inputs are held at 0 in the
@@ -152,6 +152,8 @@ def build_demo_contract(plan, definition, sources, *, top=None, directory=".", l
     if fact is None:
         raise ValueError("The plan has no documented, cited item to attach to a demo")
     clock, reset, level, questions = _bind_clock_reset(definition, plan, sources, top, ports, mapping)
+    if script is not None:
+        return _scripted_contract(script, fact, top, ports, clock, reset, level, questions)
     agents, hooks, sequences, tie_offs = [], [], [], []
     built, deferred = _split(_groups(plan, ports, {clock, reset}, mapping), ports, limit)
     for name, names in deferred:
@@ -187,6 +189,42 @@ def build_demo_contract(plan, definition, sources, *, top=None, directory=".", l
                 tests=[dict(id="demo_smoke", stages=[[s["id"] for s in sequences]], drain_cycles=DEMO_IDLE_CYCLES,
                             minimum_comparisons=0, fact_ids=[fact.id])],
                 questions=questions, demo=True)
+
+
+def demo_script_path(top):
+    """The demo script for an RTL top: $DV_AGENT_DEMO_SCRIPTS or the repository's demo_scripts/, named <top>.json."""
+    import os
+    folders = [Path(os.environ["DV_AGENT_DEMO_SCRIPTS"])] if os.environ.get("DV_AGENT_DEMO_SCRIPTS") else []
+    folders.append(Path(__file__).resolve().parents[3] / "demo_scripts")
+    for folder in folders:
+        if (folder / f"{top}.json").is_file():
+            return folder / f"{top}.json"
+    raise ValueError(f"No demo script for {top}: add demo_scripts/{top}.json (registers, sequences, routes and a test in RTL port names)")
+
+
+def _scripted_contract(script, fact, top, ports, clock, reset, level, questions):
+    """A functional-lite demo from a design-specific script: named register writes and one packet each way.
+
+    The script is data (agents, registers, sequences, routes, tests, written in RTL port names); the generator stays
+    design-agnostic. It is checked against the RTL ports, every unowned input is held at 0, and every item cites the one
+    documented plan item chosen for the demo. This is a demo, not verification sign-off.
+    """
+    if script.get("top") not in (None, top):
+        raise ValueError(f"The demo script is for {script['top']}, not {top}")
+    owned = {name for agent in script["agents"] for name in agent["bindings"].values()}
+    absent = sorted(owned - set(ports))
+    if absent:
+        raise ValueError(f"The demo script uses ports the RTL does not have: {absent}")
+    clash = sorted(owned & {clock, reset})
+    if clash:
+        raise ValueError(f"The demo script binds the clock/reset port(s) {clash}; the common UVCs own them")
+    out = {key: [dict(item, fact_ids=item.get("fact_ids") or [fact.id]) for item in script.get(key, [])]
+           for key in ("agents", "registers", "sequences", "routes", "checks", "tests")}
+    held = [n for n, p in ports.items() if p["direction"] == "input" and n not in owned and n not in (clock, reset)]
+    tie_offs = [dict(id=safe_identifier("hold_" + n).lower(), signal=n, value=0, fact_ids=[fact.id]) for n in held]
+    note = "Scripted demo: " + str(script.get("description", ""))[:160] + (" Unowned inputs held at 0: " + ", ".join(held) + "." if held else "")
+    return dict(contract="verification_codegen_v1", top=top, clock=clock, reset=reset, reset_active=level, defines=script.get("defines", []),
+                facts=[fact.model_dump()], tie_offs=tie_offs, questions=questions + [DEMO_NOTE, note], demo=True, **out)
 
 
 def demo_hook_code(plan, ports):

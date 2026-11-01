@@ -31,6 +31,34 @@ drive nothing, the next smallest one that does is added so the simulation has st
 built, the bus and modem interfaces tied off and pending, compile PASS, run PASS
 (`DV_AGENT_TEST_SIMULATION=1 pytest tests/test_demo_contract.py -k two_interfaces`).
 
+## A basic functional demo: register writes and one packet each way (`/code demo basic`)
+
+`/code demo basic` builds a small **functional** demo from a script instead of idle drivers:
+
+```text
+/code demo basic                                   # in the orchestrator terminal, then /run
+dv-agent build-code --demo --demo-script demo_scripts/uart_top.json ...
+```
+
+The script is data in RTL port names, named after the top (`demo_scripts/<top>.json`, or `$DV_AGENT_DEMO_SCRIPTS`): the
+agents (built-in bus and serial), the registers, the sequences, the scoreboard routes and one test. The generator stays
+design-agnostic; `codegen/demo_contract.py` only checks the script against the RTL ports, cites one documented plan item
+for every record, holds every unowned input at 0, and keeps the result a demo (`NEEDS_REVIEW`, not sign-off).
+
+`demo_scripts/uart_top.json` does, in order: named register writes (divisor, framing, FIFO control, through
+`cg_reg_access::write`), a read-back of the line-control register, one transmitted byte checked on the serial output,
+and one received byte driven on the serial input and read back from the bus. Three scoreboard comparisons must match
+(`minimum_comparisons: 3`), so the test fails if any transfer does not happen.
+
+The script lists the compile defines it is written for (`DATA_BUS_WIDTH_8`: the built-in bus driver drives all byte lanes,
+so it needs the 8-bit configuration). `/code demo basic` re-extracts the interface with them (the original is kept as
+`rtl/interface_definition.before_demo_defines.json`); the port comparison then asks for its alignment decisions again,
+which the quick-testing evaluator answers.
+
+Verified with real Xezim + UVM: on the UART fixture (`DV_AGENT_TEST_SIMULATION=1 pytest tests/test_demo_script.py -k real_uart`)
+and on a copy of a real quick-testing run's own plan, interface and approvals (`BUILT_NEEDS_REVIEW`, run PASS, 3
+comparisons, no UVM errors).
+
 ## Why it exists
 
 The run that prompted it did not fail for lack of interfaces. All eight Wishbone ports were in the JSON. It failed in

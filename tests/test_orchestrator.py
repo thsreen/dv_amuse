@@ -409,7 +409,7 @@ def test_repl_prompt_previews_english_steps_and_only_four_commands(tmp_path, mon
     assert "--- testplan preview ---" in text
     assert "Read specification files" in text and "Recover registers" in text
     assert "RTL top: chip_top" in text and "ready: yes" in text
-    assert terminal.HELP == "Commands: /plan  /code  /code demo [N|all]  /run  /regress  /fresh  (Ctrl-D to leave)"
+    assert terminal.HELP == "Commands: /plan  /code  /code demo [N|all|basic]  /run  /regress  /fresh  (Ctrl-D to leave)"
 
 
 def test_repl_four_commands_run_in_order_without_manual_variables(tmp_path, monkeypatch):
