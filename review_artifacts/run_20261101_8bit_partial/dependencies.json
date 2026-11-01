@@ -1,0 +1,1088 @@
+{
+  "understanding": "Verify UART core in DATA_BUS_WIDTH_8 FIFO-only build as Wishbone responder for serial modem communication, starting with directed bring-up then random exploration with bus serial checks and end-to-end comparison. This run performs only interface and feature dependency analysis from task goals and interface IDs with no source documents supplied, so all relations stay ordering, sequence_extension reuse, or p_sequencer_config coordination without inventing behavior, and missing DOCUMENTED semantics are raised as questions.",
+  "tasks": [
+    {
+      "id": "t_wb_seq",
+      "title": "Wishbone register access sequences",
+      "category": "sequence",
+      "goal": "Implement wishbone_bus register access sequences with DLAB-gated divisor children for directed and constrained-random reads and writes.",
+      "plan_pointers": [
+        "/sections/5/entries/0",
+        "/sections/7/entries/0"
+      ],
+      "depends_on": [],
+      "queries": [
+        "Confirm address representation and DLAB gating for shared addresses before coding?"
+      ],
+      "interface_id": "wishbone_bus"
+    },
+    {
+      "id": "t_serial_seq",
+      "title": "Serial traffic sequences",
+      "category": "sequence",
+      "goal": "Implement serial_data traffic driving SRX_PAD_I and observing STX_PAD_O across documented line formats with normal, break and idle children.",
+      "plan_pointers": [
+        "/sections/5/entries/1",
+        "/sections/7/entries/1"
+      ],
+      "depends_on": [],
+      "queries": [
+        "Confirm source-supported frame formats and break-hold semantics for serial children?"
+      ],
+      "interface_id": "serial_data"
+    },
+    {
+      "id": "t_modem_seq",
+      "title": "Modem handshake sequences",
+      "category": "sequence",
+      "goal": "Implement modem_control handshake driving modem inputs and MCR controls including loopback entry with single and simultaneous toggles.",
+      "plan_pointers": [
+        "/sections/5/entries/2",
+        "/sections/7/entries/2"
+      ],
+      "depends_on": [],
+      "queries": [
+        "Confirm modem pin list, inactive levels and loopback routing from sources?"
+      ],
+      "interface_id": "modem_control_if"
+    },
+    {
+      "id": "t_bringup_clk",
+      "title": "Bring-up clock and reset",
+      "category": "bringup",
+      "goal": "Implement clock_gen, reset_seq and power_on_reset coordination with fixed period per test covering documented clock points and bring-up order.",
+      "plan_pointers": [
+        "/sections/5/entries/3",
+        "/sections/7/entries/3"
+      ],
+      "depends_on": [],
+      "queries": [
+        "Confirm clock period strata and reset polarity and deassertion requirements?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_uart_cfg",
+      "title": "UART configuration sweep",
+      "category": "configuration",
+      "goal": "Implement uart_config programming of LCR format, divisor latches with DLAB, FIFO trigger and IER enables in dependency order with sweep.",
+      "plan_pointers": [
+        "/sections/5/entries/4",
+        "/sections/7/entries/4"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_bringup_clk",
+          "reason": "UART LCR divisor FIFO IER programming requires stable clock and completed reset bring-up before any register access."
+        },
+        {
+          "task_id": "t_wb_seq",
+          "reason": "Configuration sweep reuses Wishbone DLAB-gated divisor register read and write base sequences for directed and random programming."
+        }
+      ],
+      "queries": [
+        "Confirm legal LCR, divisor, trigger and IER values and programming order?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_loopback_stage",
+      "title": "Loopback staged traffic",
+      "category": "traffic",
+      "goal": "Implement loopback_traffic, normal and error virtual sequences for staged THR to Receiver Buffer transfers with internal return.",
+      "plan_pointers": [
+        "/sections/5/entries/5",
+        "/sections/7/entries/5"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_uart_cfg",
+          "reason": "Staged THR to Receiver Buffer loopback transfers require LCR format divisor FIFO trigger and IER programming completed first."
+        },
+        {
+          "task_id": "t_wb_seq",
+          "reason": "Loopback virtual sequences coordinate Wishbone THR accesses through shared virtual sequencer handle."
+        },
+        {
+          "task_id": "t_serial_seq",
+          "reason": "Loopback virtual sequences coordinate serial SRX STX traffic through shared virtual sequencer handle."
+        },
+        {
+          "task_id": "t_modem_seq",
+          "reason": "Loopback entry needs MCR loopback control and modem handshake coordination through shared virtual sequencer handle."
+        }
+      ],
+      "queries": [
+        "Confirm loopback payload path and FIFO-only expectations for directed stage?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_wb_mon",
+      "title": "Wishbone bus monitor",
+      "category": "monitor",
+      "goal": "Implement wishbone_bus monitor sampling handshake and reconstructing register read and write transactions for scoreboard and coverage.",
+      "plan_pointers": [
+        "/sections/5/entries/6"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_bringup_clk",
+          "reason": "Wishbone handshake sampling requires stable clock and reset deassertion order to avoid X sampling."
+        }
+      ],
+      "queries": [
+        "Confirm bus handshake signals and acknowledge behavior for transaction reconstruction?"
+      ],
+      "interface_id": "wishbone_bus"
+    },
+    {
+      "id": "t_serial_mon",
+      "title": "Serial data monitor",
+      "category": "monitor",
+      "goal": "Implement serial_data monitor sampling pads and reconstructing transmit and receive frame transactions without driving inputs.",
+      "plan_pointers": [
+        "/sections/5/entries/7"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_bringup_clk",
+          "reason": "Serial pad sampling requires stable clock and reset order to reconstruct frames."
+        }
+      ],
+      "queries": [
+        "Confirm tx versus rx event direction and frame sampling for monitor only?"
+      ],
+      "interface_id": "serial_data"
+    },
+    {
+      "id": "t_obs_mon",
+      "title": "Modem interrupt baud observers",
+      "category": "monitor",
+      "goal": "Implement passive modem_control, uart_interrupt and baud_output observers with analysis ports for status and interrupt comparison.",
+      "plan_pointers": [
+        "/sections/5/entries/8"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_bringup_clk",
+          "reason": "Passive modem interrupt baud observers require stable clock and reset order before status comparison."
+        }
+      ],
+      "queries": [
+        "Confirm modem, interrupt and baud observation ports and passive roles?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_reset_fifo_lcr",
+      "title": "Reset FIFO and LCR checks",
+      "category": "check",
+      "goal": "Check receiver and transmitter FIFOs cleared on reset and LCR reset to 8 bits no parity 1 stop as review-gated checks.",
+      "plan_pointers": [
+        "/sections/5/entries/9",
+        "/sections/5/entries/10"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_bringup_clk",
+          "reason": "FIFO cleared and LCR reset checks require completed power-on reset coordination."
+        }
+      ],
+      "queries": [
+        "Provide verbatim source for FIFO clear and LCR reset values?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_reset_div_known",
+      "title": "Reset divisor and known outputs",
+      "category": "check",
+      "goal": "Check Divisor Latch zero on reset and DUT outputs reaching known non-XZ after WB_RST_I deassertion.",
+      "plan_pointers": [
+        "/sections/5/entries/11",
+        "/sections/8/entries/1"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_bringup_clk",
+          "reason": "Divisor zero and known non-XZ outputs require reset deassertion order."
+        }
+      ],
+      "queries": [
+        "Provide source for divisor reset and known-after-reset requirement?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_traffic_err",
+      "title": "Normal modem traffic with errors",
+      "category": "traffic",
+      "goal": "Run normal traffic with concurrent THR writes, SRX frames and modem toggles plus parity, framing and break error injection and recovery.",
+      "plan_pointers": [
+        "/sections/7/entries/6",
+        "/sections/7/entries/7"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_uart_cfg",
+          "reason": "Normal traffic with parity framing break injection requires configured line format divisor and enables before THR SRX and modem toggles."
+        },
+        {
+          "task_id": "t_loopback_stage",
+          "reason": "Error traffic extends staged loopback normal virtual sequences with concurrent error injection children."
+        }
+      ],
+      "queries": [
+        "Confirm error injection hooks and LSR recovery to clean traffic?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_overrun_burst",
+      "title": "Overrun corner burst",
+      "category": "traffic",
+      "goal": "Drive Receiver FIFO fill bursts with overrun characters and varied pop timing and check LSR overrun reporting.",
+      "plan_pointers": [
+        "/sections/7/entries/8",
+        "/sections/8/entries/9"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_loopback_stage",
+          "reason": "Overrun burst reuses staged THR to Receiver Buffer transfer sequences with varied pop timing."
+        }
+      ],
+      "queries": [
+        "Confirm FIFO depth, full condition and overrun arrival semantics?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_xz_check",
+      "title": "XZ protocol check",
+      "category": "check",
+      "goal": "Flag X or Z sampled on WISHBONE, serial and modem signals in monitors as protocol checks.",
+      "plan_pointers": [
+        "/sections/8/entries/0"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_wb_mon",
+          "reason": "XZ protocol flagging on Wishbone signals requires bus monitor sampling established."
+        },
+        {
+          "task_id": "t_serial_mon",
+          "reason": "XZ protocol flagging on serial pads requires serial monitor sampling established."
+        },
+        {
+          "task_id": "t_obs_mon",
+          "reason": "XZ protocol flagging on modem signals requires passive modem observer sampling established."
+        }
+      ],
+      "queries": [
+        "Confirm which control and data signals are covered by XZ checks?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_ier_reset",
+      "title": "IER reset checks",
+      "category": "check",
+      "goal": "Require IER all disabled after reset and bits 7-4 remain zero with explicit masks and null unknown reset.",
+      "plan_pointers": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/3"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_bringup_clk",
+          "reason": "IER disabled after reset check requires completed reset sequence before Wishbone read."
+        }
+      ],
+      "queries": [
+        "Provide source for IER reset value and reserved bits behavior?"
+      ],
+      "interface_id": "wishbone_bus"
+    },
+    {
+      "id": "t_ier_iir_en",
+      "title": "IER enable and IIR pending",
+      "category": "check",
+      "goal": "Require IER bits 0-3 to gate Received Data, THRE, Line Status and Modem Status interrupts and IIR bit0 pending polarity.",
+      "plan_pointers": [
+        "/sections/8/entries/4",
+        "/sections/8/entries/5"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_uart_cfg",
+          "reason": "IER gating of Received Data THRE Line Status Modem Status and IIR pending polarity require IER programming first."
+        }
+      ],
+      "queries": [
+        "Confirm interrupt source mapping and pending versus no-pending encoding?"
+      ],
+      "interface_id": "uart_interrupt"
+    },
+    {
+      "id": "t_iir_prio_fixed",
+      "title": "IIR priority and fixed bits",
+      "category": "check",
+      "goal": "Require IIR bits 3-1 highest priority reporting with reset control and every read returning bits 7-6 as 1 and 5-4 as 0.",
+      "plan_pointers": [
+        "/sections/8/entries/6",
+        "/sections/8/entries/7"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_ier_iir_en",
+          "reason": "IIR highest-priority reporting and fixed bits check requires enabled interrupt sources settled first."
+        }
+      ],
+      "queries": [
+        "Confirm IIR priority encoding and fixed compatibility bits source?"
+      ],
+      "interface_id": "uart_interrupt"
+    },
+    {
+      "id": "t_lsr_par_fram",
+      "title": "LSR parity framing checks",
+      "category": "check",
+      "goal": "Require LSR parity error and framing error indications for top-of-FIFO character with read-clear behavior.",
+      "plan_pointers": [
+        "/sections/8/entries/10",
+        "/sections/8/entries/11"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_uart_cfg",
+          "reason": "LSR parity framing indications require configured line format before error injection and read-clear observation."
+        }
+      ],
+      "queries": [
+        "Confirm parity and framing error latching and clear semantics?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_lsr_dr_cov",
+      "title": "LSR data-ready and coverage",
+      "category": "check",
+      "goal": "Require LSR data-ready when FIFO non-empty and cover data-ready, overrun, parity, framing, break and error-summary indications.",
+      "plan_pointers": [
+        "/sections/8/entries/8",
+        "/sections/9/entries/3"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_loopback_stage",
+          "reason": "LSR data-ready overrun parity framing break coverage requires staged FIFO traffic with errors."
+        }
+      ],
+      "queries": [
+        "Confirm data-ready empty versus non-empty and LSR coverage points?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_wb_acc_cov",
+      "title": "Wishbone access coverage",
+      "category": "coverage",
+      "goal": "Cover WISHBONE slave accesses with direction and acknowledge plus DLAB gating of normal versus divisor at shared addresses.",
+      "plan_pointers": [
+        "/sections/9/entries/0",
+        "/sections/9/entries/4"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_wb_seq",
+          "reason": "Wishbone direction acknowledge and DLAB gating coverage requires base register access stimulus."
+        },
+        {
+          "task_id": "t_wb_mon",
+          "reason": "Wishbone access coverage sampling requires bus monitor reconstructed transactions."
+        }
+      ],
+      "queries": [
+        "Confirm documented addresses and DLAB gating for coverage bins?"
+      ],
+      "interface_id": "wishbone_bus"
+    },
+    {
+      "id": "t_div_dlab_cov",
+      "title": "Divisor latch coverage",
+      "category": "coverage",
+      "goal": "Cover divisor zero, max and mid values with DLAB handling crossed with register access to prove gating.",
+      "plan_pointers": [
+        "/sections/9/entries/1",
+        "/sections/9/entries/6"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_uart_cfg",
+          "reason": "Divisor zero max mid coverage crossed with access requires DLAB handling sweep programmed."
+        }
+      ],
+      "queries": [
+        "Confirm divisor values and cross with DLAB configuration?"
+      ],
+      "interface_id": "wishbone_bus"
+    },
+    {
+      "id": "t_iir_cov",
+      "title": "Interrupt identification coverage",
+      "category": "coverage",
+      "goal": "Cover interrupt pending and highest-priority type with source and reset plus fixed-bits property on every IIR read.",
+      "plan_pointers": [
+        "/sections/9/entries/2",
+        "/sections/9/entries/10"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_obs_mon",
+          "reason": "Interrupt pending and priority coverage requires passive interrupt observer transactions."
+        }
+      ],
+      "queries": [
+        "Confirm IIR types and fixed-bits property activation?"
+      ],
+      "interface_id": "uart_interrupt"
+    },
+    {
+      "id": "t_shared_dir",
+      "title": "Shared address direction coverage",
+      "category": "coverage",
+      "goal": "Cover shared-address direction mapping for receive versus transmit and identification versus control as review-gated register coverage.",
+      "plan_pointers": [
+        "/sections/9/entries/5"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_uart_cfg",
+          "reason": "Shared-address direction mapping coverage requires DLAB-gated normal versus divisor handling."
+        }
+      ],
+      "queries": [
+        "Confirm shared-address direction decoding for coverage?"
+      ],
+      "interface_id": "wishbone_bus"
+    },
+    {
+      "id": "t_cross_int_traffic",
+      "title": "Cross interrupt traffic coverage",
+      "category": "coverage",
+      "goal": "Cross interrupt type with enable masking and cross RX-TX with line errors and modem activity for interaction handling.",
+      "plan_pointers": [
+        "/sections/9/entries/7",
+        "/sections/9/entries/8"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_loopback_stage",
+          "reason": "Interrupt with RX-TX line-error modem cross requires staged interaction traffic first."
+        }
+      ],
+      "queries": [
+        "Confirm masking and concurrent error plus modem interaction bins?"
+      ],
+      "interface_id": null
+    },
+    {
+      "id": "t_clk_cov",
+      "title": "Clock period coverage",
+      "category": "coverage",
+      "goal": "Cover sampled CLK period-frequency band, boundary and stratum using observed edges with fixed period per test.",
+      "plan_pointers": [
+        "/sections/9/entries/9"
+      ],
+      "depends_on": [
+        {
+          "task_id": "t_bringup_clk",
+          "reason": "Clock period-frequency band stratum coverage requires fixed-period clock generation per test."
+        }
+      ],
+      "queries": [
+        "Confirm clock bands and strata for sampling?"
+      ],
+      "interface_id": null
+    }
+  ],
+  "questions": [
+    "Provide source-supported WISHBONE binding map with exact port names, reset polarity, handshake ownership, and whether write/read addresses are bus pin values or offsets?",
+    "Provide source-supported register reset values and access gating for LCR, Divisor Latch, IER, IIR, LSR and FIFO clear with verbatim quotes and source IDs?",
+    "Provide source-supported serial line configuration derived from LCR and divisor programming including data_bits, parity, stop_bits and bit_cycles for driver and monitor agreement?",
+    "Provide source-supported modem signal list with inactive levels, MCR loopback behavior, and interrupt sources with enable, priority and clear controls?",
+    "Provide source-supported system clock periods, FIFO trigger levels, and overrun/parity/framing/break error reporting and recovery semantics?",
+    "Confirm FIFO-only compatible scope for DATA_BUS_WIDTH_8 build and any excluded banked or side-effect fields that must be omitted from mirrors?",
+    "No source documents supplied: what DOCUMENTED Wishbone address map, DLAB gating at shared addresses, and acknowledge handshake defines register access for stimulus constraints?",
+    "No source documents supplied: what DOCUMENTED clock periods, reset polarity and deassertion order, and reset values with masks including IER LCR divisor and unknown reset handling are required?",
+    "No source documents supplied: what DOCUMENTED LCR formats, divisor programming, FIFO trigger levels, THR to Receiver Buffer loopback path, and overrun handling define configuration and traffic expectations?",
+    "No source documents supplied: what DOCUMENTED serial frame structure, break idle behavior, and parity framing break overrun LSR reporting and read-clear behavior define error expectations?",
+    "No source documents supplied: what DOCUMENTED IER enable gating, IIR pending polarity, priority levels, fixed bits, and modem status interrupt mapping define interrupt expectations?",
+    "No source documents supplied: what DOCUMENTED modem input to MCR control mapping, loopback entry behavior, and baud output relation define handshake observer expectations?"
+  ],
+  "generation_waves": [
+    [
+      "t_bringup_clk",
+      "t_modem_seq",
+      "t_serial_seq",
+      "t_wb_seq"
+    ],
+    [
+      "t_clk_cov",
+      "t_ier_reset",
+      "t_obs_mon",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_uart_cfg",
+      "t_wb_mon"
+    ],
+    [
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_iir_cov",
+      "t_loopback_stage",
+      "t_lsr_par_fram",
+      "t_shared_dir",
+      "t_wb_acc_cov",
+      "t_xz_check"
+    ],
+    [
+      "t_cross_int_traffic",
+      "t_iir_prio_fixed",
+      "t_lsr_dr_cov",
+      "t_overrun_burst",
+      "t_traffic_err"
+    ]
+  ],
+  "independent": {
+    "t_wb_seq": [
+      "t_bringup_clk",
+      "t_clk_cov",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_serial_seq": [
+      "t_bringup_clk",
+      "t_clk_cov",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_shared_dir",
+      "t_uart_cfg",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_wb_seq",
+      "t_xz_check"
+    ],
+    "t_modem_seq": [
+      "t_bringup_clk",
+      "t_clk_cov",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_lsr_par_fram",
+      "t_obs_mon",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_uart_cfg",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_wb_seq",
+      "t_xz_check"
+    ],
+    "t_bringup_clk": [
+      "t_modem_seq",
+      "t_serial_seq",
+      "t_wb_seq"
+    ],
+    "t_uart_cfg": [
+      "t_clk_cov",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_loopback_stage": [
+      "t_clk_cov",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_lsr_par_fram",
+      "t_obs_mon",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_shared_dir",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_wb_mon": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_uart_cfg",
+      "t_wb_seq"
+    ],
+    "t_serial_mon": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_uart_cfg",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_wb_seq"
+    ],
+    "t_obs_mon": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_uart_cfg",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_wb_seq"
+    ],
+    "t_reset_fifo_lcr": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_uart_cfg",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_wb_seq",
+      "t_xz_check"
+    ],
+    "t_reset_div_known": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_uart_cfg",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_wb_seq",
+      "t_xz_check"
+    ],
+    "t_traffic_err": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_shared_dir",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_overrun_burst": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_obs_mon",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_xz_check": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_uart_cfg",
+      "t_wb_acc_cov",
+      "t_wb_seq"
+    ],
+    "t_ier_reset": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_uart_cfg",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_wb_seq",
+      "t_xz_check"
+    ],
+    "t_ier_iir_en": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_iir_prio_fixed": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_lsr_par_fram": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_lsr_dr_cov": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_lsr_par_fram",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_wb_acc_cov": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_uart_cfg",
+      "t_xz_check"
+    ],
+    "t_div_dlab_cov": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_iir_cov": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_uart_cfg",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_wb_seq",
+      "t_xz_check"
+    ],
+    "t_shared_dir": [
+      "t_clk_cov",
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_traffic_err",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_cross_int_traffic": [
+      "t_clk_cov",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_xz_check"
+    ],
+    "t_clk_cov": [
+      "t_cross_int_traffic",
+      "t_div_dlab_cov",
+      "t_ier_iir_en",
+      "t_ier_reset",
+      "t_iir_cov",
+      "t_iir_prio_fixed",
+      "t_loopback_stage",
+      "t_lsr_dr_cov",
+      "t_lsr_par_fram",
+      "t_modem_seq",
+      "t_obs_mon",
+      "t_overrun_burst",
+      "t_reset_div_known",
+      "t_reset_fifo_lcr",
+      "t_serial_mon",
+      "t_serial_seq",
+      "t_shared_dir",
+      "t_traffic_err",
+      "t_uart_cfg",
+      "t_wb_acc_cov",
+      "t_wb_mon",
+      "t_wb_seq",
+      "t_xz_check"
+    ]
+  },
+  "dependency_authority": "INFERRED_IMPLEMENTATION_ORDER",
+  "review_status": "NEEDS_REVIEW"
+}

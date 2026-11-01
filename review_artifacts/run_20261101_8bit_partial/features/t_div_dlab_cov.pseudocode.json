@@ -1,0 +1,122 @@
+{
+  "understanding": "Cover 8-bit divisor LSB at addr 0 and MSB at addr 1 across symbolic zero max mid values with LCR bit7 DLAB set-then-clear gating and cross of WISHBONE addr with DLAB state to prove divisor versus normal routing; INFERRED quick-test bins guide architecture only with DOCUMENTED facts as oracle.",
+  "preconditions": [
+    "Clock stable at symbolic fixed period and reset completed via clock and reset without assuming polarity",
+    "Dependency t_uart_cfg programming order available for LCR DLAB set then divisor MSB-first LSB-next then DLAB clear [f_prog_msb_first f_prog_dlab_set f_prog_dlab_clear]",
+    "wishbone_bus owns wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i and observes wb_dat_o wb_ack_o as WISHBONE responder access",
+    "Bus addresses are 3-bit wb_adr_i pin values 0 for LSB DIV and 1 for MSB DIV with LCR at 3 [f_div_lsb_addr f_div_msb_addr]",
+    "DLAB is LCR bit 7 with 1 divisor and 0 normal and blocks opposite mapping at 0 to 1 [f_dlab_one f_dlab_zero f_dlab_gates_div f_dlab_blocks_norm]",
+    "Reset state divisor zero and LCR DLAB 0 [f_div_reset_zero f_lcr_reset]",
+    "TESTBENCH limits drain_cycles and request_timeout_cycles are symbolic operational limits only"
+  ],
+  "stimulus_steps": [
+    "FOR each symbolic divisor corner in DIV_ZERO DIV_MAX DIV_MID_LOW DIV_MID_HIGH do divisor-gated writes via wishbone_bus only",
+    "WRITE LCR at wb_adr_i 3 with DLAB 1 via wishbone_bus driver to select divisor [f_dlab_one f_prog_dlab_set]",
+    "WRITE divisor MSB at wb_adr_i 1 then LSB at wb_adr_i 0 MSB-first LSB-next via wishbone_bus for current corner [f_div_msb_addr f_div_lsb_addr f_prog_msb_first]",
+    "WRITE LCR at wb_adr_i 3 with DLAB 0 via wishbone_bus to disable divisor and enable normal [f_dlab_zero f_prog_dlab_clear]",
+    "IF exercising gating THEN WRITE READ normal regs at wb_adr_i 0 to 1 with DLAB 0 and divisor at wb_adr_i 0 to 1 with DLAB 1 via wishbone_bus [f_dlab_blocks_norm f_dlab_gates_div]",
+    "WAIT wb_ack_o assertion per transfer as transfer completion without assuming DUT timing"
+  ],
+  "check_steps": [],
+  "coverage_steps": [
+    "SAMPLE cg_divisor_latch via dedicated subscriber tapping wishbone_bus monitor on completed divisor write with DLAB 1 [f_dlab_gates_div f_div_lsb_addr f_div_msb_addr]",
+    "SAMPLE div_lsb_value bins zero max mid_low mid_high via subscriber using observed wb_dat_i at addr 0 with DLAB 1 symbolic DIV_ZERO DIV_MAX DIV_MID values",
+    "SAMPLE div_msb_value bins zero max mid mid_high via subscriber using observed wb_dat_i at addr 1 with DLAB 1",
+    "SAMPLE cross_wb_dlab via dedicated subscriber tapping wishbone_bus monitor on wb_ack_o assertion with DLAB state [f_dlab_one f_dlab_zero f_dlab_blocks_norm]",
+    "SAMPLE wb_addr_x_dlab bins normal_0_dlab0 normal_1_dlab0 divlsb_0_dlab1 divmsb_1_dlab1 other_2to6_dlab0 other_2to6_dlab1 using wb_adr_i pin value and LCR bit7 state",
+    "NEVER sample coverage from driver items and never compare config writes as payload"
+  ],
+  "completion": [
+    "WAIT all spawned wishbone_bus divisor sequences complete OR UNTIL TESTBENCH request_timeout_cycles expires as operational limit only",
+    "DRAIN wishbone_bus monitor for drain_cycles as TESTBENCH operational limit then close virtual sequence",
+    "CLEANUP deassert wb_stb_i and wb_cyc_i via wishbone_bus driver and return wishbone_bus to idle leaving serial_data and modem_control_if untouched"
+  ],
+  "facts": [
+    {
+      "id": "f_div_lsb_addr",
+      "statement": "Divisor Latch LSB is 8-bit RW at WISHBONE address 0.",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 1 (LSB) 0 8 RW The LSB of the divisor",
+      "plan_pointer": "/registers/registers/0"
+    },
+    {
+      "id": "f_div_msb_addr",
+      "statement": "Divisor Latch MSB is 8-bit RW at WISHBONE address 1.",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 2 1 8 RW The MSB of the divisor",
+      "plan_pointer": "/registers/registers/3"
+    },
+    {
+      "id": "f_dlab_gates_div",
+      "statement": "Divisor latches are accessible when LCR bit 7 DLAB is 1.",
+      "source_id": "CH-f88915355b",
+      "quote": "The registers can be accessed when the 7th (DLAB) bit of the Line Control Register is set",
+      "plan_pointer": "/registers/registers/0"
+    },
+    {
+      "id": "f_dlab_blocks_norm",
+      "statement": "Normal registers at addresses 0 to 1 are inaccessible while DLAB is 1.",
+      "source_id": "CH-f88915355b",
+      "quote": "At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/registers/registers/3"
+    },
+    {
+      "id": "f_dlab_one",
+      "statement": "LCR bit 7 value 1 selects divisor latch access.",
+      "source_id": "CH-bc7559f2ec",
+      "quote": " \u20181\u2019 \u2013 The divisor latches can be accessed",
+      "plan_pointer": "/registers/registers/7/fields/6"
+    },
+    {
+      "id": "f_dlab_zero",
+      "statement": "LCR bit 7 value 0 selects normal register access.",
+      "source_id": "CH-bc7559f2ec",
+      "quote": " \u20180\u2019 \u2013 The normal registers are accessed",
+      "plan_pointer": "/registers/registers/7/fields/6"
+    },
+    {
+      "id": "f_div_reset_zero",
+      "statement": "Divisor Latch register is set to 0 upon reset.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "\u2022 The Divisor Latch register is set to 0.",
+      "plan_pointer": "/sections/5/entries/11"
+    },
+    {
+      "id": "f_prog_msb_first",
+      "statement": "Proper divisor programming is MSB first LSB next.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "\u2022 Set the Divisor Latches, MSB first, LSB next.",
+      "plan_pointer": "/sections/5/entries/11"
+    },
+    {
+      "id": "f_prog_dlab_set",
+      "statement": "Proper operation sets LCR bit 7 to 1 to allow divisor latch access.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "to allow access to the Divisor Latches.",
+      "plan_pointer": "/sections/5/entries/11"
+    },
+    {
+      "id": "f_prog_dlab_clear",
+      "statement": "Proper operation clears LCR bit 7 to 0 to disable divisor latch access.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "\u2022 Set bit 7 of LCR to \u20180\u2019 to disable access to Divisor Latches.",
+      "plan_pointer": "/sections/5/entries/11"
+    },
+    {
+      "id": "f_lcr_reset",
+      "statement": "LCR reset value is 00000011b with DLAB 0.",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "Reset Value: 00000011b",
+      "plan_pointer": "/registers/registers/7/fields/6"
+    }
+  ],
+  "questions": [
+    "Confirm divisor values and cross with DLAB configuration including zero max and representative mid LSB MSB values and cross with register access gating?",
+    "Is divisor zero programmable or reset-only and are all 0x00 to 0xFF LSB MSB values legal, and what mid values and comparison masks define zero max mid coverage?",
+    "What is active level of wb_rst_i and inactive levels of wb_stb_i wb_cyc_i wb_we_i, legal wb_sel_i for 8-bit data, and WB_ACK_O latency and back-to-back idle rule for divisor and cross accesses?",
+    "What are owners or tie_offs for srx_pad_i cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i and observers for stx_pad_o rts_pad_o dtr_pad_o int_o during divisor-only coverage?",
+    "How is DLAB state sampled for cross coverage and what are write read addresses for addr 7 and handling of DLAB-banked divisor mirrors without inventing reset?",
+    "What are concrete drain_cycles and request_timeout_cycles TESTBENCH limits and symbolic sweep control for directed zero max then mid exploration?"
+  ],
+  "blockers": []
+}

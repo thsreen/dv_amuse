@@ -1,0 +1,67 @@
+{
+  "understanding": "Loopback staged traffic coordinates wishbone_bus THR writes to Receiver Buffer reads via internal return under virtual sequencer with serial_data and modem_control_if handles after t_uart_cfg t_wb_seq t_serial_seq t_modem_seq. DOCUMENTED authority is limited to LSR DR occupancy and IIR priority; MCR loopback control, THR RBR addresses, LCR divisor FIFO IER values and payload equality remain INFERRED guidance only and are referenced symbolically without invented values.",
+  "preconditions": [
+    "AFTER t_uart_cfg symbolic LCR divisor FIFO-trigger IER programming completed via wishbone_bus after clock and reset bring-up",
+    "AFTER t_wb_seq plus t_serial_seq plus t_modem_seq sequencer handles available on shared virtual sequencer for coordinated spawn",
+    "Clock running at selected fixed period and reset released with polarity symbolic pending answer",
+    "Agents bound with RTL names for code: wishbone_bus drives wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i observes wb_dat_o wb_ack_o; serial_data drives srx_pad_i observes stx_pad_o; modem_control_if drives cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i observes rts_pad_o dtr_pad_o; uart_interrupt observes int_o"
+  ],
+  "stimulus_steps": [
+    "STAGE bringup: SPAWN virtual loopback_traffic on virtual sequencer with explicit handles to wishbone_bus plus serial_data plus modem_control_if; virtual spawns only, no VIFs or delays",
+    "FOR byte_index in 0 to SYM_loopback_count minus 1: SPAWN wishbone_bus write to SYM_THR with symbolic 8-bit payload; WAIT for write completion OR UNTIL TESTBENCH request_timeout_cycles expires",
+    "WAIT for Receiver Buffer arrival bounded by TESTBENCH timeout only; SPAWN wishbone_bus read of symbolic LSR then IF DR equals 1 SPAWN wishbone_bus read from SYM_RBR; FOR each transfer WAIT for completion",
+    "OBSERVE stx_pad_o via serial_data monitor and modem pins via modem_control_if monitor without asserting values; HOLD srx_pad_i at symbolic test-only idle via serial_data driver"
+  ],
+  "check_steps": [
+    "COMPARE LSR bit0 observed via wishbone_bus monitor against Receiver Buffer occupancy: EXPECT 1 when at least one character queued ELSE 0 [f_lsr_dr_1,f_lsr_dr_0]",
+    "IF uart_interrupt observes int_o pending THEN COMPARE IIR bit0 pending indication and bits 3-1 highest-priority code with stated source and reset control [f_iir_pending_1,f_iir_code_1]"
+  ],
+  "coverage_steps": [
+    "SAMPLE LSR DR occupancy from wishbone_bus monitor on THR or Receiver Buffer transfer: bins empty_0 versus queued_1",
+    "SAMPLE IIR pending and code from wishbone_bus monitor on IIR read: bins pending_0 versus idle_1 and modem_status versus thre_empty versus rx_data versus timeout versus line_status"
+  ],
+  "completion": [
+    "WAIT all spawned wishbone_bus children complete OR UNTIL TESTBENCH request_timeout_cycles expires as operational limit only",
+    "DRAIN wishbone_bus plus serial_data plus modem_control_if monitors for drain_cycles as TESTBENCH operational limit then close virtual sequence",
+    "CLEANUP deassert wb_stb_i and wb_cyc_i via wishbone_bus driver to symbolic idle, release explicit sequencer handles, leave serial_data and modem_control_if at symbolic idle"
+  ],
+  "facts": [
+    {
+      "id": "f_lsr_dr_1",
+      "statement": "LSR bit 0 reports 1 when at least one received character is in FIFO.",
+      "source_id": "CH-a2dd758e55",
+      "quote": " \u20181\u2019 \u2013 At least one character has been received and is in the\nFIFO.",
+      "plan_pointer": "/sections/8/entries/8"
+    },
+    {
+      "id": "f_lsr_dr_0",
+      "statement": "LSR bit 0 reports 0 when no characters in FIFO.",
+      "source_id": "CH-a2dd758e55",
+      "quote": " \u20180\u2019 \u2013 No characters in the FIFO",
+      "plan_pointer": "/sections/8/entries/8"
+    },
+    {
+      "id": "f_iir_pending_1",
+      "statement": "IIR bit 0 indicates interrupt pending when 0 and no interrupt pending when 1.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019. When it\u2019s \u20181\u2019 \u2013 no interrupt\nis pending.",
+      "plan_pointer": "/sections/8/entries/6"
+    },
+    {
+      "id": "f_iir_code_1",
+      "statement": "IIR bits 3-1 report highest priority pending interrupt with stated source and reset control, including 011 Receiver Line Status.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 1 1 1 st Receiver Line\nStatus\nParity, Overrun or Framing\nerrors or Break Interrupt\nReading the Line\nStatus Register",
+      "plan_pointer": "/sections/8/entries/6"
+    }
+  ],
+  "questions": [
+    "Confirm loopback payload path and FIFO-only expectations for directed stage: DOCUMENTED authority for MCR loopback internal TX-to-RX return, STX level, DTR-to-DSR RTS-to-CTS Out1-to-RI Out2-to-DCD connections, and whether THR-write to Receiver-Buffer-read payload equality is DOCUMENTED or only LSR DR occupancy?",
+    "What are DOCUMENTED WISHBONE bindings for THR, Receiver Buffer, LSR, IIR, MCR: literal wb_adr_i pin values 0 to 6, DLAB gating for 0 to 1, access types, and legality of addr 7 in DATA_BUS_WIDTH_8 build?",
+    "What are DOCUMENTED legal LCR format, divisor, FIFO trigger and IER values and programming order including MSB-first LSB-next with DLAB set-then-clear for staged loopback traffic?",
+    "What is active level of wb_rst_i and inactive levels of wb_stb_i wb_cyc_i wb_we_i, legal wb_sel_i with 8-bit data, WB_ACK_O latency, back-to-back idle rule, and TESTBENCH request_timeout_cycles plus drain_cycles values?",
+    "What are owners or tie_offs and inactive idle levels for all DUT inputs during loopback: srx_pad_i cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i drivers and stx_pad_o rts_pad_o dtr_pad_o int_o observers, and serial bit_cycles tracking of LCR divisor?",
+    "What are DOCUMENTED comparison masks and mirror handling for THR Receiver Buffer LSR IIR given write-only and read-clear semantics, and can payload integrity exclude configuration writes and compare only completed write versus read queues?"
+  ],
+  "blockers": []
+}

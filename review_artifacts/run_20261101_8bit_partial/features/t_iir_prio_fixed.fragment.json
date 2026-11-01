@@ -1,0 +1,887 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_iir_prio_fixed_ier_enable",
+      "agent": "wishbone_bus",
+      "width": 4,
+      "default": 0,
+      "fact_ids": [
+        "f_iir_b0_pend",
+        "f_iir_b0_idle"
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_iir_read",
+      "agent": "wishbone_bus",
+      "width": 3,
+      "default": 2,
+      "fact_ids": [
+        "f_iir_addr",
+        "f_iir_func"
+      ]
+    }
+  ],
+  "registers": [],
+  "facts": [
+    {
+      "id": "f_iir_func",
+      "statement": "IIR retrieves current highest priority pending interrupt.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "The IIR enables the programmer to retrieve what is the current highest priority pending",
+      "plan_pointer": "/sections/8/entries/6"
+    },
+    {
+      "id": "f_iir_addr",
+      "statement": "IIR is address 2 width 8 access R for interrupt information.",
+      "source_id": "CH-f88915355b",
+      "quote": "Interrupt Identification 2 8 R Get interrupt information",
+      "plan_pointer": "/registers/registers/6"
+    },
+    {
+      "id": "f_iir_reset_4",
+      "statement": "IIR reset value is C1h.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Reset Value: C1h",
+      "plan_pointer": "/registers/registers/6"
+    },
+    {
+      "id": "f_iir_b0_pend",
+      "statement": "IIR bit0 is 0 when interrupt pending.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019.",
+      "plan_pointer": "/registers/registers/6/fields/0"
+    },
+    {
+      "id": "f_iir_b0_idle",
+      "statement": "IIR bit0 is 1 when no interrupt pending.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "When it\u2019s \u20181\u2019 \u2013 no interrupt",
+      "plan_pointer": "/registers/registers/6/fields/0"
+    },
+    {
+      "id": "f_iir_011",
+      "statement": "IIR code 011 is 1st priority Receiver Line Status.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 1 1 1 st Receiver Line",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_010",
+      "statement": "IIR code 010 is 2nd priority Receiver Data available.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 1 0 2 nd Receiver Data",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_110",
+      "statement": "IIR code 110 is 2nd priority Timeout indication.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "1 1 0 2 nd Timeout",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_001",
+      "statement": "IIR code 001 is 3rd priority Transmitter Holding Register empty.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 1 3 rd Transmitter Holding",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_000",
+      "statement": "IIR code 000 is 4th priority Modem Status for CTS DSR RI or DCD.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 0 4 th Modem Status CTS, DSR, RI or DCD.",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_fix67",
+      "statement": "IIR bits 7-6 are logic 1 for compatibility.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 6 and 7: Logic \u20181\u2019 for compatibility reason.",
+      "plan_pointer": "/registers/registers/6/fields/3"
+    },
+    {
+      "id": "f_iir_fix45",
+      "statement": "IIR bits 5-4 are logic 0.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 4 and 5: Logic \u20180\u2019.",
+      "plan_pointer": "/registers/registers/6/fields/2"
+    },
+    {
+      "id": "f_iir_rst_lsr",
+      "statement": "Receiver Line Status reset is reading Line Status Register.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Reading the Line\nStatus Register",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_rst_rda",
+      "statement": "Receiver Data available reset is FIFO drops below trigger level.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "FIFO drops below",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_rst_timeout",
+      "statement": "Timeout reset is reading Receiver Buffer Register.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Reading from the\nFIFO (Receiver\nBuffer Register)",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_rst_thre",
+      "statement": "THRE empty reset is writing THR or reading IIR.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Writing to the\nTransmitter Holding\nRegister or reading\nIIR.",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_rst_msr",
+      "statement": "Modem Status reset is reading Modem status register.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Reading the Modem\nstatus register.",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "t_iir_prio_fixed_bringup",
+      "agent": "wishbone_bus",
+      "purpose": "READ IIR address 2 after reset to sample C1h and fixed bits after t_ier_iir_en ordering",
+      "operations": [
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_iir_reset_4",
+        "f_iir_addr",
+        "f_iir_fix67",
+        "f_iir_fix45",
+        "f_iir_b0_idle"
+      ],
+      "extends": "t_iir_cov_seq_baseline",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "address",
+          "variable": "t_iir_prio_fixed_iir_read"
+        }
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_line",
+      "agent": "wishbone_bus",
+      "purpose": "Poll IIR for 011 line status and read LSR for reset control via base",
+      "operations": [
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_iir_011",
+        "f_iir_rst_lsr",
+        "f_iir_func"
+      ],
+      "extends": "t_lsr_par_fram_seq_lsr_poll",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "address",
+          "variable": "t_iir_prio_fixed_iir_read"
+        }
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_serial_err",
+      "agent": "serial_data",
+      "purpose": "Drive error frame via owning serial_data only to create 011 line status",
+      "operations": [
+        {
+          "kind": "send",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_iir_011",
+        "f_iir_rst_lsr"
+      ],
+      "extends": "t_lsr_par_fram_seq_parity",
+      "controls": []
+    },
+    {
+      "id": "t_iir_prio_fixed_rx_timeout",
+      "agent": "wishbone_bus",
+      "purpose": "Poll IIR for 010 data available and 110 timeout plus RBR reads via base for FIFO below trigger and RBR read resets",
+      "operations": [
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_iir_010",
+        "f_iir_110",
+        "f_iir_rst_rda",
+        "f_iir_rst_timeout"
+      ],
+      "extends": "t_iir_cov_seq_reread",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "address",
+          "variable": "t_iir_prio_fixed_iir_read"
+        },
+        {
+          "operation": 1,
+          "field": "address",
+          "variable": "t_iir_prio_fixed_iir_read"
+        }
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_serial_burst",
+      "agent": "serial_data",
+      "purpose": "Drive burst and idle gap via owning serial_data only to create 010 and 110",
+      "operations": [
+        {
+          "kind": "send",
+          "register_id": null,
+          "address": 0,
+          "data": 165,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_iir_010",
+        "f_iir_110"
+      ],
+      "extends": "t_serial_seq_normal_frame",
+      "controls": []
+    },
+    {
+      "id": "t_iir_prio_fixed_thre",
+      "agent": "wishbone_bus",
+      "purpose": "Write THR via base then poll IIR for 001 THRE empty with THR write or IIR read reset",
+      "operations": [
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_iir_001",
+        "f_iir_rst_thre"
+      ],
+      "extends": "t_wb_seq_write",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "address",
+          "variable": "t_iir_prio_fixed_iir_read"
+        }
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_msr",
+      "agent": "wishbone_bus",
+      "purpose": "Read MSR via base and poll IIR for 000 modem status with MSR read reset",
+      "operations": [
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_iir_000",
+        "f_iir_rst_msr"
+      ],
+      "extends": "t_wb_seq_read",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "address",
+          "variable": "t_iir_prio_fixed_iir_read"
+        }
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_modem_delta",
+      "agent": "modem_control_if",
+      "purpose": "Drive modem delta via owning modem_control_if only to create 000",
+      "operations": [
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 0,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_iir_000",
+        "f_iir_rst_msr"
+      ],
+      "extends": "t_ier_iir_en_modem_stim",
+      "controls": []
+    },
+    {
+      "id": "t_iir_prio_fixed_priority",
+      "agent": "wishbone_bus",
+      "purpose": "Poll IIR for highest priority with 011 over 010 and 110 over 001 over 000 during combined sources",
+      "operations": [
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_iir_func",
+        "f_iir_011",
+        "f_iir_010",
+        "f_iir_110",
+        "f_iir_001",
+        "f_iir_000"
+      ],
+      "extends": "t_ier_iir_en_iir_poll",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "address",
+          "variable": "t_iir_prio_fixed_iir_read"
+        },
+        {
+          "operation": 1,
+          "field": "address",
+          "variable": "t_iir_prio_fixed_iir_read"
+        }
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_soak",
+      "agent": "wishbone_bus",
+      "purpose": "Back to back IIR reads to sample fixed bits 7-6 as 1 and 5-4 as 0 on every read",
+      "operations": [
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_iir_fix67",
+        "f_iir_fix45",
+        "f_iir_addr"
+      ],
+      "extends": "t_iir_cov_seq_reread",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "address",
+          "variable": "t_iir_prio_fixed_iir_read"
+        },
+        {
+          "operation": 1,
+          "field": "address",
+          "variable": "t_iir_prio_fixed_iir_read"
+        }
+      ]
+    }
+  ],
+  "routes": [],
+  "checks": [
+    {
+      "id": "t_iir_prio_fixed_check_prio",
+      "agent": "wishbone_bus",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_iir_func",
+        "f_iir_011",
+        "f_iir_010",
+        "f_iir_110",
+        "f_iir_001",
+        "f_iir_000"
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_check_pend",
+      "agent": "wishbone_bus",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_iir_b0_pend",
+        "f_iir_b0_idle",
+        "f_iir_func"
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_check_fixed",
+      "agent": "wishbone_bus",
+      "kind": "stable_until_ack",
+      "fact_ids": [
+        "f_iir_fix67",
+        "f_iir_fix45"
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_check_reset",
+      "agent": "wishbone_bus",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_iir_rst_lsr",
+        "f_iir_rst_rda",
+        "f_iir_rst_timeout",
+        "f_iir_rst_thre",
+        "f_iir_rst_msr"
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_check_postrst",
+      "agent": "wishbone_bus",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_iir_reset_4",
+        "f_iir_fix67",
+        "f_iir_fix45",
+        "f_iir_b0_idle"
+      ]
+    }
+  ],
+  "hooks": [
+    {
+      "id": "t_iir_prio_fixed_hook_int_mon",
+      "target": "uart_interrupt",
+      "slot": "monitor.body",
+      "purpose": "Observe int_o via custom monitor with symbolic polarity for pending correlation",
+      "fact_ids": [
+        "f_iir_b0_pend",
+        "f_iir_b0_idle"
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_hook_modem_drv",
+      "target": "modem_control_if",
+      "slot": "driver.body",
+      "purpose": "Drive modem delta via custom driver with symbolic idle tie_offs",
+      "fact_ids": [
+        "f_iir_000",
+        "f_iir_rst_msr"
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "id": "t_iir_prio_fixed_cov_code",
+      "agent": "wishbone_bus",
+      "points": [
+        {
+          "name": "t_iir_prio_fixed_pending",
+          "field": "data",
+          "mask": 1,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "pending",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "no_pending",
+              "values": [
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "t_iir_prio_fixed_code",
+          "field": "data",
+          "mask": 14,
+          "shift": 1,
+          "bins": [
+            {
+              "name": "modem_status",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "thre_empty",
+              "values": [
+                1
+              ]
+            },
+            {
+              "name": "rx_data",
+              "values": [
+                2
+              ]
+            },
+            {
+              "name": "line_status",
+              "values": [
+                3
+              ]
+            },
+            {
+              "name": "timeout",
+              "values": [
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [
+        {
+          "name": "pending_x_code",
+          "points": [
+            "t_iir_prio_fixed_pending",
+            "t_iir_prio_fixed_code"
+          ]
+        }
+      ],
+      "sample_kinds": [
+        1
+      ],
+      "sample_address": 2,
+      "fact_ids": [
+        "f_iir_b0_pend",
+        "f_iir_b0_idle",
+        "f_iir_011",
+        "f_iir_010",
+        "f_iir_110",
+        "f_iir_001",
+        "f_iir_000",
+        "f_iir_func"
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_cov_fixed",
+      "agent": "wishbone_bus",
+      "points": [
+        {
+          "name": "t_iir_prio_fixed_fixed67",
+          "field": "data",
+          "mask": 192,
+          "shift": 6,
+          "bins": [
+            {
+              "name": "compat_one",
+              "values": [
+                3
+              ]
+            }
+          ]
+        },
+        {
+          "name": "t_iir_prio_fixed_fixed45",
+          "field": "data",
+          "mask": 48,
+          "shift": 4,
+          "bins": [
+            {
+              "name": "zero",
+              "values": [
+                0
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [
+        {
+          "name": "fixed67_x_fixed45",
+          "points": [
+            "t_iir_prio_fixed_fixed67",
+            "t_iir_prio_fixed_fixed45"
+          ]
+        }
+      ],
+      "sample_kinds": [
+        1
+      ],
+      "sample_address": 2,
+      "fact_ids": [
+        "f_iir_fix67",
+        "f_iir_fix45",
+        "f_iir_addr"
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed_cov_reset",
+      "agent": "wishbone_bus",
+      "points": [
+        {
+          "name": "t_iir_prio_fixed_reset_code",
+          "field": "data",
+          "mask": 14,
+          "shift": 1,
+          "bins": [
+            {
+              "name": "modem_status",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "thre_empty",
+              "values": [
+                1
+              ]
+            },
+            {
+              "name": "rx_data",
+              "values": [
+                2
+              ]
+            },
+            {
+              "name": "line_status",
+              "values": [
+                3
+              ]
+            },
+            {
+              "name": "timeout",
+              "values": [
+                6
+              ]
+            }
+          ]
+        },
+        {
+          "name": "t_iir_prio_fixed_reset_pending",
+          "field": "data",
+          "mask": 1,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "pending",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "no_pending",
+              "values": [
+                1
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [
+        {
+          "name": "reset_code_x_pending",
+          "points": [
+            "t_iir_prio_fixed_reset_code",
+            "t_iir_prio_fixed_reset_pending"
+          ]
+        }
+      ],
+      "sample_kinds": [
+        1
+      ],
+      "sample_address": 2,
+      "fact_ids": [
+        "f_iir_rst_lsr",
+        "f_iir_rst_rda",
+        "f_iir_rst_timeout",
+        "f_iir_rst_thre",
+        "f_iir_rst_msr",
+        "f_iir_func"
+      ]
+    }
+  ],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [
+        "t_iir_prio_fixed_bringup"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [
+        "t_iir_prio_fixed_serial_err",
+        "t_iir_prio_fixed_line"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [
+        "t_iir_prio_fixed_serial_burst",
+        "t_iir_prio_fixed_rx_timeout"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [
+        "t_iir_prio_fixed_thre",
+        "t_iir_prio_fixed_modem_delta",
+        "t_iir_prio_fixed_msr"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [
+        "t_iir_prio_fixed_serial_err",
+        "t_iir_prio_fixed_serial_burst",
+        "t_iir_prio_fixed_modem_delta",
+        "t_iir_prio_fixed_thre",
+        "t_iir_prio_fixed_priority"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/5",
+      "component_ids": [
+        "t_iir_prio_fixed_soak"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [
+        "t_iir_prio_fixed_check_prio"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [
+        "t_iir_prio_fixed_check_pend"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/2",
+      "component_ids": [
+        "t_iir_prio_fixed_check_fixed"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/3",
+      "component_ids": [
+        "t_iir_prio_fixed_check_reset"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/4",
+      "component_ids": [
+        "t_iir_prio_fixed_check_postrst"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [
+        "t_iir_prio_fixed_cov_code"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [
+        "t_iir_prio_fixed_cov_fixed"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [
+        "t_iir_prio_fixed_cov_reset"
+      ],
+      "question": ""
+    }
+  ],
+  "questions": [
+    "What is wb_rst_i active level and sampling clock edge for IIR reads and int_o observation?",
+    "What are wb_stb_i wb_cyc_i wb_we_i inactive levels, wb_sel_i legal value for 8-bit data, wb_adr_i literal pin encoding for IIR address 2, and wb_ack_o latency?",
+    "What is int_o assertion polarity and clearing behavior, and does disabled IER source still affect IIR bit0 and bits 3-1 or only int_o?",
+    "Who drives srx_pad_i cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i and observes stx_pad_o rts_pad_o dtr_pad_o int_o during this feature, and what are idle tie_offs?",
+    "How must serial_data data_bits parity stop_bits bit_cycles track LCR programming and agree with wishbone_bus config writes for line-status, data-available and timeout stimulus?",
+    "What are comparison masks for IIR bits 7-4 and handling of side-effect IIR read that clears THRE and DLAB banking for IIR access?",
+    "What are TESTBENCH request_timeout_cycles drain_cycles and back-to-back idle rule for IIR reads and LSR RBR THR MSR reset accesses?",
+    "Deferred (quick testing): hook t_iir_prio_fixed_hook_cov does not fit the testbench: Coverage hook requires selected coverage infrastructure"
+  ]
+}

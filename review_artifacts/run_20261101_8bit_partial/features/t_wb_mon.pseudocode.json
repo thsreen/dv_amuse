@@ -1,0 +1,113 @@
+{
+  "understanding": "Implement passive wishbone_bus monitor for DATA_BUS_WIDTH_8 build sampling DUT responder WISHBONE signals on the clock with reset flushing and reconstructing read and write register transactions with address data control and ACK latency for predictor and scoreboard forwarding with no local compare. Depends on stable clock and ordered reset deassertion. DOCUMENTED sources define signal directions and bus interface role; handshake polarity, framing and ACK timing, address representation, SEL use, sampling edge and reset sequencing remain symbolic. Quick-test intentions guide architecture only and are not sign-off.",
+  "preconditions": [
+    "WAIT for clock stable and reset deasserted via clock and reset coordination before enabling sampling [f_clk_1,f_rst_1]",
+    "ENTER passive observe-only mode driving no DUT inputs on SoC bus interface [f_bus_1]",
+    "FLUSH all queued cycles and partial transaction state on reset assertion [f_rst_1]"
+  ],
+  "stimulus_steps": [
+    "SAMPLE on each clock edge wb_adr_i and wb_sel_i and wb_dat_i and wb_dat_o and wb_we_i and wb_stb_i and wb_cyc_i and wb_ack_o [f_addr_1,f_sel_1,f_wdat_1,f_rdat_1,f_we_1,f_stb_1,f_cyc_1,f_ack_1]",
+    "IF reset asserted THEN discard partial transaction and clear latency count and CONTINUE after deassertion [f_rst_1]",
+    "CAPTURE per-cycle request image with address and write-data and WE selection and STB and CYC framing and SEL select using SYM polarity without inventing active level [f_addr_1,f_wdat_1,f_we_1,f_stb_1,f_cyc_1,f_sel_1]",
+    "TRACK elapsed cycles from framed request to observed acknowledge and CAPTURE read-data at acknowledge to form ACK latency [f_ack_1,f_rdat_1]",
+    "EMIT one completed read or write register transaction per acknowledged transfer with address and data and control and latency to analysis ports and IGNORE unacknowledged idle cycles [f_addr_1,f_wdat_1,f_rdat_1,f_we_1,f_stb_1,f_cyc_1,f_ack_1]"
+  ],
+  "check_steps": [],
+  "coverage_steps": [
+    "FORWARD each completed register transaction via monitor analysis ports to register predictor and scoreboard subscribers for end-to-end comparison",
+    "SAMPLE each completed transaction in dedicated coverage subscriber tapping monitor analysis port for address direction and acknowledge observation"
+  ],
+  "completion": [
+    "WAIT for in-flight acknowledged transfer to emit or flush on reset then observe SYM_DRAIN_CYCLES idle cycles for pipeline drain",
+    "ENFORCE testbench operational timeout SYM_TIMEOUT_CYCLES as run limit not DUT timing requirement",
+    "CLEANUP clear partial transaction and latency state and release observation handles with no driven bus changes"
+  ],
+  "facts": [
+    {
+      "id": "f_clk_1",
+      "statement": "Block clock input is CLK",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input Block\u2019s clock input",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_rst_1",
+      "statement": "Block reset input is asynchronous WB_RST_I",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_RST_I 1 Input Asynchronous Reset",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_addr_1",
+      "statement": "WISHBONE address input is used for register selection",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_sel_1",
+      "statement": "WISHBONE select input is select signal",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_SEL_I 4 Input Select signal",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_wdat_1",
+      "statement": "WISHBONE WB_DAT_I is data input",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_DAT_I 32 or 8 Input Data input",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_rdat_1",
+      "statement": "WISHBONE WB_DAT_O is data output",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_DAT_O 32 or 8 Output Data output",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_we_1",
+      "statement": "WISHBONE WB_WE_I selects write or read cycle",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_WE_I 1 Input Write or read cycle selection",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_stb_1",
+      "statement": "WISHBONE WB_STB_I specifies transfer cycle",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_STB_I 1 Input Specifies transfer cycle",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_cyc_1",
+      "statement": "WISHBONE WB_CYC_I indicates a bus cycle is in progress",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_CYC_I 1 Input A bus cycle is in progress",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_ack_1",
+      "statement": "WISHBONE WB_ACK_O is acknowledge of a transfer",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ACK_O 1 Output Acknowledge of a transfer",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_bus_1",
+      "statement": "Core implements WISHBONE SoC bus interface for system communication",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "The core implements the WISNBONE SoC bus interface for communication with the\nsystem.",
+      "plan_pointer": "/sections/10/entries/3"
+    }
+  ],
+  "questions": [
+    "What are active levels and idle values of wb_we_i, wb_stb_i, wb_cyc_i and wb_ack_o for framing versus idle detection?",
+    "What defines transaction boundaries and acknowledge behavior for reconstruction: required STB and CYC combination, ACK duration, latency range, and back-to-back or pipelined handling?",
+    "What is active level and assert and deassert sequencing of wb_rst_i relative to the sampling clock edge and required flush behavior?",
+    "On which clock edge must the monitor sample and what symbolic period coordination applies without stating DUT timing?",
+    "What is bus address representation on wb_adr_i in DATA_BUS_WIDTH_8 build: 3-bit index versus 5-bit mode, handling of address 7, and meaning of wb_sel_i lanes for 8-bit data?",
+    "When is wb_dat_i versus wb_dat_o valid relative to framing and acknowledge, and how is wb_sel_i applied?"
+  ],
+  "blockers": []
+}

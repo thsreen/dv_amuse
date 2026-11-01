@@ -1,0 +1,368 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_lsr_par_fram_error_inject",
+      "agent": "serial_data",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "f_pe_top",
+        "f_fe_top"
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram_lsr_addr",
+      "agent": "wishbone_bus",
+      "width": 3,
+      "default": 0,
+      "fact_ids": [
+        "f_pe_clear",
+        "f_fe_clear"
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram_lcr_format",
+      "agent": "wishbone_bus",
+      "width": 8,
+      "default": 3,
+      "fact_ids": [
+        "f_first_stop",
+        "f_pe_top"
+      ]
+    }
+  ],
+  "registers": [],
+  "facts": [
+    {
+      "id": "f_pe_top",
+      "statement": "LSR bit 2 reports 1 when top-of-FIFO character was received with parity error.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The character that is currently at the top of the FIFO\nhas been received with parity error.",
+      "plan_pointer": "/sections/8/entries/10"
+    },
+    {
+      "id": "f_pe_clear",
+      "statement": "LSR parity error bit clears on LSR read and generates Receiver Line Status interrupt.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "has been received with parity error. The bit is cleared upon reading\nfrom the register. Generates Receiver Line Status interrupt.",
+      "plan_pointer": "/registers/registers/9/fields/2"
+    },
+    {
+      "id": "f_pe_zero",
+      "statement": "LSR bit 2 reports 0 when no parity error in current character.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "No parity error in the current character",
+      "plan_pointer": "/registers/registers/9/fields/2"
+    },
+    {
+      "id": "f_fe_top",
+      "statement": "LSR bit 3 reports 1 when top-of-FIFO character lacked valid stop bit.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The received character at the top of the FIFO did not\nhave a valid stop bit.",
+      "plan_pointer": "/sections/8/entries/11"
+    },
+    {
+      "id": "f_fe_clear",
+      "statement": "LSR framing error bit clears on LSR read and generates Receiver Line Status interrupt.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "did not\nhave a valid stop bit. Of course, generally, it might be that all the\nfollowing data is corrupt. The bit is cleared upon reading from the\nregister. Generates Receiver Line Status interrupt.",
+      "plan_pointer": "/registers/registers/9/fields/3"
+    },
+    {
+      "id": "f_fe_zero",
+      "statement": "LSR bit 3 reports 0 when no framing error in current character.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "No framing error in the current character",
+      "plan_pointer": "/registers/registers/9/fields/3"
+    },
+    {
+      "id": "f_rls_int",
+      "statement": "Receiver Line Status interrupt source is parity overrun framing or break and resets by reading Line Status Register.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Parity, Overrun or Framing\nerrors or Break Interrupt\nReading the Line\nStatus Register",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_first_stop",
+      "statement": "Receiver checks only first stop bit for framing validity.",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "Note that the receiver always checks the first stop bit only.",
+      "plan_pointer": "/registers/registers/7/fields/1"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "t_lsr_par_fram_seq_parity",
+      "agent": "serial_data",
+      "purpose": "Drive single frame with inverted parity bit under SYM_LCR_PARITY for top-of-FIFO PE",
+      "operations": [
+        {
+          "kind": "send",
+          "register_id": null,
+          "address": 0,
+          "data": 85,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_pe_top"
+      ],
+      "extends": "t_serial_seq_normal_frame",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "data",
+          "variable": "t_lsr_par_fram_error_inject"
+        }
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram_seq_framing",
+      "agent": "serial_data",
+      "purpose": "Drive single frame with missing first stop bit held at 0 for top-of-FIFO FE",
+      "operations": [
+        {
+          "kind": "send",
+          "register_id": null,
+          "address": 0,
+          "data": 85,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_fe_top",
+        "f_first_stop"
+      ],
+      "extends": "t_serial_seq_normal_frame",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "data",
+          "variable": "t_lsr_par_fram_error_inject"
+        }
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram_seq_clean",
+      "agent": "serial_data",
+      "purpose": "Drive clean frame matching SYM_LCR_PARITY with valid first stop for recovery",
+      "operations": [
+        {
+          "kind": "send",
+          "register_id": null,
+          "address": 0,
+          "data": 85,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_pe_zero",
+        "f_fe_zero"
+      ],
+      "extends": "t_serial_seq_normal_frame",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "data",
+          "variable": "t_lsr_par_fram_error_inject"
+        }
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram_seq_lsr_poll",
+      "agent": "wishbone_bus",
+      "purpose": "Read SYM_LSR_ADDR via owning wishbone_bus only to observe PE FE with read-clear",
+      "operations": [
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_pe_clear",
+        "f_fe_clear"
+      ],
+      "extends": "t_wb_seq_read",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "address",
+          "variable": "t_lsr_par_fram_lsr_addr"
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "id": "t_lsr_par_fram_route_pe",
+      "expected_agent": "serial_data",
+      "expected_event": "rx",
+      "actual_agent": "wishbone_bus",
+      "actual_event": "read",
+      "expected_address": null,
+      "actual_address": null,
+      "when": [],
+      "mask": 4,
+      "fact_ids": [
+        "f_pe_top"
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram_route_fe",
+      "expected_agent": "serial_data",
+      "expected_event": "rx",
+      "actual_agent": "wishbone_bus",
+      "actual_event": "read",
+      "expected_address": null,
+      "actual_address": null,
+      "when": [],
+      "mask": 8,
+      "fact_ids": [
+        "f_fe_top",
+        "f_first_stop"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "t_lsr_par_fram_check_pe_top",
+      "agent": "wishbone_bus",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_pe_top"
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram_check_pe_clear",
+      "agent": "wishbone_bus",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_pe_clear"
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram_check_fe_top",
+      "agent": "wishbone_bus",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_fe_top",
+        "f_first_stop"
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram_check_fe_clear",
+      "agent": "wishbone_bus",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_fe_clear"
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram_check_clean",
+      "agent": "wishbone_bus",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_pe_zero",
+        "f_fe_zero"
+      ]
+    }
+  ],
+  "hooks": [],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [
+        "t_lsr_par_fram_seq_parity",
+        "t_lsr_par_fram_seq_lsr_poll"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [
+        "t_lsr_par_fram_seq_framing",
+        "t_lsr_par_fram_seq_lsr_poll"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [
+        "t_lsr_par_fram_seq_clean",
+        "t_lsr_par_fram_seq_lsr_poll"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [
+        "t_lsr_par_fram_seq_parity",
+        "t_lsr_par_fram_seq_framing"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [
+        "t_lsr_par_fram_check_pe_top",
+        "t_lsr_par_fram_route_pe"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [
+        "t_lsr_par_fram_check_pe_clear"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/2",
+      "component_ids": [
+        "t_lsr_par_fram_check_fe_top",
+        "t_lsr_par_fram_route_fe"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/3",
+      "component_ids": [
+        "t_lsr_par_fram_check_fe_clear"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/4",
+      "component_ids": [
+        "t_lsr_par_fram_check_clean"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/5",
+      "component_ids": [],
+      "question": "Deferred: check t_lsr_par_fram_check_rls_int is a built-in bus check on uart_interrupt, which is not a bus agent"
+    }
+  ],
+  "questions": [
+    "Confirm parity and framing error latching and clear semantics including whether second LSR read shows 0 and top-of-FIFO advancement after Receiver Buffer pop?",
+    "What is actual 3-bit wb_adr_i pin value for LSR read, address representation, and legal wb_sel_i wb_we_i wb_stb_i wb_cyc_i levels for reads?",
+    "What is active level of wb_rst_i and inactive levels of wb_stb_i wb_cyc_i srx_pad_i cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i and active level of int_o?",
+    "What LCR parity-enable even stick and stop settings enable parity and framing detection, and how must serial_data data_bits parity stop_bits bit_cycles agree with configuration bus writes and divisor?",
+    "What is expected receiver handling when more than one stop bit is generated given only first stop bit is checked?",
+    "What are TESTBENCH request_timeout_cycles drain_cycles and WB_ACK_O latency for LSR poll and error injection stages?",
+    "Deferred (quick testing): check t_lsr_par_fram_check_rls_int is a built-in bus check on uart_interrupt, which is not a bus agent"
+  ]
+}

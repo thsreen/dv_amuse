@@ -1,0 +1,74 @@
+{
+  "agents": [
+    {
+      "id": "wishbone_bus",
+      "protocol": "wishbone",
+      "bindings": {
+        "addr": "wb_adr_i",
+        "wdata": "wb_dat_i",
+        "rdata": "wb_dat_o",
+        "we": "wb_we_i",
+        "stb": "wb_stb_i",
+        "cyc": "wb_cyc_i",
+        "ack": "wb_ack_o"
+      },
+      "fact_ids": [
+        "f_wb_adr_i",
+        "f_wb_sel_i"
+      ],
+      "bit_cycles": 8,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "active": true,
+      "coverage_enabled": false,
+      "idle_values": {
+        "wb_we_i": 0,
+        "wb_stb_i": 0,
+        "wb_cyc_i": 0
+      }
+    }
+  ],
+  "tie_offs": [
+    {
+      "id": "hold_wb_sel_i",
+      "signal": "wb_sel_i",
+      "value": 0,
+      "fact_ids": [
+        "f_wb_adr_i",
+        "f_wb_sel_i"
+      ]
+    }
+  ],
+  "registers": [],
+  "hooks": [],
+  "defines": [],
+  "facts": [
+    {
+      "id": "f_wb_adr_i",
+      "statement": "WB_ADDR_I is input used for register selection",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+      "plan_pointer": "/interfaces/groups/0/signals/0"
+    },
+    {
+      "id": "f_wb_sel_i",
+      "statement": "WB_SEL_I is input select signal",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_SEL_I 4 Input Select signal",
+      "plan_pointer": "/interfaces/groups/0/signals/1"
+    },
+    {
+      "id": "test_99ab92df9507ed1fc34f",
+      "statement": "Quick-testing inferred binding",
+      "source_id": "QUICK-TEST-99ab92df9507ed1fc34f",
+      "quote": "QUICK TESTING ONLY inferred binding for collateral_wishbone_bus: {\"idle_values\": {\"wb_cyc_i\": 0, \"wb_stb_i\": 0, \"wb_we_i\": 0}, \"roles\": {\"wb_ack\": \"wb_ack_o\", \"wb_cyc\": \"wb_cyc_i\", \"wb_stb\": \"wb_stb_i\", \"wb_we\": \"wb_we_i\"}} \u2014 Automatically approved for quick testing on 2026-11-01T14:30:33.534860+00:00; NOT human approval or sign-off. Reason: Source excerpts document function but leave active_level unknown for all four handshake signals, so polarity is resolved from named WISHBONE protocol convention as permitted for this quick test. Standard WISHBONE uses active-high STB/CYC/WE/ACK, with STB&&CYC framing a transfer and ACK closing it, so idle/deasserted is 0.. Assumptions: Outside-knowledge assumption: wb_we_i, wb_stb_i, wb_cyc_i, wb_ack_o are active-high per general public WISHBONE B3/B4 slave handshake convention; rejected active-low alternative as inconsistent with _I/_O naming and standard practice.; Outside-knowledge assumption: wb_we_i=1 means write and 0 means read; rejected inverted write-low/read-high alternative.; Guessed assumption for quick-test only: driver idle is 0 for wb_we_i, wb_stb_i, wb_cyc_i to park bus deasserted/idle; rejected idle 1 which would imply continuous write/transfer/cycle in progress.",
+      "plan_pointer": "/sections/14/entries/3"
+    }
+  ],
+  "questions": [
+    "On which wb_clk_i edge should the later monitor sample wb_adr_i, wb_sel_i, wb_dat_i, wb_we_i, wb_stb_i, wb_cyc_i and observe wb_dat_o, wb_ack_o? Sources define handshake purpose but no sampling edge; needed only for later-phase timing, not scaffold.",
+    "Evidence substituted: f_wb_ack_o, f_wb_cyc_i, f_wb_dat_i, f_wb_dat_o, f_wb_stb_i, f_wb_we_i could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them.",
+    "wb_sel_i is held at 0: the 8-bit data bus configuration does not use byte lanes."
+  ]
+}

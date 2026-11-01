@@ -1,0 +1,72 @@
+{
+  "agents": [
+    {
+      "id": "serial_data",
+      "protocol": "serial",
+      "bindings": {
+        "rx": "srx_pad_i",
+        "tx": "stx_pad_o"
+      },
+      "fact_ids": [
+        "f_stx_pad_o_2",
+        "f_srx_pad_i_2",
+        "f_function_2",
+        "f_protocol_2"
+      ],
+      "bit_cycles": 16,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "active": true,
+      "coverage_enabled": false,
+      "idle_values": {
+        "srx_pad_i": 1
+      }
+    }
+  ],
+  "tie_offs": [],
+  "registers": [],
+  "hooks": [],
+  "defines": [],
+  "facts": [
+    {
+      "id": "f_stx_pad_o_2",
+      "statement": "STX_PAD_O is 1-bit DUT output serial output signal",
+      "source_id": "CH-98be4510fb",
+      "quote": "STX_PAD_O 1 Output The serial output signal",
+      "plan_pointer": "/interfaces/groups/5/signals/0"
+    },
+    {
+      "id": "f_srx_pad_i_2",
+      "statement": "SRX_PAD_I is 1-bit DUT input serial input signal",
+      "source_id": "CH-98be4510fb",
+      "quote": "SRX_PAD_I 1 Input The serial input signal",
+      "plan_pointer": "/interfaces/groups/5/signals/1"
+    },
+    {
+      "id": "f_function_2",
+      "statement": "UART core provides serial communication capabilities for UART serial transmit and receive data",
+      "source_id": "CH-2baa4497c0",
+      "quote": "The UART (Universal Asynchronous Receiver/Transmitter) core provides serial\ncommunication capabilities",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/function"
+    },
+    {
+      "id": "f_protocol_2",
+      "statement": "Serial_data interface uses RS232 protocol over serial cable",
+      "source_id": "CH-2baa4497c0",
+      "quote": "like another computer using a serial cable and RS232 protocol.",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/protocol"
+    },
+    {
+      "id": "test_c9e997a95566f2598523",
+      "statement": "Quick-testing inferred binding",
+      "source_id": "QUICK-TEST-c9e997a95566f2598523",
+      "quote": "QUICK TESTING ONLY inferred binding for collateral_serial_data: {\"idle_values\": {\"srx_pad_i\": 1}, \"roles\": {\"serial_rx\": \"srx_pad_i\", \"serial_tx\": \"stx_pad_o\"}} \u2014 Automatically approved for quick testing on 2026-11-01T14:26:20.593790+00:00; NOT human approval or sign-off. Reason: Documented serial_data group is bidirectional RS232 to modem/external device with STX_PAD_O output and SRX_PAD_I input; single bidirectional ownership requires driving srx_pad_i and observing stx_pad_o with UART mark idle 1.. Assumptions: Outside knowledge: UART RS232 idle is logic 1 (mark state), so srx_pad_i idle_values=1; rejected idle 0 which would be a break condition.; Guessed: single bidirectional external-device RS232 agent is intended, with srx_pad_i driven and stx_pad_o observed; rejected two separate unidirectional agents or leaving pads unowned.; Guessed: role names serial_rx for srx_pad_i and serial_tx for stx_pad_o chosen as distinct per-port roles; rejected generic driver/monitor keys and list values.",
+      "plan_pointer": "/sections/14/entries/2"
+    }
+  ],
+  "questions": [
+    "collateral_serial_data stx_pad_o/srx_pad_i: sources document 1-bit RS232 bidirectional pads to modem/external device but leave baud-derived bit timing, line format and DUT sampling edge unspecified - confirm single bidirectional endpoint with srx_pad_i drive idle 1 plus stx_pad_o/srx_pad_i observe completes infrastructure now with timing/line-format reconstruction deferred to later phase, since timing affects future transaction monitoring but not current ownership?",
+    "Evidence substituted: f_peer could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them."
+  ]
+}

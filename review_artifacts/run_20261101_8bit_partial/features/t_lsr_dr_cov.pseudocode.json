@@ -1,0 +1,92 @@
+{
+  "understanding": "Verify LSR DR tracks Receiver FIFO occupancy and cover DR overrun parity framing break and error-summary via staged loopback plus error traffic, sampling LSR reads and comparing against serial and bus observations.",
+  "preconditions": [
+    "Clock running at fixed test period with reset asserted then released; DUT in DATA_BUS_WIDTH_8 build",
+    "wishbone_bus owns wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i and observes wb_dat_o wb_ack_o; serial_data owns srx_pad_i and observes stx_pad_o; modem_control_if owns cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i; uart_interrupt observes int_o",
+    "LSR reachable by WISHBONE read at address 5 as read-only status [f_lsr_1]",
+    "Staged FIFO traffic from t_loopback_stage available symbolically for fill drain and error bursts; serial format divisor bit_cycles and FIFO depth remain symbolic"
+  ],
+  "stimulus_steps": [
+    "IF bring-up THEN drive one clean serial frame via serial_data at symbolic format divisor THEN WISHBONE read LSR via wishbone_bus at address 5 [f_lsr_1] [f_dr_1]",
+    "FOR occupancy THEN burst serial frames to fill FIFO THEN pop via symbolic Receiver Buffer reads with varied timing THEN reread LSR after each pop [f_dr_1]",
+    "FOR parity framing break THEN inject bad-parity frame THEN missing-stop frame THEN held-zero break for one symbolic character time via serial_data THEN read LSR after each [f_pe_1] [f_fe_1] [f_bi_1]",
+    "FOR overrun THEN burst to FIFO full THEN inject extra character while full with varied pop timing THEN read LSR [f_oe_1]",
+    "AFTER each error burst drive clean frames to recover then reread LSR to confirm DR follows occupancy"
+  ],
+  "check_steps": [
+    "COMPARE LSR bit0 DR against Receiver FIFO occupancy on each LSR read: EXPECT 1 when at least one character in FIFO ELSE 0 [f_dr_1]",
+    "COMPARE LSR OE when FIFO full and extra character in shift register with FIFO intact; PE when top character has parity error; FE when top character lacks valid stop bit; BI when break hold produced zero character [f_oe_1] [f_pe_1] [f_fe_1] [f_bi_1]",
+    "COMPARE clear-on-read: reread LSR after first read; EXPECT OE PE FE BI cleared while DR continues to follow occupancy and pop sequence exposes next character status [f_oe_1] [f_pe_1] [f_fe_1] [f_bi_1] [f_dr_1]",
+    "COMPARE Receiver Line Status interrupt pending when OE PE FE BI set with reset by reading LSR [f_rls_1] [f_oe_1] [f_pe_1]"
+  ],
+  "coverage_steps": [
+    "SAMPLE LSR value on each WISHBONE LSR read at clock edge via wishbone_bus monitor with serial_data scoreboard comparison",
+    "COVER lsr_dr bins empty versus data_ready derived from occupancy comparison [f_dr_1]",
+    "COVER lsr_error_class bins no_error parity framing overrun break multiple summary_set as inferred sampling; clear-on-read verified by paired scoreboard not coverage alone [f_oe_1] [f_pe_1] [f_fe_1] [f_bi_1]"
+  ],
+  "completion": [
+    "WAIT all LSR read and FIFO drain operations complete OR UNTIL TESTBENCH request_timeout_cycles expires as operational limit only",
+    "DRAIN wishbone_bus plus serial_data plus modem_control_if monitors for drain_cycles as TESTBENCH operational limit then close sequence",
+    "CLEANUP deassert wishbone_bus strobes to symbolic idle, release sequencer handles, leave serial_data and modem_control_if at symbolic idle"
+  ],
+  "facts": [
+    {
+      "id": "f_dr_1",
+      "statement": "LSR bit 0 DR is 0 when no characters in FIFO and 1 when at least one received character is in FIFO.",
+      "source_id": "CH-a2dd758e55",
+      "quote": " \u20180\u2019 \u2013 No characters in the FIFO\n \u20181\u2019 \u2013 At least one character has been received and is in the\nFIFO.",
+      "plan_pointer": "/sections/8/entries/8"
+    },
+    {
+      "id": "f_oe_1",
+      "statement": "LSR bit 1 OE reports overrun when FIFO full and another character in shift register, FIFO remains intact, bit clears on LSR read and generates Receiver Line Status interrupt.",
+      "source_id": "CH-a2dd758e55",
+      "quote": " \u20181\u2019 \u2013 If the FIFO is full and another character has been\nreceived in the receiver shift register. If another character is starting\nto arrive, it will overwrite the data in the shift register but the FIFO\nwill remain intact. The bit is cleared upon reading from the register.\nGenerates Receiver Line Status interrupt.",
+      "plan_pointer": "/sections/8/entries/9"
+    },
+    {
+      "id": "f_pe_1",
+      "statement": "LSR bit 2 PE reports 1 when top-of-FIFO character has parity error, clears on LSR read and generates Receiver Line Status interrupt.",
+      "source_id": "CH-a2dd758e55",
+      "quote": " \u20181\u2019 \u2013 The character that is currently at the top of the FIFO\nhas been received with parity error. The bit is cleared upon reading\nfrom the register. Generates Receiver Line Status interrupt.",
+      "plan_pointer": "/sections/8/entries/10"
+    },
+    {
+      "id": "f_fe_1",
+      "statement": "LSR bit 3 FE reports 1 when top-of-FIFO character lacks valid stop bit, clears on LSR read and generates Receiver Line Status interrupt.",
+      "source_id": "CH-a2dd758e55",
+      "quote": " \u20181\u2019 \u2013 The received character at the top of the FIFO did not\nhave a valid stop bit. Of course, generally, it might be that all the\nfollowing data is corrupt. The bit is cleared upon reading from the\nregister. Generates Receiver Line Status interrupt.",
+      "plan_pointer": "/sections/8/entries/11"
+    },
+    {
+      "id": "f_bi_1",
+      "statement": "LSR bit 4 BI reports break when line held at 0 for one character time, one zero character enters FIFO and waits for valid start, clears on LSR read and generates Receiver Line Status interrupt.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The break occurs when the line is held in logic 0 for a\ntime of one character (start bit + data + parity + stop bit). In that\ncase, one zero character enters the FIFO and the UART waits for a\nvalid start bit to receive next character. The bit is cleared upon\nreading from the register. Generates Receiver Line Status interrupt.",
+      "plan_pointer": "/registers/registers/9/fields/4"
+    },
+    {
+      "id": "f_lsr_1",
+      "statement": "Line Status LSR is at bus address 5, width 8, read-only status.",
+      "source_id": "CH-f88915355b",
+      "quote": "Line Status 5 8 R Status information",
+      "plan_pointer": "/registers/registers/9"
+    },
+    {
+      "id": "f_rls_1",
+      "statement": "Highest priority Receiver Line Status interrupt covers parity overrun framing errors or break and is reset by reading LSR.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 1 1 1 st Receiver Line\nStatus\nParity, Overrun or Framing\nerrors or Break Interrupt\nReading the Line\nStatus Register",
+      "plan_pointer": "/sections/8/entries/6"
+    }
+  ],
+  "questions": [
+    "Confirm error-summary bit number semantics and clear-on-read behavior for coverage: CH-4e1d3a956c indicates at least one parity framing break inside FIFO but no DOCUMENTED field is supplied?",
+    "Confirm Receiver Buffer read address access and FIFO depth plus trigger level for DR empty versus non-empty transitions and overrun fill with varied pop timing?",
+    "Confirm WISHBONE read signaling for LSR at address 5 including wb_sel_i wb_we_i wb_stb_i wb_cyc_i wb_ack_o handshake and address representation, plus wb_rst_i polarity and inactive levels?",
+    "Confirm serial configuration and divisor-derived bit_cycles including LCR format parity stop programming order and break hold of one character time for parity framing break injection and clean recovery?",
+    "Confirm read-clear scope: DR follows occupancy versus OE PE FE BI cleared on LSR read, and effect of Receiver Buffer pop exposing next character error bits, plus LSR reset value?",
+    "Confirm owners tie_offs and idle levels for all DUT inputs during LSR tests and TESTBENCH drain_cycles request_timeout_cycles operational limits?"
+  ],
+  "blockers": []
+}

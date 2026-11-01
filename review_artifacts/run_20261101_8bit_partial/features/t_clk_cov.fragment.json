@@ -1,0 +1,92 @@
+{
+  "sequencer_variables": [],
+  "registers": [],
+  "facts": [
+    {
+      "id": "t_clk_cov_f_clk_input",
+      "statement": "CLK is 1-bit input block clock for UART core sink into DUT",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input Block\u2019s clock input",
+      "plan_pointer": "/interfaces/groups/1"
+    },
+    {
+      "id": "t_clk_cov_f_clk_wb",
+      "statement": "CLK is WISHBONE clock per Clocks table deferred to SoC clock-tree level",
+      "source_id": "CH-8e56094e71",
+      "quote": "WISHBONE\nclock",
+      "plan_pointer": "/sections/10/entries/8"
+    },
+    {
+      "id": "t_clk_cov_f_point_1200",
+      "statement": "Clocks table lists 1258Mhz point for 1200 bps",
+      "source_id": "CH-8e56094e71",
+      "quote": "1258Mhz for\n1200 bps",
+      "plan_pointer": "/sections/10/entries/8"
+    },
+    {
+      "id": "t_clk_cov_f_point_115200",
+      "statement": "Clocks table lists 3.6864 point for 115200 bps",
+      "source_id": "CH-8e56094e71",
+      "quote": "3.6864 for\n115200 bps",
+      "plan_pointer": "/sections/10/entries/8"
+    }
+  ],
+  "sequences": [],
+  "routes": [],
+  "checks": [],
+  "hooks": [],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "How should fixed SYM_PERIOD clock generation on wb_clk_i with HOLD fixed through reset and traffic be implemented when clock is a common UVC not an existing shared agent and no supported sequencer variable exists for clk_period with ordering only to t_bringup_clk?"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [],
+      "question": "How should reset assert then deassert with SYM_IDLE_CYCLES wait and idle HOLD on wishbone_bus serial_data modem_control_if be ordered with common-UVC clock and reset when reset is not an existing shared agent and cross-agent inheritance control is unsupported?"
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [],
+      "question": "How should reset assert then deassert with SYM_IDLE_CYCLES wait and idle HOLD on wishbone_bus serial_data modem_control_if be ordered with common-UVC clock and reset when reset is not an existing shared agent and cross-agent inheritance control is unsupported?"
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [],
+      "question": "How should observed CLK period sampling on wb_clk_i with per-instance false including point stratum boundary bins gap exclusion as never-sampled ignore and single fixed SYM_PERIOD finite-sample record be implemented when no clock monitor agent exists in shared_agents and cg_item typed fields provide no period field and all band stratum boundary values remain INFERRED quick-test navigation only?"
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [],
+      "question": "How should observed CLK period sampling on wb_clk_i with per-instance false including point stratum boundary bins gap exclusion as never-sampled ignore and single fixed SYM_PERIOD finite-sample record be implemented when no clock monitor agent exists in shared_agents and cg_item typed fields provide no period field and all band stratum boundary values remain INFERRED quick-test navigation only?"
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [],
+      "question": "How should observed CLK period sampling on wb_clk_i with per-instance false including point stratum boundary bins gap exclusion as never-sampled ignore and single fixed SYM_PERIOD finite-sample record be implemented when no clock monitor agent exists in shared_agents and cg_item typed fields provide no period field and all band stratum boundary values remain INFERRED quick-test navigation only?"
+    },
+    {
+      "step": "coverage_steps/3",
+      "component_ids": [],
+      "question": "How should observed CLK period sampling on wb_clk_i with per-instance false including point stratum boundary bins gap exclusion as never-sampled ignore and single fixed SYM_PERIOD finite-sample record be implemented when no clock monitor agent exists in shared_agents and cg_item typed fields provide no period field and all band stratum boundary values remain INFERRED quick-test navigation only?"
+    },
+    {
+      "step": "coverage_steps/4",
+      "component_ids": [],
+      "question": "How should observed CLK period sampling on wb_clk_i with per-instance false including point stratum boundary bins gap exclusion as never-sampled ignore and single fixed SYM_PERIOD finite-sample record be implemented when no clock monitor agent exists in shared_agents and cg_item typed fields provide no period field and all band stratum boundary values remain INFERRED quick-test navigation only?"
+    }
+  ],
+  "questions": [
+    "What are units nominal min max and resolution for documented WISHBONE clock points 3.6864 for 115200 bps and 1258Mhz for 1200 bps?",
+    "Confirm clock bands and strata for sampling low-middle-high and nominal-min-max boundaries?",
+    "What is required sampling edge sample count and per-instance scope for CLK period coverage?",
+    "How must reset duration and all sequence timing scale with the selected clock period in cycles versus absolute time?",
+    "Is dynamic clock period change permitted during reset or traffic or must period remain fixed per test?",
+    "What is active level and assert deassert sequencing for reset coordinated with stable clock before traffic?",
+    "How should fixed SYM_PERIOD clock generation on wb_clk_i with HOLD fixed through reset and traffic be implemented when clock is a common UVC not an existing shared agent and no supported sequencer variable exists for clk_period with ordering only to t_bringup_clk?",
+    "How should reset assert then deassert with SYM_IDLE_CYCLES wait and idle HOLD on wishbone_bus serial_data modem_control_if be ordered with common-UVC clock and reset when reset is not an existing shared agent and cross-agent inheritance control is unsupported?",
+    "How should observed CLK period sampling on wb_clk_i with per-instance false including point stratum boundary bins gap exclusion as never-sampled ignore and single fixed SYM_PERIOD finite-sample record be implemented when no clock monitor agent exists in shared_agents and cg_item typed fields provide no period field and all band stratum boundary values remain INFERRED quick-test navigation only?"
+  ]
+}

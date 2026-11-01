@@ -1,0 +1,805 @@
+{
+  "status": "BLOCKED",
+  "mode": "generate_code",
+  "cycle": [
+    "retrieve",
+    "understand_and_pseudocode",
+    "implement",
+    "validate",
+    "checkpoint"
+  ],
+  "steps": [
+    {
+      "id": "foundation_clock",
+      "title": "Clock",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "foundation_reset",
+      "title": "Reset",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "interface_uart_interrupt",
+      "title": "UART Interrupt",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "interface_serial_data",
+      "title": "Serial Data",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "interface_modem_control_if",
+      "title": "Modem Control",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "interface_wishbone_bus",
+      "title": "Wishbone Bus",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "assessment_uart_interrupt",
+      "title": "Assess UART Interrupt",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "assess",
+        "validate",
+        "checkpoint"
+      ],
+      "decision": {
+        "level": "passive_agent",
+        "reason": "DUT sources single-wire INT_O requiring observation only with no driving; documented IER-gated behavior and deferred SoC routing support passive monitor at unit level. Choice of passive_agent is inferred and needs human review.",
+        "responsibilities": [
+          "Observe int_o as DUT-driven output via passive monitor without driving",
+          "Expose int_o level and transition events for IER-gated assertion and clearing checks",
+          "Leave SoC routing and interrupt-controller response to higher level per deferred scope"
+        ],
+        "coverage": false,
+        "facts": [
+          {
+            "id": "f_int_o_port",
+            "statement": "Specification defines INT_O as 1-bit Output Interrupt output for uart_interrupt",
+            "source_id": "CH-8c2c8e9408",
+            "quote": "INT_O 1 Output Interrupt output",
+            "plan_pointer": "/interfaces/groups/3/signals/0"
+          },
+          {
+            "id": "f_int_o_source",
+            "statement": "uart_interrupt is DUT-sourced single-wire interrupt sideband output out of DUT",
+            "source_id": "CH-8c2c8e9408",
+            "quote": "INT_O 1 Output Interrupt output",
+            "plan_pointer": "/interfaces/groups/3"
+          }
+        ],
+        "questions": [
+          "For uart_interrupt int_o: sources document 'INT_O 1 Output Interrupt output' as DUT output but leave active_level unknown/undocumented; what asserted polarity/level should the passive monitor use to interpret assertion vs deassertion and clearing in relation to WISHBONE IER/IIR-gated handling?",
+          "Evidence substituted: f_defer_routing, f_reset_disabled could not be proven from the retrieved sources (Fact quote must occur in a retrieved source excerpt); the documented facts of this interface are cited instead. Review the choice that cited them."
+        ]
+      }
+    },
+    {
+      "id": "collateral_uart_interrupt",
+      "title": "UART Interrupt collateral",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ],
+      "profile": {
+        "kind": "collateral",
+        "required": [
+          "source-supported ownership and required protocol configuration"
+        ],
+        "deferred": [
+          "scoreboard",
+          "functional tests",
+          "full register map"
+        ]
+      },
+      "deferred_questions": [
+        "What active level should later-phase logic assume for int_o assertion given documented INT_O 1 Output Interrupt output leaves active_level undocumented, not needed for passive observation?",
+        "On which clock edge should later-phase sampling of int_o transitions be aligned, deferred from passive infrastructure with no sampling requirement?",
+        "Evidence substituted: f_int_o_port could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them."
+      ]
+    },
+    {
+      "id": "assessment_serial_data",
+      "title": "Assess Serial Data",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "assess",
+        "validate",
+        "checkpoint"
+      ],
+      "decision": {
+        "level": "full_agent",
+        "reason": "Documented bidirectional RS232 serial_data to external device requires driving DUT input srx_pad_i and observing DUT output stx_pad_o, so scaffold_only/passive_agent/utility tie-off is insufficient. Minimum is full_agent bidirectional endpoint. Active traffic and monitor/scoreboard details from quick-test plan approvals are inferred test-only and this architecture choice needs human review; no scoreboard, protocol transaction, or coverage is required for infrastructure completion.",
+        "responsibilities": [
+          "Drive srx_pad_i from serial_data agent as RS232 external-device receive stimulus",
+          "Observe stx_pad_o serial transmit output in same bidirectional agent",
+          "Observe srx_pad_i in same agent for bidirectional visibility",
+          "Provide bidirectional RS232 endpoint toward modem or other external devices without permanent tie-off"
+        ],
+        "coverage": false,
+        "facts": [
+          {
+            "id": "f_stx_pad_o",
+            "statement": "The specification defines STX_PAD_O as 1-bit DUT output serial output signal",
+            "source_id": "CH-98be4510fb",
+            "quote": "STX_PAD_O 1 Output The serial output signal",
+            "plan_pointer": "/interfaces/groups/5/signals/0"
+          },
+          {
+            "id": "f_srx_pad_i",
+            "statement": "The specification defines SRX_PAD_I as 1-bit DUT input serial input signal",
+            "source_id": "CH-98be4510fb",
+            "quote": "SRX_PAD_I 1 Input The serial input signal",
+            "plan_pointer": "/interfaces/groups/5/signals/1"
+          },
+          {
+            "id": "f_function",
+            "statement": "The serial_data group function is UART serial transmit and receive data",
+            "source_id": "CH-2baa4497c0",
+            "quote": "The UART (Universal Asynchronous Receiver/Transmitter) core provides serial\ncommunication capabilities",
+            "plan_pointer": "/interfaces/groups/5/property_evidence/function"
+          },
+          {
+            "id": "f_protocol",
+            "statement": "The serial_data interface protocol is RS232 over serial cable",
+            "source_id": "CH-2baa4497c0",
+            "quote": "like another computer using a serial cable and RS232 protocol.",
+            "plan_pointer": "/interfaces/groups/5/property_evidence/protocol"
+          },
+          {
+            "id": "f_peer",
+            "statement": "The serial_data peer is modem or other external devices as external_device",
+            "source_id": "CH-2baa4497c0",
+            "quote": "which allow communication with modem or other external\ndevices",
+            "plan_pointer": "/interfaces/groups/5/property_evidence/connected_to"
+          }
+        ],
+        "questions": [
+          "serial_data stx_pad_o/srx_pad_i: sources document 1-bit RS232 bidirectional pads to modem/external device but leave baud-derived bit timing and DUT sampling edge unspecified \u2014 confirm infrastructure stays declaration plus drive/observe ownership now with timing/line-format reconstruction deferred to later phase, since timing affects future transaction monitoring but not current ownership?",
+          "Evidence substituted: f_loopback could not be proven from the retrieved sources (Fact quote must occur in a retrieved source excerpt); the documented facts of this interface are cited instead. Review the choice that cited them."
+        ]
+      }
+    },
+    {
+      "id": "collateral_serial_data",
+      "title": "Serial Data collateral",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ],
+      "profile": {
+        "kind": "collateral",
+        "required": [
+          "source-supported ownership and required protocol configuration"
+        ],
+        "deferred": [
+          "scoreboard",
+          "functional tests",
+          "full register map"
+        ]
+      },
+      "deferred_questions": [
+        "serial_data stx_pad_o/srx_pad_i: sources document 1-bit RS232 bidirectional pads to modem/external device but leave baud-derived bit timing and DUT sampling edge unspecified \u2014 confirm infrastructure stays declaration plus drive/observe ownership now with timing/line-format reconstruction deferred to later phase, since timing affects future transaction monitoring but not current ownership?",
+        "Evidence substituted: f_peer could not be proven from the retrieved sources (Fact f_peer lacks an eligible source); the documented facts of this interface are cited instead. Review the choice that cited them."
+      ]
+    },
+    {
+      "id": "assessment_modem_control_if",
+      "title": "Assess Modem Control",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "assess",
+        "validate",
+        "checkpoint"
+      ],
+      "decision": {
+        "level": "full_agent",
+        "reason": "Bidirectional modem handshake requires active stimulus on four DUT inputs and continuous observation of two DUT outputs to an external modem peer, not declarations or static tie-offs alone; full_agent is minimum to drive status toggles and monitor control outputs. Architecture choice is inferred and needs review.",
+        "responsibilities": [
+          "Drive cts_pad_i, dsr_pad_i, ri_pad_i, dcd_pad_i as active modem status stimulus from external modem peer",
+          "Observe rts_pad_o and dtr_pad_o as DUT modem control outputs",
+          "Monitor all six handshake lines for change observation coordinated with Wishbone MCR/MSR access and serial data operation",
+          "Provide external modem endpoint separate from serial data path for handshake sequencing"
+        ],
+        "coverage": false,
+        "facts": [
+          {
+            "id": "port_rts_pad_o",
+            "statement": "The specification defines RTS_PAD_O as a port of this interface",
+            "source_id": "CH-98be4510fb",
+            "quote": "RTS_PAD_O 1 Output Request To Send",
+            "plan_pointer": "/interfaces/groups/6/signals/0"
+          },
+          {
+            "id": "port_dtr_pad_o",
+            "statement": "The specification defines DTR_PAD_O as a port of this interface",
+            "source_id": "CH-98be4510fb",
+            "quote": "DTR_PAD_O 1 Output Data Terminal Ready",
+            "plan_pointer": "/interfaces/groups/6/signals/1"
+          },
+          {
+            "id": "port_cts_pad_i",
+            "statement": "The specification defines CTS_PAD_I as a port of this interface",
+            "source_id": "CH-98be4510fb",
+            "quote": "CTS_PAD_I 1 Input Clear To Send",
+            "plan_pointer": "/interfaces/groups/6/signals/2"
+          },
+          {
+            "id": "port_dsr_pad_i",
+            "statement": "The specification defines DSR_PAD_I as a port of this interface",
+            "source_id": "CH-98be4510fb",
+            "quote": "DSR_PAD_I 1 Input Data Set Ready",
+            "plan_pointer": "/interfaces/groups/6/signals/3"
+          },
+          {
+            "id": "port_ri_pad_i",
+            "statement": "The specification defines RI_PAD_I as a port of this interface",
+            "source_id": "CH-98be4510fb",
+            "quote": "RI_PAD_I 1 Input Ring Indicator",
+            "plan_pointer": "/interfaces/groups/6/signals/4"
+          },
+          {
+            "id": "port_dcd_pad_i",
+            "statement": "The specification defines DCD_PAD_I as a port of this interface",
+            "source_id": "CH-98be4510fb",
+            "quote": "DCD_PAD_I 1 Input Data Carrier Detect",
+            "plan_pointer": "/interfaces/groups/6/signals/5"
+          },
+          {
+            "id": "f_modem_function",
+            "statement": "Modem control function transfers control signals to a modem connected to the UART",
+            "source_id": "CH-6abe65aeff",
+            "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+            "plan_pointer": "/interfaces/groups/6/property_evidence/function"
+          },
+          {
+            "id": "f_modem_peer",
+            "statement": "Modem interface communicates with modem or other external devices",
+            "source_id": "CH-2baa4497c0",
+            "quote": "which allow communication with modem or other external\ndevices",
+            "plan_pointer": "/interfaces/groups/6/property_evidence/peer_type"
+          }
+        ],
+        "questions": [
+          "For modem_control rts_pad_o/dtr_pad_o outputs and cts_pad_i/dsr_pad_i/ri_pad_i/dcd_pad_i inputs: spec documents names, directions and descriptions but leaves active_level unknown for all six, with open inversion/reset mapping for DTR/RTS versus MCR values \u2014 what asserted polarity and any MCR inversion applies? Needed to interpret driven status levels and monitored control levels; scaffold can proceed at logical levels pending human decision."
+        ]
+      }
+    },
+    {
+      "id": "collateral_modem_control_if",
+      "title": "Modem Control collateral",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ],
+      "profile": {
+        "kind": "collateral",
+        "required": [
+          "source-supported ownership and required protocol configuration"
+        ],
+        "deferred": [
+          "scoreboard",
+          "functional tests",
+          "full register map"
+        ]
+      },
+      "deferred_questions": [
+        "For later functional use of rts_pad_o, dtr_pad_o, cts_pad_i, dsr_pad_i, ri_pad_i, dcd_pad_i: spec documents names, directions and descriptions but active_level is undocumented, what asserted polarity and MCR inversion applies? Infrastructure proceeds at logical levels.",
+        "What DUT sampling and timing relationship applies to modem status inputs and control outputs relative to wb_clk_i for later stimulus coordination? Deferred sequencing detail only.",
+        "Evidence substituted: f_modem_peer, port_dcd_pad_i, port_dsr_pad_i, port_dtr_pad_o, port_ri_pad_i, port_rts_pad_o could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them."
+      ]
+    },
+    {
+      "id": "assessment_wishbone_bus",
+      "title": "Assess Wishbone Bus",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "assess",
+        "validate",
+        "checkpoint"
+      ],
+      "decision": {
+        "level": "full_agent",
+        "reason": "DUT is documented WISHBONE responder for UART control and data register access to interconnect peer; testbench must actively drive wb_adr_i/wb_sel_i/wb_dat_i/wb_we_i/wb_stb_i/wb_cyc_i and observe wb_dat_o/wb_ack_o to perform reads/writes. This front-end feeds UART configuration and data-path logic, requiring full_agent drive plus observe. Architecture choice is inferred and needs review.",
+        "responsibilities": [
+          "drive wb_adr_i, wb_sel_i, wb_dat_i, wb_we_i, wb_stb_i, wb_cyc_i to initiate WISHBONE register reads and writes",
+          "observe wb_dat_o and wb_ack_o for transfer acknowledge and read data",
+          "observe driven inputs together with outputs to allow later transaction reconstruction for register and data-path checks",
+          "connect as interconnect-facing front-end for UART control and data register access"
+        ],
+        "coverage": false,
+        "facts": [
+          {
+            "id": "f_wb_adr_i",
+            "statement": "WB_ADDR_I is input used for register selection",
+            "source_id": "CH-63ad4d61a5",
+            "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+            "plan_pointer": "/interfaces/groups/0/signals/0"
+          },
+          {
+            "id": "f_wb_sel_i",
+            "statement": "WB_SEL_I is input select signal",
+            "source_id": "CH-63ad4d61a5",
+            "quote": "WB_SEL_I 4 Input Select signal",
+            "plan_pointer": "/interfaces/groups/0/signals/1"
+          },
+          {
+            "id": "f_wb_dat_i",
+            "statement": "WB_DAT_I is input data input",
+            "source_id": "CH-63ad4d61a5",
+            "quote": "WB_DAT_I 32 or 8 Input Data input",
+            "plan_pointer": "/interfaces/groups/0/signals/2"
+          },
+          {
+            "id": "f_wb_dat_o",
+            "statement": "WB_DAT_O is output data output",
+            "source_id": "CH-63ad4d61a5",
+            "quote": "WB_DAT_O 32 or 8 Output Data output",
+            "plan_pointer": "/interfaces/groups/0/signals/3"
+          },
+          {
+            "id": "f_wb_we_i",
+            "statement": "WB_WE_I is input for write or read cycle selection",
+            "source_id": "CH-63ad4d61a5",
+            "quote": "WB_WE_I 1 Input Write or read cycle selection",
+            "plan_pointer": "/interfaces/groups/0/signals/4"
+          },
+          {
+            "id": "f_wb_stb_i",
+            "statement": "WB_STB_I is input that specifies transfer cycle",
+            "source_id": "CH-63ad4d61a5",
+            "quote": "WB_STB_I 1 Input Specifies transfer cycle",
+            "plan_pointer": "/interfaces/groups/0/signals/5"
+          },
+          {
+            "id": "f_wb_cyc_i",
+            "statement": "WB_CYC_I is input indicating a bus cycle is in progress",
+            "source_id": "CH-63ad4d61a5",
+            "quote": "WB_CYC_I 1 Input A bus cycle is in progress",
+            "plan_pointer": "/interfaces/groups/0/signals/6"
+          },
+          {
+            "id": "f_wb_ack_o",
+            "statement": "WB_ACK_O is output acknowledge of a transfer",
+            "source_id": "CH-63ad4d61a5",
+            "quote": "WB_ACK_O 1 Output Acknowledge of a transfer",
+            "plan_pointer": "/interfaces/groups/0/signals/7"
+          }
+        ],
+        "questions": [
+          "On which wb_clk_i edge should the later monitor sample wb_adr_i, wb_sel_i, wb_dat_i, wb_we_i, wb_stb_i, wb_cyc_i and observe wb_dat_o, wb_ack_o? Sources define handshake purpose but no sampling edge; needed only for later-phase timing, not scaffold.",
+          "Evidence substituted: f_connected, f_function, f_protocol could not be proven from the retrieved sources (Fact quote must occur in a retrieved source excerpt); the documented facts of this interface are cited instead. Review the choice that cited them."
+        ]
+      }
+    },
+    {
+      "id": "collateral_wishbone_bus",
+      "title": "Wishbone Bus collateral",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ],
+      "profile": {
+        "kind": "collateral",
+        "required": [
+          "source-supported ownership and required protocol configuration"
+        ],
+        "deferred": [
+          "scoreboard",
+          "functional tests",
+          "full register map"
+        ]
+      },
+      "deferred_questions": [
+        "On which wb_clk_i edge should the later monitor sample wb_adr_i, wb_sel_i, wb_dat_i, wb_we_i, wb_stb_i, wb_cyc_i and observe wb_dat_o, wb_ack_o? Sources define handshake purpose but no sampling edge; needed only for later-phase timing, not scaffold.",
+        "Evidence substituted: f_wb_cyc_i, f_wb_dat_i, f_wb_dat_o, f_wb_stb_i, f_wb_we_i could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them."
+      ]
+    },
+    {
+      "id": "t_bringup_clk",
+      "title": "Bring-up clock and reset",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_modem_seq",
+      "title": "Modem handshake sequences",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_serial_seq",
+      "title": "Serial traffic sequences",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_wb_seq",
+      "title": "Wishbone register access sequences",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_clk_cov",
+      "title": "Clock period coverage",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_ier_reset",
+      "title": "IER reset checks",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_obs_mon",
+      "title": "Modem interrupt baud observers",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_reset_div_known",
+      "title": "Reset divisor and known outputs",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_reset_fifo_lcr",
+      "title": "Reset FIFO and LCR checks",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_serial_mon",
+      "title": "Serial data monitor",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_uart_cfg",
+      "title": "UART configuration sweep",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_wb_mon",
+      "title": "Wishbone bus monitor",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_div_dlab_cov",
+      "title": "Divisor latch coverage",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_ier_iir_en",
+      "title": "IER enable and IIR pending",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_iir_cov",
+      "title": "Interrupt identification coverage",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_loopback_stage",
+      "title": "Loopback staged traffic",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_lsr_par_fram",
+      "title": "LSR parity framing checks",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_shared_dir",
+      "title": "Shared address direction coverage",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_wb_acc_cov",
+      "title": "Wishbone access coverage",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_xz_check",
+      "title": "XZ protocol check",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_cross_int_traffic",
+      "title": "Cross interrupt traffic coverage",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_iir_prio_fixed",
+      "title": "IIR priority and fixed bits",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_lsr_dr_cov",
+      "title": "LSR data-ready and coverage",
+      "status": "PASS",
+      "phase": "checkpoint",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_overrun_burst",
+      "title": "Overrun corner burst",
+      "status": "BLOCKED",
+      "phase": "validate",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    },
+    {
+      "id": "t_traffic_err",
+      "title": "Normal modem traffic with errors",
+      "status": "PENDING",
+      "phase": "retrieve",
+      "cycle": [
+        "retrieve",
+        "understand_and_pseudocode",
+        "implement",
+        "validate",
+        "checkpoint"
+      ]
+    }
+  ]
+}

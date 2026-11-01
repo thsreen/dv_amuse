@@ -1,0 +1,65 @@
+{
+  "understanding": "t_clk_cov is coverage-only sampling of observed CLK period on wb_clk_i with per-instance false requiring fixed period per test from t_bringup_clk. DOCUMENTED evidence confirms CLK input role and WISHBONE clock table points with SoC deferral. Band stratum boundary min-max resolution and directed nominal-min-max plus random low-middle-high settings remain INFERRED quick-test navigation only and prove only finite sample.",
+  "preconditions": [
+    "Clock stable at symbolic fixed SYM_PERIOD before reset and traffic with no dynamic change pending",
+    "Reset assert then deassert coordination complete with wishbone_bus and serial_data and modem_control_if idle",
+    "wb_clk_i driven by clock with all DUT inputs owned or tied and period change allowed only between tests before reset"
+  ],
+  "stimulus_steps": [
+    "SET clock to SYM_PERIOD for this test before reset and HOLD fixed through reset and traffic",
+    "EXECUTE reset assert then deassert then WAIT SYM_IDLE_CYCLES clock cycles for idle",
+    "HOLD wishbone_bus and serial_data and modem_control_if idle while clock edges accumulate for sampling"
+  ],
+  "check_steps": [],
+  "coverage_steps": [
+    "SAMPLE observed clock edges from clock monitor analysis port on each observed edge of wb_clk_i with per-instance false",
+    "SAMPLE SYM_OBSERVED_PERIOD into symbolic point bins tracing documented Clocks table points",
+    "SAMPLE stratum and boundary into symbolic low_stratum middle_stratum high_stratum and nominal min max boundary",
+    "IF observed period falls in unlisted gap THEN EXCLUDE as never-sampled ignore without DUT failure",
+    "FOR each test RECORD single fixed SYM_PERIOD and prove only finite sample exercised not exhaustive frequency proof"
+  ],
+  "completion": [
+    "WAIT until SYM_MIN_EDGES observed clock edges sampled and coverage recorded",
+    "ENFORCE testbench operational timeout TEST_TIMEOUT_CYCLES as limit not as DUT timing requirement",
+    "CLEANUP return wishbone_bus and serial_data and modem_control_if to idle and release coordination handles"
+  ],
+  "facts": [
+    {
+      "id": "f_clk_input",
+      "statement": "CLK is 1-bit input block clock for UART core sink into DUT",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input Block\u2019s clock input",
+      "plan_pointer": "/interfaces/groups/1"
+    },
+    {
+      "id": "f_clk_wb",
+      "statement": "CLK is WISHBONE clock per Clocks table deferred to SoC clock-tree level",
+      "source_id": "CH-8e56094e71",
+      "quote": "WISHBONE\nclock",
+      "plan_pointer": "/sections/10/entries/8"
+    },
+    {
+      "id": "f_point_1200",
+      "statement": "Clocks table lists 1258Mhz point for 1200 bps",
+      "source_id": "CH-8e56094e71",
+      "quote": "1258Mhz for\n1200 bps",
+      "plan_pointer": "/sections/10/entries/8"
+    },
+    {
+      "id": "f_point_115200",
+      "statement": "Clocks table lists 3.6864 point for 115200 bps",
+      "source_id": "CH-8e56094e71",
+      "quote": "3.6864 for\n115200 bps",
+      "plan_pointer": "/sections/10/entries/8"
+    }
+  ],
+  "questions": [
+    "What are units nominal min max and resolution for documented WISHBONE clock points 3.6864 for 115200 bps and 1258Mhz for 1200 bps?",
+    "Confirm clock bands and strata for sampling low-middle-high and nominal-min-max boundaries?",
+    "What is required sampling edge sample count and per-instance scope for CLK period coverage?",
+    "How must reset duration and all sequence timing scale with the selected clock period in cycles versus absolute time?",
+    "Is dynamic clock period change permitted during reset or traffic or must period remain fixed per test?",
+    "What is active level and assert deassert sequencing for reset coordinated with stable clock before traffic?"
+  ],
+  "blockers": []
+}

@@ -1,0 +1,336 @@
+{
+  "sequencer_variables": [],
+  "registers": [
+    {
+      "id": "t_modem_seq_mcr",
+      "agent": "wishbone_bus",
+      "address": 4,
+      "width": 8,
+      "access": "WO",
+      "reset": 0,
+      "mask": 31,
+      "fact_ids": [
+        "f_dtr_inv",
+        "f_rts_inv",
+        "f_out_map",
+        "f_loop_mode",
+        "f_mcr_reset"
+      ]
+    }
+  ],
+  "facts": [
+    {
+      "id": "f_modem_pins",
+      "statement": "DUT modem group comprises RTS_O, CTS_I, DTR_O, DSR_I, DCD_I and RI_I.",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "RTS_O\nCTS_I\nDTR_O\nDSR_I\nDCD_I\nRI_I",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_gpio_option",
+      "statement": "Six modem control signals are optional and may use general-purpose I/Os.",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "and, optionally, another six modem\ncontrol signals, which can otherwise be implemented using general purpose I/Os on the\nchip.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_dtr_inv",
+      "statement": "MCR bit0 controls DTR with 0 means pin 1 and 1 means pin 0.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "0 W Data Terminal Ready (DTR) signal control\n \u20180\u2019 \u2013 DTR is \u20181\u2019\n \u20181\u2019 \u2013 DTR is \u20180\u2019",
+      "plan_pointer": "/sections/12/entries/7"
+    },
+    {
+      "id": "f_rts_inv",
+      "statement": "MCR bit1 controls RTS with 0 means pin 1 and 1 means pin 0.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "1 W Request To Send (RTS) signal control\n \u20180\u2019 \u2013 RTS is \u20181\u2019\n \u20181\u2019 \u2013 RTS is \u20180\u2019",
+      "plan_pointer": "/sections/12/entries/7"
+    },
+    {
+      "id": "f_out_map",
+      "statement": "MCR Out1 connects to RI input and Out2 connects to DCD input in loopback mode.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "2 W Out1. In loopback mode, connected Ring Indicator (RI) signal input\n3 W Out2. In loopback mode, connected to Data Carrier Detect (DCD)\ninput.",
+      "plan_pointer": "/sections/12/entries/7"
+    },
+    {
+      "id": "f_loop_mode",
+      "statement": "MCR bit4 0 is normal and 1 is loopback with STX_PAD_O set to 1 and TX shift internally to RX shift.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "4 W Loopback mode\n \u20180\u2019 \u2013 normal operation\n \u20181\u2019 \u2013 loopback mode. When in loopback mode, the Serial\nOutput Signal (STX_PAD_O) is set to logic \u20181\u2019. The signal of the\ntransmitter shift register is internally connected to the input of the\nreceiver shift register.",
+      "plan_pointer": "/sections/12/entries/7"
+    },
+    {
+      "id": "f_loop_map",
+      "statement": "Loopback makes DTR to DSR and RTS to CTS and Out1 to RI and Out2 to DCD.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The following connections are made:\nDTR \u00ce  DSR\nRTS \u00ce CTS\nOut1 \u00ce RI\nOut2 \u00ce DCD",
+      "plan_pointer": "/sections/12/entries/7"
+    },
+    {
+      "id": "f_mcr_reset",
+      "statement": "MCR bits 7-5 are ignored and MCR reset value is 0.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "7-5 W Ignored\nReset Value: 0",
+      "plan_pointer": "/sections/12/entries/7"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "t_modem_seq_single",
+      "agent": "modem_control_if",
+      "purpose": "Drive directed single-pin toggles on cts dsr ri dcd via modem_control_if",
+      "operations": [
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 1,
+          "cycles": 1,
+          "count": 1
+        },
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 2,
+          "cycles": 1,
+          "count": 1
+        },
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 4,
+          "cycles": 1,
+          "count": 1
+        },
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 8,
+          "cycles": 1,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_modem_pins"
+      ],
+      "extends": null,
+      "controls": []
+    },
+    {
+      "id": "t_modem_seq_simul",
+      "agent": "modem_control_if",
+      "purpose": "Drive constrained-random simultaneous toggles on subset of modem inputs",
+      "operations": [
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 15,
+          "cycles": 1,
+          "count": 8
+        }
+      ],
+      "fact_ids": [
+        "f_modem_pins"
+      ],
+      "extends": null,
+      "controls": []
+    },
+    {
+      "id": "t_modem_seq_loopback",
+      "agent": "modem_control_if",
+      "purpose": "Program MCR loopback entry plus DTR RTS Out1 Out2 controls plus exit with explicit ordering before pin bursts",
+      "operations": [
+        {
+          "kind": "register_write",
+          "register_id": "t_modem_seq_mcr",
+          "address": 4,
+          "data": 16,
+          "mask": 31,
+          "cycles": 1,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_modem_seq_mcr",
+          "address": 4,
+          "data": 28,
+          "mask": 31,
+          "cycles": 1,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_modem_seq_mcr",
+          "address": 4,
+          "data": 31,
+          "mask": 31,
+          "cycles": 1,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_modem_seq_mcr",
+          "address": 4,
+          "data": 0,
+          "mask": 31,
+          "cycles": 1,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_loop_mode",
+        "f_dtr_inv",
+        "f_rts_inv",
+        "f_out_map",
+        "f_loop_map",
+        "f_mcr_reset"
+      ],
+      "extends": null,
+      "controls": []
+    }
+  ],
+  "routes": [],
+  "checks": [],
+  "hooks": [
+    {
+      "id": "t_modem_seq_drv_modem",
+      "target": "modem_control_if",
+      "slot": "driver.body",
+      "purpose": "Drive directed single and simultaneous modem input toggles via custom ops",
+      "fact_ids": [
+        "f_modem_pins"
+      ]
+    },
+    {
+      "id": "t_modem_seq_mon_modem",
+      "target": "modem_control_if",
+      "slot": "monitor.body",
+      "purpose": "Observe rts_pad_o dtr_pad_o and modem inputs on clock edges for checks",
+      "fact_ids": [
+        "f_modem_pins",
+        "f_dtr_inv",
+        "f_rts_inv",
+        "f_loop_map"
+      ]
+    }
+  ],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [
+        "t_modem_seq_single"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [
+        "t_modem_seq_simul"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [
+        "t_modem_seq_loopback"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [
+        "t_modem_seq_loopback"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [
+        "t_modem_seq_loopback"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/5",
+      "component_ids": [
+        "t_modem_seq_loopback"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [],
+      "question": "Deferred: check t_modem_seq_chk_rts is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_seq_chk_dtr is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_seq_chk_loopmap is a built-in bus check on modem_control_if, which is not a bus agent"
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [],
+      "question": "Deferred: check t_modem_seq_chk_rts is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_seq_chk_dtr is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_seq_chk_loopmap is a built-in bus check on modem_control_if, which is not a bus agent"
+    },
+    {
+      "step": "check_steps/2",
+      "component_ids": [],
+      "question": "How to observe STX_PAD_O logic 1 and internal transmitter to receiver shift connection during loopback from t_modem_seq without serial_data agent?"
+    },
+    {
+      "step": "check_steps/3",
+      "component_ids": [],
+      "question": "Deferred: check t_modem_seq_chk_rts is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_seq_chk_dtr is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_seq_chk_loopmap is a built-in bus check on modem_control_if, which is not a bus agent"
+    },
+    {
+      "step": "check_steps/4",
+      "component_ids": [
+        "t_modem_seq_mon_modem"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [],
+      "question": "Deferred: coverage t_modem_seq_cov_inputs does not fit the testbench: Coverage bin exceeds its selected field/mask width; coverage t_modem_seq_cov_mcr does not fit the testbench: Coverage bin exceeds its selected field/mask width; hook t_modem_seq_cov_sample does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [],
+      "question": "Deferred: coverage t_modem_seq_cov_inputs does not fit the testbench: Coverage bin exceeds its selected field/mask width; coverage t_modem_seq_cov_mcr does not fit the testbench: Coverage bin exceeds its selected field/mask width; hook t_modem_seq_cov_sample does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [],
+      "question": "Deferred: coverage t_modem_seq_cov_inputs does not fit the testbench: Coverage bin exceeds its selected field/mask width; coverage t_modem_seq_cov_mcr does not fit the testbench: Coverage bin exceeds its selected field/mask width; hook t_modem_seq_cov_sample does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/3",
+      "component_ids": [],
+      "question": "Deferred: coverage t_modem_seq_cov_inputs does not fit the testbench: Coverage bin exceeds its selected field/mask width; coverage t_modem_seq_cov_mcr does not fit the testbench: Coverage bin exceeds its selected field/mask width; hook t_modem_seq_cov_sample does not fit the testbench: Agent hook requires an agent target"
+    }
+  ],
+  "questions": [
+    "What are the inactive and idle driven levels for cts_pad_i, dsr_pad_i, ri_pad_i and dcd_pad_i? Do not infer from names.",
+    "What is wb_rst_i active polarity and what are rts_pad_o and dtr_pad_o levels during reset and does MCR clear per f_mcr_reset?",
+    "What are the WISHBONE pin addresses and byte lanes and write masks for MCR controls and for any MSR observation?",
+    "What setup plus hold and minimum spacing apply to modem input toggles relative to clock edges?",
+    "What does a WISHBONE read of write-only MCR return?",
+    "What are the required MSR current-state versus delta semantics including complement versus loopback equality and DCTS plus DDSR plus TERI plus DDCD set and clear on read for checks?",
+    "What IER enable combination gates modem-status interrupt observation during modem toggles?",
+    "How to observe STX_PAD_O logic 1 and internal transmitter to receiver shift connection during loopback from t_modem_seq without serial_data agent?",
+    "Deferred (quick testing): check t_modem_seq_chk_rts is a built-in bus check on modem_control_if, which is not a bus agent",
+    "Deferred (quick testing): check t_modem_seq_chk_dtr is a built-in bus check on modem_control_if, which is not a bus agent",
+    "Deferred (quick testing): check t_modem_seq_chk_loopmap is a built-in bus check on modem_control_if, which is not a bus agent",
+    "Deferred (quick testing): coverage t_modem_seq_cov_inputs does not fit the testbench: Coverage bin exceeds its selected field/mask width",
+    "Deferred (quick testing): coverage t_modem_seq_cov_mcr does not fit the testbench: Coverage bin exceeds its selected field/mask width",
+    "Deferred (quick testing): hook t_modem_seq_cov_sample does not fit the testbench: Agent hook requires an agent target"
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "sequencer_variables": [],
+  "registers": [],
+  "facts": [
+    {
+      "id": "t_bringup_clk_f_fifo_cleared",
+      "statement": "Receiver and transmitter FIFOs are cleared upon reset",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter FIFOs are cleared.",
+      "plan_pointer": "/sections/5/entries/9"
+    },
+    {
+      "id": "t_bringup_clk_f_outputs_known",
+      "statement": "DUT outputs must reach known non-X or non-Z values after WB_RST_I deassertion",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Upon reset the core performs the following tasks:",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "t_bringup_clk_f_clk_115200",
+      "statement": "WISHBONE clock table includes point 3.6864 for 115200 bps",
+      "source_id": "CH-8e56094e71",
+      "quote": "3.6864 for\n115200 bps",
+      "plan_pointer": "/sections/10/entries/8"
+    },
+    {
+      "id": "t_bringup_clk_f_clk_1200",
+      "statement": "WISHBONE clock table includes point 1258Mhz for 1200 bps",
+      "source_id": "CH-8e56094e71",
+      "quote": "1258Mhz for\n1200 bps",
+      "plan_pointer": "/sections/10/entries/8"
+    }
+  ],
+  "sequences": [],
+  "routes": [],
+  "checks": [
+    {
+      "id": "t_bringup_clk_check_known_wb",
+      "agent": "wishbone_bus",
+      "kind": "known_controls",
+      "fact_ids": [
+        "t_bringup_clk_f_outputs_known"
+      ]
+    }
+  ],
+  "hooks": [],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "Which common clock UVC configures wb_clk_i to symbolic PERIOD_TEST before reset or traffic and holds period fixed during reset and traffic, since sys_clock clock_gen is INFERRED quick-test approval only and sys_clock is not a shared agent, and what are units nominal min max and resolution for 3.6864 for 115200 bps and 1258Mhz for 1200 bps?"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [],
+      "question": "Which common clock UVC observes stable clock for SYM_STABLE_CYCLES cycles before reset, since sys_clock is not a shared agent, and how must timing scale with PERIOD_TEST?"
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [],
+      "question": "What is the active level and polarity of wb_rst_i for assert to SYM_RESET_ACTIVE and hold for SYM_RESET_CYCLES scaled to PERIOD_TEST, and which common reset UVC drives it since sys_reset reset_seq is INFERRED quick-test approval only and sys_reset is not a shared agent?"
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [],
+      "question": "What is inactive level of wb_rst_i for deassertion and SYM_SETTLE_CYCLES settling wait, and which common reset and clock UVCs coordinate it since sys_clock and sys_reset are not shared agents?"
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [],
+      "question": "How to spawn per-interface idle handling on wishbone_bus serial_data and modem_control_if via explicit sequencer handles with spawn only and no delays and no virtual-interface access without power_on_reset virtual sequence, since cross-agent virtual coordination is INFERRED only and unsupported, and what idle register and pin values indicate success?"
+    },
+    {
+      "step": "stimulus_steps/5",
+      "component_ids": [],
+      "question": "How to repeat bring-up with PERIOD_TEST fixed per test for each directed documented point 3.6864 for 115200 bps and 1258Mhz for 1200 bps and each seeded random stratum in separate tests, since period control requires common clock UVC and full Max Min Resolution mapping is unresolved?"
+    },
+    {
+      "step": "stimulus_steps/6",
+      "component_ids": [],
+      "question": "Is dynamic clock period change permitted during reset or traffic or must period remain fixed per test with change only between tests before reset and traffic, and which common clock UVC applies change?"
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [
+        "t_bringup_clk_check_known_wb"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [],
+      "question": "How to compare receiver and transmitter FIFOs for cleared empty state after reset before further traffic without documented register addresses, masks, or readback values?"
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [],
+      "question": "Which common clock monitor analysis port samples observed clock edges to classify PERIOD_TEST into symbolic band and stratum bins, since clock is not a shared agent and cg_sys_clk is INFERRED quick-test approval only?"
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [],
+      "question": "How to sample boundary classification for documented points 3.6864 and 1258Mhz without claiming exhaustive frequency proof or gap coverage, since full Max Min Resolution mapping is unresolved and clock is not a shared agent?"
+    }
+  ],
+  "questions": [
+    "What is the active level and polarity of wb_rst_i and required assert and deassert sequencing?",
+    "What are units nominal min max and resolution for documented WISHBONE clock points 3.6864 for 115200 bps and 1258Mhz for 1200 bps?",
+    "How must reset duration and all sequence timing scale with the selected clock period in cycles versus absolute time?",
+    "What idle register and pin check is required after deassertion before configuration and what values indicate success?",
+    "Is dynamic clock period change permitted during reset or traffic or must period remain fixed per test?",
+    "Which common clock UVC configures wb_clk_i to symbolic PERIOD_TEST before reset or traffic and holds period fixed during reset and traffic, since sys_clock clock_gen is INFERRED quick-test approval only and sys_clock is not a shared agent, and what are units nominal min max and resolution for 3.6864 for 115200 bps and 1258Mhz for 1200 bps?",
+    "Which common clock UVC observes stable clock for SYM_STABLE_CYCLES cycles before reset, since sys_clock is not a shared agent, and how must timing scale with PERIOD_TEST?",
+    "What is the active level and polarity of wb_rst_i for assert to SYM_RESET_ACTIVE and hold for SYM_RESET_CYCLES scaled to PERIOD_TEST, and which common reset UVC drives it since sys_reset reset_seq is INFERRED quick-test approval only and sys_reset is not a shared agent?",
+    "What is inactive level of wb_rst_i for deassertion and SYM_SETTLE_CYCLES settling wait, and which common reset and clock UVCs coordinate it since sys_clock and sys_reset are not shared agents?",
+    "How to spawn per-interface idle handling on wishbone_bus serial_data and modem_control_if via explicit sequencer handles with spawn only and no delays and no virtual-interface access without power_on_reset virtual sequence, since cross-agent virtual coordination is INFERRED only and unsupported, and what idle register and pin values indicate success?",
+    "How to repeat bring-up with PERIOD_TEST fixed per test for each directed documented point 3.6864 for 115200 bps and 1258Mhz for 1200 bps and each seeded random stratum in separate tests, since period control requires common clock UVC and full Max Min Resolution mapping is unresolved?",
+    "Is dynamic clock period change permitted during reset or traffic or must period remain fixed per test with change only between tests before reset and traffic, and which common clock UVC applies change?",
+    "How to compare receiver and transmitter FIFOs for cleared empty state after reset before further traffic without documented register addresses, masks, or readback values?",
+    "Which common clock monitor analysis port samples observed clock edges to classify PERIOD_TEST into symbolic band and stratum bins, since clock is not a shared agent and cg_sys_clk is INFERRED quick-test approval only?",
+    "How to sample boundary classification for documented points 3.6864 and 1258Mhz without claiming exhaustive frequency proof or gap coverage, since full Max Min Resolution mapping is unresolved and clock is not a shared agent?",
+    "Deferred (quick testing): check t_bringup_clk_check_known_serial is a built-in bus check on serial_data, which is not a bus agent",
+    "Deferred (quick testing): check t_bringup_clk_check_known_modem is a built-in bus check on modem_control_if, which is not a bus agent",
+    "Deferred (quick testing): check t_bringup_clk_check_known_irq is a built-in bus check on uart_interrupt, which is not a bus agent"
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "understanding": "Overrun corner burst reuses t_loopback_stage staged transfer setup to fill Receiver FIFO via serial_data RX bursts then inject extra characters while full with varied Receiver Buffer pop timing, checking DOCUMENTED LSR bit1 OE reporting, FIFO-intact DR, clear-on-LSR-read and Receiver Line Status IIR 011 with pending bit; burst_depth and pop timing are symbolic INFERRED knobs, all expectations from DOCUMENTED LSR-IIR-FCR items.",
+  "preconditions": [
+    "PRE clock running at symbolic fixed period via common clock and reset released via common reset with symbolic polarity; wishbone_bus owns wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i and observes wb_dat_o wb_ack_o, serial_data owns srx_pad_i and observes stx_pad_o, modem_control_if owns cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i at symbolic idle, uart_interrupt observes int_o",
+    "PRE Receiver FIFO cleared via documented FCR bit1 write-then LSR read shows OE cleared and DR 0 empty before burst [f_rx_fifo_clear] [f_overrun_field] [f_dr_field]",
+    "PRE serial frame and divisor use symbolic programming agreed between configuration bus writes and serial_data driver-monitor bit_cycles; symbolic knob burst_depth scales fill level and symbolic full-heavy distribution varies pop timing as architecture only, no invented depth or timing values"
+  ],
+  "stimulus_steps": [
+    "STAGE 0 directed bring-up: virtual spawns only, no VIFs or delays; wishbone_bus child clears FIFO then polls LSR for DR 0 and OE 0, serial_data child sends one clean RX character then wishbone_bus child pops Receiver Buffer and polls LSR [f_rx_fifo_clear] [f_dr_field]",
+    "STAGE 1 fill burst: virtual concurrently spawns serial_data burst of symbolic burst_depth RX characters back-to-back at symbolic divisor-derived character time with no pops to hold full, plus wishbone_bus LSR polls for DR 1 to flag FIFO-full event; per-agent children drive only own interface",
+    "STAGE 2 overrun injection with varied pop timing: FOR each corner iteration IF FIFO-full event THEN serial_data injects extra RX character while full including back-to-back overrun events WHILE wishbone_bus varies Receiver Buffer pop timing over no-pop versus immediate-pop versus delayed-pop symbolic schedule; track RX versus Receiver Buffer read completed-transaction queues filtered by origin, configuration writes excluded",
+    "STAGE 3 recovery: wishbone_bus LSR read to clear OE then drain remaining FIFO via Receiver Buffer reads, plus serial_data clean traffic to show return to OE 0 with DR progression [f_overrun_field]"
+  ],
+  "check_steps": [
+    "COMPARE LSR bit1 OE equals 1 after FIFO-full plus extra character received in shift register via wishbone_bus LSR read completion queue [f_overrun_field] [f_overrun_required]",
+    "COMPARE FIFO-intact after overrun: LSR bit0 DR remains 1 and prior FIFO occupancy still readable via Receiver Buffer read completions without loss, configuration writes excluded from payload route [f_dr_field] [f_dr_required]",
+    "COMPARE LSR OE clears upon LSR read: second LSR read shows bit1 equals 0 while DR reflects remaining occupancy [f_overrun_field]",
+    "COMPARE IIR bits 3-1 equals 011 Receiver Line Status with bit0 equals 0 pending when OE set, reset by Reading LSR, with int_o observed via uart_interrupt plus wishbone_bus IIR read [f_iir_rls] [f_iir_pending] [f_iir_check]"
+  ],
+  "coverage_steps": [
+    "SAMPLE monitor-sampled LSR OE equals 1 with DR equals 1 in FIFO-full overrun window via dedicated subscriber tapping wishbone_bus monitor LSR-read analysis port and serial_data monitor rx analysis port [f_overrun_required] [f_dr_required]",
+    "SAMPLE varied pop-timing strata: no-pop versus pop-during-overrun versus back-to-back overrun with IIR 011 Receiver Line Status activation [f_iir_rls] [f_iir_check]",
+    "SAMPLE LSR read-clear transition OE 1 to 0 and interrupt pending 0 to 1 as activation covers for OE checks [f_overrun_field] [f_iir_pending]"
+  ],
+  "completion": [
+    "WAIT all spawned wishbone_bus plus serial_data children complete OR UNTIL TESTBENCH request_timeout_cycles expires as operational limit only, not DUT timing",
+    "DRAIN wishbone_bus plus serial_data plus uart_interrupt monitors for drain_cycles as TESTBENCH operational limit then close virtual sequence",
+    "CLEANUP deassert wb_stb_i and wb_cyc_i via wishbone_bus driver to symbolic idle, release sequencer handles, leave serial_data and modem_control_if at symbolic idle, re-clear Receiver FIFO via documented FCR action if needed [f_rx_fifo_clear]"
+  ],
+  "facts": [
+    {
+      "id": "f_overrun_field",
+      "statement": "LSR bit1 OE is 1 when FIFO full and another character received in receiver shift register; starting arrival overwrites shift register but FIFO remains intact; bit clears on LSR read and generates Receiver Line Status interrupt.",
+      "source_id": "CH-a2dd758e55",
+      "quote": " \u20181\u2019 \u2013 If the FIFO is full and another character has been\nreceived in the receiver shift register. If another character is starting\nto arrive, it will overwrite the data in the shift register but the FIFO\nwill remain intact. The bit is cleared upon reading from the register.\nGenerates Receiver Line Status interrupt.",
+      "plan_pointer": "/registers/registers/9/fields/1"
+    },
+    {
+      "id": "f_overrun_required",
+      "statement": "Require LSR bit1 to report overrun when FIFO full and another character arrives in shift register.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "If the FIFO is full and another character has been\nreceived in the receiver shift register.",
+      "plan_pointer": "/sections/8/entries/9"
+    },
+    {
+      "id": "f_dr_field",
+      "statement": "LSR bit0 DR is 0 when no characters in FIFO and 1 when at least one received character is in FIFO.",
+      "source_id": "CH-a2dd758e55",
+      "quote": " \u20180\u2019 \u2013 No characters in the FIFO\n \u20181\u2019 \u2013 At least one character has been received and is in the\nFIFO.",
+      "plan_pointer": "/registers/registers/9/fields/0"
+    },
+    {
+      "id": "f_dr_required",
+      "statement": "Require LSR bit0 to report 1 when at least one received character is in FIFO and 0 when empty.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "At least one character has been received and is in the\nFIFO.",
+      "plan_pointer": "/sections/8/entries/8"
+    },
+    {
+      "id": "f_iir_rls",
+      "statement": "IIR bits 3-1 code 011 is highest-priority Receiver Line Status for parity, overrun, framing or break, reset by reading LSR.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 1 1 1 st Receiver Line\nStatus\nParity, Overrun or Framing\nerrors or Break Interrupt\nReading the Line\nStatus Register",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_check",
+      "statement": "Require IIR bits 3-1 to report highest priority pending interrupt with stated source and reset control including Receiver Line Status reset by LSR read.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Parity, Overrun or Framing\nerrors or Break Interrupt\nReading the Line\nStatus Register",
+      "plan_pointer": "/sections/8/entries/6"
+    },
+    {
+      "id": "f_iir_pending",
+      "statement": "Require IIR bit0 to report pending as 0 and no pending as 1.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019. When it\u2019s \u20181\u2019 \u2013 no interrupt\nis pending.",
+      "plan_pointer": "/sections/8/entries/5"
+    },
+    {
+      "id": "f_rx_fifo_clear",
+      "statement": "Writing 1 to FCR bit1 clears Receiver FIFO and resets its logic without clearing shift register reception.",
+      "source_id": "CH-dfb1048908",
+      "quote": "Writing a \u20181\u2019 to bit 1 clears the Receiver FIFO and resets its logic.\nBut it doesn\u2019t clear the shift register, i.e. receiving of the current\ncharacter continues.",
+      "plan_pointer": "/registers/registers/5/fields/1"
+    }
+  ],
+  "questions": [
+    "What is DOCUMENTED Receiver FIFO depth and full threshold in bytes and exact overrun arrival timing: shift-register-complete while full versus start-of-next-character overwrite, beyond already DOCUMENTED FIFO-intact and clear-on-LSR-read semantics?",
+    "What are DOCUMENTED WISHBONE bindings for Receiver Buffer pop read, LSR read and IIR read in DATA_BUS_WIDTH_8 build: literal wb_adr_i pin values, DLAB gating for divisor versus data addresses, access types, and legality of unused addresses?",
+    "What are DOCUMENTED legal serial frame and divisor programming for overrun bursts: LCR data_bits parity stop_bits, divisor latch values, divisor-derived character time and fixed wb_clk_i period for bit_cycles agreement between bus writes and serial_data driver-monitor?",
+    "What is active level of wb_rst_i, inactive idle levels of wb_stb_i wb_cyc_i wb_we_i wb_sel_i srx_pad_i cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i, owners or tie_offs for all DUT inputs during burst, wb_ack_o latency and back-to-back idle rule, and TESTBENCH request_timeout_cycles plus drain_cycles values?",
+    "What are DOCUMENTED comparison masks and read-clear mirror handling for LSR OE versus DR and IIR RLS code when checking FIFO-intact and OE 1-to-0 on LSR read, with configuration writes excluded from payload routes?"
+  ],
+  "blockers": []
+}

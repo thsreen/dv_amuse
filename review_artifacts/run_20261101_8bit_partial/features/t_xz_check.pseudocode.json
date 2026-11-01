@@ -1,0 +1,75 @@
+{
+  "understanding": "Implement passive XZ protocol checks flagging X or Z on WISHBONE responder ports RS232 serial pads and modem handshake signals on default clock sampling with immediate error, depending on established bus serial and modem monitor sampling.",
+  "preconditions": [
+    "wishbone_bus passive monitor sampling established for DATA_BUS_WIDTH_8 responder",
+    "serial_data passive monitor sampling established for stx_pad_o tx and srx_pad_i rx",
+    "modem_control passive observer sampling established for rts_pad_o dtr_pad_o cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i",
+    "common clock stable and reset at symbolic inactive level with monitors driving nothing"
+  ],
+  "stimulus_steps": [],
+  "check_steps": [
+    "SAMPLE wishbone_bus ports wb_adr_i wb_sel_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o in monitor on SYM_CLK_DEFAULT_EDGE while reset inactive",
+    "IF any sampled wishbone_bus bit is X or Z THEN FLAG immediate protocol error for wishbone_bus XZ",
+    "SAMPLE serial_data ports stx_pad_o srx_pad_i in monitor on SYM_CLK_DEFAULT_EDGE while reset inactive",
+    "IF any sampled serial_data bit is X or Z THEN FLAG immediate protocol error for serial_data XZ",
+    "SAMPLE modem_control ports rts_pad_o dtr_pad_o cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i in observer on SYM_CLK_DEFAULT_EDGE while reset inactive",
+    "IF any sampled modem_control bit is X or Z THEN FLAG immediate protocol error for modem_control XZ",
+    "GATE all XZ flagging while reset asserted per symbolic SYM_RESET_GATING without assuming polarity or idle levels"
+  ],
+  "coverage_steps": [],
+  "completion": [
+    "WAIT for monitor XZ evaluations to settle and event queues to drain within TEST_TIMEOUT_CYCLES operational limit not DUT timing",
+    "CLEANUP release monitor observation handles with monitors driving nothing"
+  ],
+  "facts": [
+    {
+      "id": "f_wb_protocol",
+      "statement": "WISHBONE bus uses WISHBONE protocol for slave register access.",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "2.1 WISHBONE interface signals",
+      "plan_pointer": "/interfaces/groups/0/property_evidence/protocol"
+    },
+    {
+      "id": "f_wb_signals",
+      "statement": "WISHBONE bus groups WB_ADDR_I WB_SEL_I WB_DAT_I WB_DAT_O WB_WE_I WB_STB_I WB_CYC_I WB_ACK_O.",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "2.1 WISHBONE interface signals",
+      "plan_pointer": "/interfaces/groups/0"
+    },
+    {
+      "id": "f_serial_rs232",
+      "statement": "Serial communication uses RS232 protocol to modem or other external devices.",
+      "source_id": "CH-2baa4497c0",
+      "quote": "like another computer using a serial cable and RS232 protocol.",
+      "plan_pointer": "/sections/1/entries/3"
+    },
+    {
+      "id": "f_modem_mcr",
+      "statement": "Modem control register transfers control signals to modem connected UART.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The modem control register allows transferring control signals to a modem connected to",
+      "plan_pointer": "/sections/1/entries/4"
+    },
+    {
+      "id": "f_data8",
+      "statement": "Core implements 8-bit data bus for compatibility in DATA_BUS_WIDTH_8 build.",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "It has an 8-bit data bus for compatibility reason.",
+      "plan_pointer": "/sections/10/entries/3"
+    },
+    {
+      "id": "f_xz_scope",
+      "statement": "Flag X or Z sampled on WISHBONE serial and modem control and data signals in monitors.",
+      "source_id": "CH-32b051cdb1",
+      "quote": "UART IP Core",
+      "plan_pointer": "/sections/8/entries/0"
+    }
+  ],
+  "questions": [
+    "Confirm which control and data signals are covered by XZ checks?",
+    "On which clock edge must wishbone_bus serial_data and modem_control XZ sampling occur given default CLK sampling only?",
+    "How must XZ checks be gated during wb_rst_i assertion and immediately after deassertion without inferring polarity?",
+    "Does XZ coverage include wb_sel_i wb_adr_i lanes and all modem inputs versus only outputs and data, and does it exclude int_o wb_clk_i and wb_rst_i itself?"
+  ],
+  "blockers": []
+}

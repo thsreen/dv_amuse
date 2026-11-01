@@ -1,0 +1,178 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_shared_dir_shared_addr",
+      "agent": "wishbone_bus",
+      "width": 3,
+      "default": 0,
+      "fact_ids": [
+        "f_thr_1_2",
+        "f_dlab_1"
+      ]
+    },
+    {
+      "id": "t_shared_dir_thr_data",
+      "agent": "wishbone_bus",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "f_thr_1_2",
+        "f_wb_1"
+      ]
+    }
+  ],
+  "registers": [],
+  "facts": [
+    {
+      "id": "f_thr_1_2",
+      "statement": "THR at address 0 width 8 access W is Transmit FIFO input",
+      "source_id": "CH-f88915355b",
+      "quote": "Transmitter Holding\nRegister (THR)\n0 8 W Transmit FIFO input",
+      "plan_pointer": "/registers/registers/2"
+    },
+    {
+      "id": "f_dlab_1",
+      "statement": "Divisor latches accessed when LCR DLAB bit 7 is 1 while addresses 0-1 normal registers cannot be accessed",
+      "source_id": "CH-f88915355b",
+      "quote": "The registers can be accessed when the 7th (DLAB) bit of the Line Control Register is set\nto \u20181\u2019. At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/registers/registers/2"
+    },
+    {
+      "id": "f_wb_1",
+      "statement": "Core implements WISHBONE SoC bus interface with 8-bit data bus as responder",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "The core implements the WISNBONE SoC bus interface for communication with the\nsystem. It has an 8-bit data bus for compatibility reason.",
+      "plan_pointer": "/sections/10/entries/3"
+    },
+    {
+      "id": "f_pad_1",
+      "statement": "STX_PAD_O is serial output and SRX_PAD_I is serial input",
+      "source_id": "CH-98be4510fb",
+      "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+      "plan_pointer": "/sections/10/entries/4"
+    },
+    {
+      "id": "f_serial_1",
+      "statement": "UART core provides serial communication with modem or external devices",
+      "source_id": "CH-2baa4497c0",
+      "quote": "The UART (Universal Asynchronous Receiver/Transmitter) core provides serial\ncommunication capabilities",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/function"
+    }
+  ],
+  "sequences": [],
+  "routes": [],
+  "checks": [],
+  "hooks": [],
+  "coverage": [
+    {
+      "id": "t_shared_dir_regcov_shared_addr_dir",
+      "agent": "wishbone_bus",
+      "points": [
+        {
+          "name": "t_shared_dir_addr",
+          "field": "address",
+          "mask": 7,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "addr0",
+              "values": [
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "t_shared_dir_dir",
+          "field": "kind",
+          "mask": 1,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "write_dir",
+              "values": [
+                1
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [
+        {
+          "name": "t_shared_dir_addr0_write_THR",
+          "points": [
+            "t_shared_dir_addr",
+            "t_shared_dir_dir"
+          ]
+        }
+      ],
+      "sample_kinds": [
+        1
+      ],
+      "sample_address": 0,
+      "fact_ids": [
+        "f_thr_1_2",
+        "f_dlab_1",
+        "f_wb_1"
+      ]
+    }
+  ],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "Deferred: register t_shared_dir_thr does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_shared_dir_seq_thr_write does not fit the testbench: register_write names 't_shared_dir_thr', which is not a declared register: ['t_div_dlab_cov_div_lsb', 't_div_dlab_cov_div_msb', 't_modem_seq_mcr', 't_reset_fifo_lcr_lcr', 't_uart_cfg_fcr']; hook t_shared_dir_hook_cov_sample does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [],
+      "question": "Confirm shared-address direction decoding for coverage: documented address access for Receiver Buffer read at 0 versus THR write at 0 and IIR read at 2 versus FIFO Control write at 2 and IER RW at 1? Only THR is documented; FIFO Control and Line Control items are empty and RB IIR IER lack documented items."
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [],
+      "question": "Deferred: register t_shared_dir_thr does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_shared_dir_seq_thr_write does not fit the testbench: register_write names 't_shared_dir_thr', which is not a declared register: ['t_div_dlab_cov_div_lsb', 't_div_dlab_cov_div_msb', 't_modem_seq_mcr', 't_reset_fifo_lcr_lcr', 't_uart_cfg_fcr']; hook t_shared_dir_hook_cov_sample does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [
+        "t_shared_dir_regcov_shared_addr_dir"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [
+        "t_shared_dir_regcov_shared_addr_dir"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [],
+      "question": "Confirm shared-address direction decoding for coverage: documented address access for Receiver Buffer read at 0 versus THR write at 0 and IIR read at 2 versus FIFO Control write at 2 and IER RW at 1? Only THR is documented; FIFO Control and Line Control items are empty and RB IIR IER lack documented items."
+    },
+    {
+      "step": "coverage_steps/3",
+      "component_ids": [],
+      "question": "Confirm sampling event and encoding: ACK-qualified completed transfer versus address phase, WE value for read versus write, 3-bit wb_adr_i pin-value representation 0 to 6, and legality of addr7 for illegal_bins?"
+    },
+    {
+      "step": "coverage_steps/4",
+      "component_ids": [
+        "t_shared_dir_regcov_shared_addr_dir"
+      ],
+      "question": ""
+    }
+  ],
+  "questions": [
+    "Confirm shared-address direction decoding for coverage: documented address access for Receiver Buffer read at 0 versus THR write at 0 and IIR read at 2 versus FIFO Control write at 2 and IER RW at 1? Only THR is documented; FIFO Control and Line Control items are empty and RB IIR IER lack documented items.",
+    "Confirm DLAB0 precondition for normal shared-address sampling: LCR DLAB bit position access reset value and MSB-first LSB-next divisor routing versus blocking of 0-1, and required programming order?",
+    "Confirm sampling event and encoding: ACK-qualified completed transfer versus address phase, WE value for read versus write, 3-bit wb_adr_i pin-value representation 0 to 6, and legality of addr7 for illegal_bins?",
+    "What are active owner or evidenced tie_off and inactive levels during this coverage for all DUT inputs: wb_rst_i polarity, wb_stb_i wb_cyc_i wb_we_i wb_sel_i levels, and drivers for srx_pad_i cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i while observing rts_pad_o dtr_pad_o int_o?",
+    "Confirm per-instance false scope, review-gate pass criteria for regcov_shared_addr_dir, and TESTBENCH request_timeout_cycles drain_cycles limits without implying DUT timing?",
+    "Deferred (quick testing): register t_shared_dir_thr does not fit the testbench: Banked/aliased register mirrors require an explicit extension",
+    "Deferred (quick testing): sequence t_shared_dir_seq_thr_write does not fit the testbench: register_write names 't_shared_dir_thr', which is not a declared register: ['t_div_dlab_cov_div_lsb', 't_div_dlab_cov_div_msb', 't_modem_seq_mcr', 't_reset_fifo_lcr_lcr', 't_uart_cfg_fcr']",
+    "Deferred (quick testing): hook t_shared_dir_hook_cov_sample does not fit the testbench: Agent hook requires an agent target"
+  ]
+}

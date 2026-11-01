@@ -1,0 +1,87 @@
+{
+  "understanding": "Implement passive observers for modem_control_if on rts_pad_o dtr_pad_o cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i and uart_interrupt on int_o with analysis ports for status and interrupt comparison after bring-up clock and reset order. baud_output has no RTL port and no agent and is retained as unsupported without driving or sampling.",
+  "preconditions": [
+    "WAIT for clock stable at SYM_CLK_PERIOD and reset deasserted plus SYM_IDLE_CYCLES before enabling observers",
+    "ASSUME wishbone_bus owns wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i and observes wb_dat_o wb_ack_o",
+    "ASSUME serial_data owns srx_pad_i and observes stx_pad_o",
+    "ASSUME modem_control_if owns cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i and observers tap rts_pad_o dtr_pad_o plus inputs passively",
+    "ASSUME uart_interrupt observes int_o passively and drives nothing",
+    "ASSUME monitors drive no DUT inputs and provide analysis ports for scoreboard plumbing"
+  ],
+  "stimulus_steps": [],
+  "check_steps": [
+    "SAMPLE rts_pad_o dtr_pad_o cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i on clock and PUBLISH modem_status_event to analysis port without driving",
+    "SAMPLE int_o level on clock and on transition PUBLISH interrupt_event to analysis port without driving",
+    "IF reset asserted THEN FLUSH partial modem and interrupt events and WAIT for deassertion plus SYM_IDLE_CYCLES before resuming SAMPLE",
+    "COMPARE observed int_o level against IIR bit0 value from wishbone_bus read to qualify pending versus no-pending",
+    "CHECK observed int_o assertion only when corresponding IER bit among 0-3 is enabled as programmed via wishbone_bus"
+  ],
+  "coverage_steps": [
+    "SAMPLE cg_interrupt from uart_interrupt analysis port covering IIR pending versus no-pending and IER bits 0-3 combinations including all-disabled",
+    "SAMPLE cg_modem from modem_control_if analysis port covering each pin toggle and combined status change"
+  ],
+  "completion": [
+    "WAIT for modem and interrupt event queues to drain within TEST_TIMEOUT_CYCLES operational limit not DUT timing",
+    "CLEANUP release observer handles and leave DUT pins to owners with monitors driving nothing"
+  ],
+  "facts": [
+    {
+      "id": "f_ier_enable",
+      "statement": "IER enables and disables interrupt generation by the UART.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "This register allows enabling and disabling interrupt generation by the UART.",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_ier_bit0",
+      "statement": "IER bit 0 controls Received Data available interrupt disabled when 0 enabled when 1.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "0 RW Received Data available interrupt",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_ier_bit1",
+      "statement": "IER bit 1 controls Transmitter Holding Register empty interrupt.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "1 RW Transmitter Holding Register empty interrupt",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_ier_bit2",
+      "statement": "IER bit 2 controls Receiver Line Status Interrupt.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "2 RW Receiver Line Status Interrupt",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_ier_bit3",
+      "statement": "IER bit 3 controls Modem Status Interrupt.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "3 RW Modem Status Interrupt",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_iir_pending0",
+      "statement": "IIR bit 0 reports interrupt pending when 0.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/5"
+    },
+    {
+      "id": "f_iir_nopending1",
+      "statement": "IIR reports no interrupt pending when 1.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "When it\u2019s \u20181\u2019 \u2013 no interrupt",
+      "plan_pointer": "/sections/8/entries/5"
+    }
+  ],
+  "questions": [
+    "Confirm modem interrupt and baud observation ports and passive roles including analysis port destinations?",
+    "Where is BAUD_O physical port and binding given interface has no BAUD_O and existing agents have no baud_output?",
+    "How do rts_pad_o dtr_pad_o map to MCR and cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i map to MSR status and delta including loopback routing for comparison?",
+    "How does each IER enable bit gate INT_O assertion priority and clearing including which wishbone_bus register access clears each RDA THRE line-status modem-status source?",
+    "What clock edge and synchronization depth must modem and interrupt monitors use and how must they flush on reset given wb_rst_i polarity duration sequencing unresolved?",
+    "What are idle tie-off levels for modem inputs when modem_control_if inactive and required post-reset idle checks before observation?"
+  ],
+  "blockers": []
+}
