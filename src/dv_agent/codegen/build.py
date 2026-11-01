@@ -117,7 +117,12 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
             with stage('code_validation'):
                 ports=validate(plan,specification,definition,sources)
             if llm:
-                with stage('code_review'): review(llm,plan,directory)
+                with stage('code_review'):
+                    try: review(llm,plan,directory)
+                    except ValueError as exc:
+                        # A prototype keeps the reviewer's objections as questions instead of redesigning the whole contract.
+                        if not (enabled() and (directory/'quick_testing.json').is_file()): raise
+                        plan.questions.append('Review (quick testing): '+str(exc)[:600])
             else: skip('code_review')
             break
         except ValueError as exc:

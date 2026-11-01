@@ -762,7 +762,11 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                                                   bus_ids=[a.id for a in assembled.agents if a.protocol=='wishbone'])
                     from .defer_unsupported import defer_until_valid
                     deferred={**deferred,**defer_until_valid(f,lambda candidate:validate(_merge(assembled,candidate),plan,definition,sources))}
-                    if deferred: emit(f'code work: deferred {len(deferred)} unsupported item(s): {", ".join(deferred)}')
+                    if deferred:
+                        from .fact_reconcile import drop_unreferenced_facts
+                        drop_unreferenced_facts(f)
+                        emit(f'code work: deferred {len(deferred)} unsupported item(s): {", ".join(deferred)}')
+                    row['deferred_items']=sorted(deferred)
                 _facts_in_context(f.facts,selected)
                 validate(_merge(assembled,f),plan,definition,sources)
                 mapped=[m.step for m in f.step_implementations]
@@ -802,6 +806,8 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 'builtin coverage references apply only where its existing bins actually meet the goal. '
                 'Coverage must subscribe to observed monitor transactions. Do not invent expected behavior.',fragment_check)
             assembled=_merge(assembled,fragment)
+            from .defer_unsupported import complete_items
+            row['complete_items']=complete_items(fragment)
             _write(work/(tid+'.fragment.json'),fragment.model_dump())
             completed[tid]['sequences']=[s.id for s in fragment.sequences]
             completed[tid]['checks']=[c.id for c in fragment.checks]
@@ -821,70 +827,85 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             for tid in wave:
                 task=tasks[tid]
                 row=unit_row(tid,task.title)
-                row.update(status='RUN',phase='retrieve');save_execution()
-                emit(f'code feature {tid}: retrieve excerpts, write pseudocode, implement scoped components')
-                targets=[]
-                for p in task.plan_pointers:
-                    entry=pointer(plan,p)
-                    targets.append(dict(plan_pointer=p,**{k:entry[k] for k in
-                        ('text','details','kind','provenance','cited_chunk_ids','cited_req_ids') if k in entry}))
-                direct={sid for target in targets for sid in target.get('cited_chunk_ids',[])+target.get('cited_req_ids',[])}
-                selected=evidence.fetch(task.queries+[task.goal]+[t['text'] for t in targets],source_ids=direct)
-                payload=dict(task=task.model_dump(),planning_intentions=targets,high_level_strategy=strategy,
-                             dependencies={d.task_id:completed[d.task_id] for d in task.depends_on},
-                             existing_agent_ids=[a.id for a in assembled.agents],
-                             interface=definition,evidence=selected)
-                _write(work/(tid+'.context.json'),payload)
-                categories={intent['category'] for intent in intentions if intent['plan_pointer'] in task.plan_pointers}
-                def pseudo_check(p):
-                    _facts_in_context(p.facts,selected)
-                    validate_facts(p.facts,plan,sources)
-                    problems=_pseudocode_problems(p,categories)
-                    if problems: raise ValueError('; '.join(problems))
+                try:
+                    row.update(status='RUN',phase='retrieve');save_execution()
+                    emit(f'code feature {tid}: retrieve excerpts, write pseudocode, implement scoped components')
+                    targets=[]
+                    for p in task.plan_pointers:
+                        entry=pointer(plan,p)
+                        targets.append(dict(plan_pointer=p,**{k:entry[k] for k in
+                            ('text','details','kind','provenance','cited_chunk_ids','cited_req_ids') if k in entry}))
+                    direct={sid for target in targets for sid in target.get('cited_chunk_ids',[])+target.get('cited_req_ids',[])}
+                    selected=evidence.fetch(task.queries+[task.goal]+[t['text'] for t in targets],source_ids=direct)
+                    payload=dict(task=task.model_dump(),planning_intentions=targets,high_level_strategy=strategy,
+                                 dependencies={d.task_id:completed[d.task_id] for d in task.depends_on},
+                                 existing_agent_ids=[a.id for a in assembled.agents],
+                                 interface=definition,evidence=selected)
+                    _write(work/(tid+'.context.json'),payload)
+                    categories={intent['category'] for intent in intentions if intent['plan_pointer'] in task.plan_pointers}
+                    def pseudo_check(p):
+                        _facts_in_context(p.facts,selected)
+                        validate_facts(p.facts,plan,sources)
+                        problems=_pseudocode_problems(p,categories)
+                        if problems: raise ValueError('; '.join(problems))
 
-                def recover_pseudo(retry,rejected,reason):
-                    nonlocal selected
-                    previous=rejected if isinstance(rejected,dict) else {}
-                    gaps=[q for key in ('blockers','questions') for q in
-                          (previous.get(key,[]) if isinstance(previous.get(key,[]),list) else []) if isinstance(q,str)]
-                    queries=gaps[:8]+task.queries+[task.goal]
-                    selected=evidence.fetch(queries,source_ids=direct,focus=True)
-                    emit(f'code feature {tid}: recover evidence for incomplete pseudocode')
-                    retry=retry|dict(evidence=selected,previous_pseudocode={k:v for k,v in previous.items() if k!='facts'})
-                    _write(work/(tid+'.recovery.context.json'),retry)
-                    return retry
+                    def recover_pseudo(retry,rejected,reason):
+                        nonlocal selected
+                        previous=rejected if isinstance(rejected,dict) else {}
+                        gaps=[q for key in ('blockers','questions') for q in
+                              (previous.get(key,[]) if isinstance(previous.get(key,[]),list) else []) if isinstance(q,str)]
+                        queries=gaps[:8]+task.queries+[task.goal]
+                        selected=evidence.fetch(queries,source_ids=direct,focus=True)
+                        emit(f'code feature {tid}: recover evidence for incomplete pseudocode')
+                        retry=retry|dict(evidence=selected,previous_pseudocode={k:v for k,v in previous.items() if k!='facts'})
+                        _write(work/(tid+'.recovery.context.json'),retry)
+                        return retry
 
-                row.update(phase='understand_and_pseudocode');save_execution()
-                pseudo=call('code_pseudocode',payload,Pseudocode,
-                    'This is feature planning, not the final runnable CodePlan: retain supported partial algorithms '
-                    'even when other features or final bus bindings need clarification. Do not require a complete '
-                    'register map or all protocol settings to plan a supported monitor/check/coverage feature. '
-                    'The only testbench agents are the ids in existing_agent_ids; the clock and reset are common UVCs and are not '
-                    'agents, so never name a clock or reset agent: describe such steps in terms of the clock or reset itself. '
-                    'Collate this feature and its dependencies into precise language-neutral pseudocode: '
-                    'preconditions, stimulus steps, comparisons/checks, monitor-sampled coverage and bounded completion. '
-                    'Provide steps for each assigned stimulus/checks/coverage intention; unused categories may be empty. '
-                    'Use algorithmic IF/FOR/WAIT/SAMPLE/COMPARE steps with termination and cleanup. '
-                    'Testbench timeouts are operational limits, not DUT requirements. '
-                    'Supply exact source-backed facts for behavior; explicitly TEST_AUTO_APPROVED inferred plan items '
-                    'may be used only in isolated quick testing. Other INFERRED/ASSUMED intentions guide architecture only. '
-                    'Use symbolic references to supported settings if concrete bindings are unresolved, without inventing values. '
-                    'Questions record missing or ambiguous details; blockers list ONLY essential gaps preventing ALL supported '
-                    'work in this feature. Questions alone are not pseudocode. Inspect supplied documented items and excerpts '
-                    'before asking for information already present. On repair use recovered excerpts to resolve gaps, retaining '
-                    'supported work. Never invent expected behavior to fill a required list. Do not emit SystemVerilog.',
-                    pseudo_check,recover_pseudo)
-                _write(work/(tid+'.pseudocode.json'),pseudo.model_dump())
-                _artifact(work/(tid+'.md'),_document(task,pseudo,independent[tid]))
-                completed[tid]=dict(understanding=pseudo.understanding,completion=pseudo.completion,
-                                    questions=pseudo.questions)
-                pseudocode_by_id[tid]=pseudo;contexts[tid]=selected
-                work_manifest['pseudocode_tasks'].append(tid)
-                _write(directory/'code_work_manifest.json',work_manifest)
-                if not pseudocode_only:
-                    row.update(phase='implement');save_execution()
-                    implement_feature(tid,pseudo,selected)
-                row.update(phase='checkpoint',status='PLANNED' if pseudocode_only else 'PASS');save_execution()
+                    row.update(phase='understand_and_pseudocode');save_execution()
+                    pseudo=call('code_pseudocode',payload,Pseudocode,
+                        'This is feature planning, not the final runnable CodePlan: retain supported partial algorithms '
+                        'even when other features or final bus bindings need clarification. Do not require a complete '
+                        'register map or all protocol settings to plan a supported monitor/check/coverage feature. '
+                        'The only testbench agents are the ids in existing_agent_ids; the clock and reset are common UVCs and are not '
+                        'agents, so never name a clock or reset agent: describe such steps in terms of the clock or reset itself. '
+                        'Collate this feature and its dependencies into precise language-neutral pseudocode: '
+                        'preconditions, stimulus steps, comparisons/checks, monitor-sampled coverage and bounded completion. '
+                        'Provide steps for each assigned stimulus/checks/coverage intention; unused categories may be empty. '
+                        'Use algorithmic IF/FOR/WAIT/SAMPLE/COMPARE steps with termination and cleanup. '
+                        'Testbench timeouts are operational limits, not DUT requirements. '
+                        'Supply exact source-backed facts for behavior; explicitly TEST_AUTO_APPROVED inferred plan items '
+                        'may be used only in isolated quick testing. Other INFERRED/ASSUMED intentions guide architecture only. '
+                        'Use symbolic references to supported settings if concrete bindings are unresolved, without inventing values. '
+                        'Questions record missing or ambiguous details; blockers list ONLY essential gaps preventing ALL supported '
+                        'work in this feature. Questions alone are not pseudocode. Inspect supplied documented items and excerpts '
+                        'before asking for information already present. On repair use recovered excerpts to resolve gaps, retaining '
+                        'supported work. Never invent expected behavior to fill a required list. Do not emit SystemVerilog.',
+                        pseudo_check,recover_pseudo)
+                    _write(work/(tid+'.pseudocode.json'),pseudo.model_dump())
+                    _artifact(work/(tid+'.md'),_document(task,pseudo,independent[tid]))
+                    completed[tid]=dict(understanding=pseudo.understanding,completion=pseudo.completion,
+                                        questions=pseudo.questions)
+                    pseudocode_by_id[tid]=pseudo;contexts[tid]=selected
+                    work_manifest['pseudocode_tasks'].append(tid)
+                    _write(directory/'code_work_manifest.json',work_manifest)
+                    if not pseudocode_only:
+                        row.update(phase='implement');save_execution()
+                        implement_feature(tid,pseudo,selected)
+                    from .defer_unsupported import feature_status
+                    row.update(phase='checkpoint',status='PLANNED' if pseudocode_only else feature_status(row.get('deferred_items'),row.get('complete_items',0)));save_execution()
+                except ValueError as exc:
+                    # Quick testing builds a prototype: a feature that cannot be completed is listed and the run goes on.
+                    from ..quality.quick_testing import enabled as quick_enabled
+                    if isinstance(exc,(HumanReviewPending,PlanUpdated)) or not (quick_enabled() and (directory/'quick_testing.json').is_file()): raise
+                    reason=str(exc).splitlines()[0][:240]
+                    emit(f'code work: deferred feature {tid}: {reason}')
+                    pseudocode_by_id.pop(tid,None)
+                    completed[tid]=dict(understanding=f'Deferred (quick testing): {reason}',sequences=[],checks=[],routes=[],coverage=[],questions=[])
+                    assembled.questions=list(dict.fromkeys(assembled.questions+[f'Deferred (quick testing): feature {tid} was not built: {reason}']))
+                    execution['status']='IN_PROGRESS';work_manifest.update(status='IN_PROGRESS');work_manifest.pop('blocked_stage',None);work_manifest.pop('reason',None)
+                    row.update(phase='checkpoint',status='DEFERRED',deferred_reason=reason);save_execution()
+        if not pseudocode_by_id:
+            raise ValueError('No feature could be completed; see the deferred features in the execution plan')
         try:
             approach=_collate(call,strategy,tasks,pseudocode_by_id)
         except ValueError as exc:
@@ -941,5 +962,8 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             '\n\n'.join(f'## {tid}\n\n{completed[tid]["understanding"]}\n\n[Detailed pseudocode]({tid}.md)' for wave in waves for tid in wave))
         execution['status']='COMPLETE_NEEDS_REVIEW';save_execution()
         work_manifest['status']='COMPLETE_NEEDS_REVIEW'
+        work_manifest['features']=dict(passed=[r['id'] for r in execution['steps'] if r['id'] in tasks and r['status']=='PASS'],
+                                       deferred=[r['id'] for r in execution['steps'] if r['id'] in tasks and r['status']=='DEFERRED'],
+                                       deferred_items=sum(len(r.get('deferred_items',[])) for r in execution['steps']))
         _write(directory/'code_work_manifest.json',work_manifest)
         return assembled

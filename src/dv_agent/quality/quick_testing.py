@@ -14,6 +14,26 @@ def enabled():
     return os.getenv(ENV) == '1'
 
 
+def _resumable_copy(source):
+    """The newest quick-testing copy of this exact saved plan, so /code after a restart resumes from its checkpoints.
+
+    A copy made before the source plan last changed is stale. A newly planned run has a new source and starts its own copy.
+    """
+    plan = source/'dv/testplan_doc.json'
+    if not plan.is_file():
+        return None
+    copies = []
+    for path in source.parent.glob(source.name+'-quick-testing-*'):
+        marker = path/'quick_testing.json'
+        try:
+            if json.loads(marker.read_text()).get('source_run') == str(source) and marker.stat().st_mtime >= plan.stat().st_mtime \
+                    and (path/'dv/testplan_doc.json').is_file():
+                copies.append((marker.stat().st_mtime, str(path), path))
+        except (OSError, ValueError):
+            continue
+    return max(copies)[2] if copies else None
+
+
 def prepare_run(source):
     from .human_review import utc, write
     source = Path(source).resolve()
@@ -21,6 +41,10 @@ def prepare_run(source):
     if (source/'quick_testing.json').is_file():
         approve_inferred_plan(source)
         return source
+    earlier = _resumable_copy(source)
+    if earlier is not None:
+        approve_inferred_plan(earlier)
+        return earlier
     target = source.parent / (source.name + '-quick-testing-' + utc().replace(':', '').replace('.', '').replace('+', ''))
     target.mkdir()
     write(target/'quick_testing.json', dict(test_only=True, source_run=str(source), warning=WARNING))

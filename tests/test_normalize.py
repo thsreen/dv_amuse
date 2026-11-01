@@ -86,11 +86,30 @@ def test_a_feature_answer_uses_the_real_agents_and_a_clashing_fact_gets_a_new_id
         sequences=[dict(id='s', agent='bus_agent', purpose='p', fact_ids=['f1'], operations=[dict(kind='idle', cycles=1)])],
         routes=[dict(id='r', expected_agent='bus_agent', expected_event='write', actual_agent='link', actual_event='tx', mask=255, fact_ids=['f1'],
                      when=[dict(agent='collateral_bus', address=3, mask=1, value=0)])])
-    renamed = normalize_fragment(answer, ['bus', 'link'], {'f1': dict(FACT, statement='another fact under the same label')})
+    renamed = normalize_fragment(answer, ['bus', 'link'], {'f1': dict(FACT, quote='different evidence under the same label')})
     assert answer.checks[0].agent == answer.sequences[0].agent == answer.routes[0].expected_agent == answer.routes[0].when[0].agent == 'bus'
     assert renamed == {'f1': 'f1_2'} and answer.facts[0].id == 'f1_2' and answer.checks[0].fact_ids == ['f1_2'] and answer.routes[0].fact_ids == ['f1_2']
+
+
+def test_a_fact_already_in_the_plan_is_reused_with_its_references_and_copies_in_one_answer_collapse():
+    """Run 1423: 257 facts, only 204 of them distinct, passed the contract's limit of 256."""
+    answer = fragment(facts=[dict(FACT, id='mine', statement='reworded'), dict(FACT, id='mine_again', statement='again'), dict(FACT, id='new', quote='new evidence here')],
+                      checks=[dict(id='c', agent='bus', kind='known_controls', fact_ids=['mine', 'mine_again', 'new'])])
+    normalize_fragment(answer, ['bus'], {'f1': dict(FACT)})
+    assert [f.id for f in answer.facts] == ['new'] and answer.checks[0].fact_ids == ['f1', 'new']
     same = fragment()
-    assert normalize_fragment(same, ['bus'], {'f1': dict(FACT)}) == {} and same.facts[0].id == 'f1'  # an identical fact merges
+    assert normalize_fragment(same, ['bus'], {'f1': dict(FACT)}) == {} and same.facts == []  # already in the plan
+    fresh = fragment(facts=[dict(FACT, id='a'), dict(FACT, id='b')], checks=[dict(id='c', agent='bus', kind='known_controls', fact_ids=['b'])])
+    normalize_fragment(fresh, ['bus'], {})
+    assert [f.id for f in fresh.facts] == ['a'] and fresh.checks[0].fact_ids == ['a']
+
+
+def test_facts_only_a_deferred_item_cited_do_not_enter_the_plan():
+    from dv_agent.codegen.fact_reconcile import drop_unreferenced_facts
+    answer = fragment(facts=[dict(FACT, id='used'), dict(FACT, id='orphan', quote='cited only by a dropped item')],
+                      checks=[dict(id='c', agent='bus', kind='known_controls', fact_ids=['used'])])
+    drop_unreferenced_facts(answer)
+    assert [f.id for f in answer.facts] == ['used']
 
 
 def test_quick_testing_defers_a_bus_check_on_a_non_bus_agent_and_a_sequence_on_a_missing_agent():

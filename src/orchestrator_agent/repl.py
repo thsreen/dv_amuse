@@ -339,6 +339,13 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                     show(f"Code: {result['code_dir']} ({policy['kept']} documented items retained as code input; "
                          f"{policy['skipped']} unsupported or inferred items excluded).")
                 show(f"Built tests: {', '.join(t['name'] for t in result['tests'])}.")
+                try:
+                    features = json.loads((out / "code_work_manifest.json").read_text()).get("features")
+                except (OSError, ValueError):
+                    features = None
+                if features and (features["deferred"] or features["deferred_items"]):
+                    show(f"Quick testing: {len(features['passed'])} features passed, {len(features['deferred'])} deferred, "
+                         f"{features['deferred_items']} items deferred; the reasons are in the code questions.")
                 if result.get('work_documents'):
                     show(f"Feature dependencies and pseudocode: {result['work_documents']}")
                 if result.get("contract"):

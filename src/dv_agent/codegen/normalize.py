@@ -6,7 +6,7 @@ cost repair attempts and stopped runs while the decision itself was fine. Everyt
 is written into the unit's questions. Nothing here adds behaviour or evidence.
 """
 from .contracts import Agent, TieOff, safe_identifier
-from .fact_reconcile import rename_conflicting_facts
+from .fact_reconcile import rename_conflicting_facts, reuse_existing_facts
 from .validate import agent_id_is_free, builtin_protocol, canonical_roles
 
 BODY_SLOTS = ("driver.body", "monitor.body")
@@ -97,7 +97,8 @@ def agent_alias(name, agent_ids):
 
 
 def normalize_fragment(fragment, agent_ids, known_facts):
-    """Feature answers: agent names resolve to the real agents and a fact id already used differently gets a new id."""
+    """Feature answers: agent names resolve to the real agents, facts already in the plan are reused, and a fact id already
+    used for different evidence gets a new id."""
     ids = set(agent_ids)
     for item in (*fragment.sequences, *fragment.checks, *fragment.coverage, *fragment.registers, *fragment.sequencer_variables):
         item.agent = agent_alias(item.agent, ids)
@@ -107,4 +108,5 @@ def normalize_fragment(fragment, agent_ids, known_facts):
             condition.agent = agent_alias(condition.agent, ids)
     for hook in fragment.hooks:
         hook.target = agent_alias(hook.target, ids)
+    reuse_existing_facts(fragment, known_facts)
     return rename_conflicting_facts(fragment, known_facts)

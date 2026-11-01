@@ -23,3 +23,16 @@ quick evaluator and keeps its own assumptions and test-only approval records.
 
 Remove the isolated run to discard the temporary approvals. Generator source and normal plans never
 depend on the copied run. This mode is intended only for quick tests and demos.
+
+## Prototype behaviour of `/code`
+
+Quick testing builds a prototype, so a run does not stop on what it cannot build:
+
+- An item in a feature that does not fit the contract is deferred with the rule it broke.
+- A feature with deferrals passes once 2 of its items are complete (sequences, routes, checks, coverage, hooks). Below that it is
+  `DEFERRED`: what it did build stays, and the run goes on.
+- A feature that cannot be completed after its repair is `DEFERRED` and not built. Reviewer objections become questions.
+- `/code` reports the counts, and every deferral is in the code questions. A passing prototype is not functional sign-off.
+
+`/code` resumes from the newest quick-testing copy of the same saved plan, also after a restart. Model answers come back from its
+cache until a request differs. A new `/plan`, or `/fresh`, starts a new copy. Normal runs still stop and ask.

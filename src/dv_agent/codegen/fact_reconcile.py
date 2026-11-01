@@ -75,3 +75,41 @@ def rename_conflicting_facts(unit, known):
         for item in references:
             item.fact_ids = [renamed.get(x, x) for x in item.fact_ids]
     return renamed
+
+
+def _fact_key(fact):
+    return (fact["source_id"], fact["quote"], fact["plan_pointer"]) if isinstance(fact, dict) else (fact.source_id, fact.quote, fact.plan_pointer)
+
+
+def reuse_existing_facts(unit, known):
+    """A fact is its evidence: the same source, quote and plan item already in the plan is reused, not added under a new id.
+
+    Each model answer restates the facts it cites, so a long run outgrows the contract's fact limit with copies.
+    known: {fact id: fact dict}. References in the unit follow. Returns {dropped id: reused id}.
+    """
+    by_evidence = {_fact_key(fact): fact_id for fact_id, fact in known.items()}
+    reused, kept = {}, []
+    for fact in unit.facts:
+        existing = by_evidence.get(_fact_key(fact))
+        if existing is None:
+            by_evidence[_fact_key(fact)] = fact.id
+            kept.append(fact)
+        elif existing != fact.id:
+            reused[fact.id] = existing
+        elif fact.id not in known:
+            kept.append(fact)
+    unit.facts[:] = kept
+    if reused:
+        references = []
+        _references(unit, references)
+        for item in references:
+            item.fact_ids = list(dict.fromkeys(reused.get(x, x) for x in item.fact_ids))
+    return reused
+
+
+def drop_unreferenced_facts(unit):
+    """Facts only a deferred item cited need not enter the plan."""
+    references = []
+    _references(unit, references)
+    used = {x for item in references for x in item.fact_ids}
+    unit.facts[:] = [fact for fact in unit.facts if fact.id in used]

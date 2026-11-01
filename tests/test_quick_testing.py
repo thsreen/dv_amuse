@@ -82,3 +82,18 @@ def test_quick_testing_copy_not_selected_as_normal_plan(tmp_path,monkeypatch):
     path.write_text(json.dumps(plan))
     monkeypatch.setenv(ENV,'1');copy=prepare_run(source)
     assert copy!=source and latest_successful(source.parent)[0]==source
+
+
+def test_code_after_a_restart_resumes_the_newest_copy_of_the_same_plan(tmp_path,monkeypatch):
+    import os
+    source,_,_=seed(tmp_path)
+    monkeypatch.setenv(ENV,'1')
+    first=prepare_run(source)
+    assert prepare_run(source)==first  # a new session on the same saved plan keeps its checkpoints
+    (first/'llm_cache').mkdir();(first/'llm_cache/kept').write_text('x')
+    assert (prepare_run(source)/'llm_cache/kept').is_file()
+    plan=source/'dv/testplan_doc.json'
+    later=(first/'quick_testing.json').stat().st_mtime+5
+    os.utime(plan,(later,later))  # the saved plan changed after the copy was made
+    second=prepare_run(source)
+    assert second!=first and not (second/'llm_cache').exists()

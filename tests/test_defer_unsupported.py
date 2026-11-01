@@ -190,3 +190,59 @@ def test_quick_testing_defers_any_item_the_contract_refuses_and_a_normal_build_s
     assert result['contract'] == 'verification_codegen_v1'
     built = json.loads((run / 'code_plan.json').read_text())
     assert built['hooks'] == [] and any('storage_feature_hook' in q and 'Agent hook requires' in q for q in built['questions'])
+
+
+def test_a_feature_with_deferrals_passes_once_two_items_are_complete():
+    from dv_agent.codegen.defer_unsupported import complete_items, feature_status
+    assert feature_status(['x'], 2) == 'PASS' and feature_status(['x'], 3) == 'PASS'
+    assert feature_status(['x'], 1) == 'DEFERRED' and feature_status(['x'], 0) == 'DEFERRED'
+    assert feature_status([], 0) == 'PASS' and feature_status(None, 1) == 'PASS'  # nothing was dropped
+    assert complete_items(fragment(hooks=[_hook('good')], sequences=[_sequence()], registers=[_register()])) == 2  # a register supports, it is not a check
+
+
+def _feature_llm(contract, feature):
+    llm = workflow_model(contract)
+    llm.handlers['code_feature'] = feature
+    return llm
+
+
+def test_quick_testing_lists_a_feature_it_cannot_complete_and_carries_on(inputs, monkeypatch):
+    from dv_agent.codegen.workplan import design
+    from test_quick_testing_rounds import quick_run
+    root, plan, definition, contract, rtl = inputs
+    plan['sections'][0]['entries'].append(dict(plan['sections'][0]['entries'][0]))
+    run, plan_path = quick_run(root, plan, monkeypatch)
+    llm = workflow_model(contract)
+    normal = llm.handlers['code_feature']
+    llm.handlers['code_feature'] = lambda p: dict(normal(p), step_implementations=[]) if p['task_id'] == 'broken_feature' else normal(p)
+    task = lambda name, entry: dict(id=name, title=name, category='feature', goal='Read/write storage control', plan_pointers=[f'/sections/0/entries/{entry}'],
+                                    depends_on=[], queries=['control storage register clock reset bus'])
+    llm.handlers['code_grouping'] = lambda p: dict(understanding='Two features', tasks=[task('broken_feature', 0), task('storage_feature', 1)], questions=[])
+    llm.handlers['code_collation'] = lambda p: dict(shared_setup=['Reuse the shared bus'], execution_order=[list(p['features'])], stimulus_approach=['Sequence'],
+                                                    check_approach=['Compare'], coverage_approach=['Monitor'], questions=[])
+    built = design(llm, json.loads(plan_path.read_text()), definition, {'CH-spec': plan['evidence_index']['CH-spec']['excerpt']}, run)
+    manifest = json.loads((run / 'code_work_manifest.json').read_text())
+    assert manifest['status'] == 'COMPLETE_NEEDS_REVIEW' and manifest['features']['deferred'] == ['broken_feature'] and manifest['features']['passed'] == ['storage_feature']
+    assert any(q.startswith('Deferred (quick testing): feature broken_feature was not built') for q in built.questions)
+    assert [t.id for t in built.tests] and built.sequences
+
+
+def test_quick_testing_says_so_when_no_feature_could_be_completed(inputs, monkeypatch):
+    from dv_agent.codegen.workplan import design
+    from test_quick_testing_rounds import quick_run
+    root, plan, definition, contract, rtl = inputs
+    run, plan_path = quick_run(root, plan, monkeypatch)
+    llm = workflow_model(contract)
+    normal = llm.handlers['code_feature']
+    llm.handlers['code_feature'] = lambda p: dict(normal(p), step_implementations=[])
+    with pytest.raises(ValueError, match='No feature could be completed'):
+        design(llm, json.loads(plan_path.read_text()), definition, {'CH-spec': plan['evidence_index']['CH-spec']['excerpt']}, run)
+
+
+def test_a_normal_build_still_stops_on_a_feature_it_cannot_complete(inputs):
+    from dv_agent.codegen.workplan import design
+    root, plan, definition, contract, rtl = inputs
+    normal = workflow_model(contract).handlers['code_feature']
+    llm = _feature_llm(contract, lambda p: dict(normal(p), step_implementations=[]))
+    with pytest.raises(ValueError, match='exactly one implementation mapping'):
+        design(llm, plan, definition, {'CH-spec': plan['evidence_index']['CH-spec']['excerpt']}, root / 'output')

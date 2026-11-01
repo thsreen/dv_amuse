@@ -86,3 +86,17 @@ def defer_until_valid(fragment, check):
     for key in COMPONENTS:
         getattr(fragment, key)[:] = getattr(kept, key)
     return _record(fragment, {item.id: f"{key.rstrip('s')} {item.id} does not fit the testbench: {errors[item.id]}" for key, item in pending})
+
+
+# A prototype feature passes with deferrals once this many of its items are complete (user decision, quick testing).
+MIN_COMPLETE_ITEMS = 2
+COUNTED = ("sequences", "routes", "checks", "coverage", "hooks")
+
+
+def complete_items(fragment):
+    return sum(len(getattr(fragment, key)) for key in COUNTED)
+
+
+def feature_status(deferred, complete):
+    """PASS unless items were deferred and too few are left; DEFERRED features do not stop the run."""
+    return "DEFERRED" if deferred and complete < MIN_COMPLETE_ITEMS else "PASS"
