@@ -5,6 +5,7 @@ from pathlib import Path
 
 def _identity_matches(saved, selected):
     if selected.get('rtl_top') and saved.get('rtl_top')!=selected['rtl_top']: return False
+    if 'rtl_defines' in selected and set(saved.get('rtl_defines') or [])!=set(selected['rtl_defines']): return False
     chosen={str(Path(p).resolve()) for p in selected.get('rtl_files',[])}
     previous={str(Path(p).resolve()) for p in saved.get('rtl_files',[])}
     if chosen: return bool(chosen & previous)

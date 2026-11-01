@@ -46,6 +46,14 @@ def load_sources(plan, graph_path=None):
     return sources
 
 
+def _apply_configuration(plan, definition, *, explicit):
+    """Compile the RTL as the interface was extracted. An operator's explicit contract may add defines; a model may not,
+    because a define changes the ports and the configuration comes from the request."""
+    configured=list(definition.get('defines',[]))
+    plan.defines=list(dict.fromkeys(configured+plan.defines)) if explicit else configured
+    return plan
+
+
 def build_project(plan_path, interface_path, directory, *, llm=None, contract_path=None,
                   rtl_files=(), expected_top=None, compile=False):
     plan_path,interface_path,directory=Path(plan_path).resolve(),Path(interface_path).resolve(),Path(directory).resolve()
@@ -97,6 +105,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
         raise ValueError('Functional generation requires an explicit code contract or an enabled model')
     if expected_top and plan.top!=expected_top:
         raise ValueError('Code contract top does not match the selected design')
+    _apply_configuration(plan,definition,explicit=bool(contract_path))
     emit('code [2/5]: validate evidence, ownership, protocol bindings and comparisons')
     if not plan.clock_period_ranges:
         question='Clock-period randomization is not configured: confirm operating bands; the nominal testbench period does not establish DUT limits.'
@@ -118,6 +127,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
             plan=design(llm,specification,definition,sources,directory,previous=plan.model_dump(),feedback=str(exc),top=expected_top)
             if expected_top and plan.top!=expected_top:
                 raise ValueError('Repaired code contract top does not match the selected design')
+            _apply_configuration(plan,definition,explicit=False)
     if not plan.tests:
         atomic_write_text(directory/'code_plan.json',plan.model_dump_json(indent=2)+'\n')
         raise ValueError('No executable tests: '+'; '.join(plan.questions or ['Implementation contract is incomplete']))

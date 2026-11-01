@@ -34,6 +34,11 @@ def interface_definition(contract: dict, *, groups: dict | None = None) -> dict:
     definition["sources"] = [Path(s).name for s in sources]
     definition["parameters"] = [dict(name=p["name"].upper(), width=p["value"] if detailed else p["width"])
                                 for p in contract["parameters"]]
+    # Only when set, so an unconfigured interface keeps its format. The compile step needs the same configuration.
+    configured = (contract.get("configuration") or {}).get("defines") if detailed else contract.get("defines")
+    if configured:
+        definition["defines"] = (sorted(k if v == "1" else f"{k}={v}" for k, v in configured.items())
+                                 if isinstance(configured, dict) else list(configured))
     parameter_names = [p["name"] for p in definition["parameters"]]
     if len(parameter_names) != len(set(parameter_names)):
         raise RTLExtractionError("parameter names collide after capitalization")

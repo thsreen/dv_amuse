@@ -83,3 +83,67 @@ def test_the_ask_card_shows_the_selected_configuration_and_an_open_question(tmp_
     assert 'RTL configuration from the request: DATA_BUS_WIDTH_8' in text
     blocked = repl.ask_card(flow, Path('flow.json'), dict(repo='r', rtl_define_question='Name the one you want.'), 'use the 8 bit version', tmp_path)
     assert 'RTL configuration: NOT SET' in blocked and 'blocked until it is named' in blocked
+
+
+def test_the_interface_records_its_configuration_only_when_one_is_set(tmp_path):
+    from rtl_agent.builder import interface_definition
+    from rtl_agent.extractor import extract_interface
+    files = rtl(tmp_path, GENERIC)
+    assert 'defines' not in interface_definition(extract_interface(files, 'bus_top'))
+    configured = interface_definition(extract_interface(files, 'bus_top', defines={'NARROW_DATA_BUS_WIDTH_8': '1', 'LEVEL': '3'}))
+    assert configured['defines'] == ['LEVEL=3', 'NARROW_DATA_BUS_WIDTH_8']
+
+
+def test_the_build_compiles_with_the_interface_configuration_and_a_model_cannot_change_it():
+    from types import SimpleNamespace
+    from dv_agent.codegen.build import _apply_configuration
+    definition = dict(defines=['WIDE'])
+    assert _apply_configuration(SimpleNamespace(defines=['EXTRA']), definition, explicit=True).defines == ['WIDE', 'EXTRA']
+    assert _apply_configuration(SimpleNamespace(defines=['EXTRA']), definition, explicit=False).defines == ['WIDE']
+    assert _apply_configuration(SimpleNamespace(defines=['EXTRA']), {}, explicit=False).defines == []
+
+
+def test_a_saved_run_with_another_configuration_is_not_restored():
+    from orchestrator_agent.saved_runs import _identity_matches
+    saved_wide = dict(rtl_top='t', rtl_files=['a.v'])
+    saved_narrow = dict(saved_wide, rtl_defines=['NARROW'])
+    assert not _identity_matches(saved_wide, dict(rtl_top='t', rtl_files=['a.v'], rtl_defines=['NARROW']))
+    assert not _identity_matches(saved_narrow, dict(rtl_top='t', rtl_files=['a.v'], rtl_defines=[]))
+    assert _identity_matches(saved_narrow, dict(rtl_top='t', rtl_files=['a.v'], rtl_defines=['NARROW']))
+    assert _identity_matches(saved_wide, dict(rtl_top='t', rtl_files=['a.v'], rtl_defines=[]))
+    assert _identity_matches(saved_narrow, dict(rtl_top='t', rtl_files=['a.v']))  # nothing selected yet: unchanged behaviour
+
+
+def test_real_uart_request_configuration_reaches_the_compile_with_no_define_in_the_contract(tmp_path, monkeypatch):
+    """Extract through the flow's tool from the top file only, as a run does; the contract names no define."""
+    import os
+    if os.getenv('DV_AGENT_TEST_SIMULATION') != '1':
+        pytest.skip('Set DV_AGENT_TEST_SIMULATION=1 for real Xezim/UVM integration')
+    from codegen_uart_fixture import create
+    from dv_agent.codegen import build_project
+    from dv_agent.codegen.simulator import discover, run_project
+    if not os.getenv('XEZIM_UVM_DIR'):
+        monkeypatch.setenv('XEZIM_UVM_DIR', str(Path(__file__).resolve().parents[1] / '.deps/uvm-core-2020.3.1/src'))
+    if discover()['status'] != 'PASS':
+        pytest.fail(str(discover()))
+    repo = create(tmp_path)
+    top = repo / 'rtl/verilog/uart_top.v'
+    defines, question = resolve('use the 8 bit version', sorted((repo / 'rtl/verilog').glob('*.v')))
+    assert question is None
+    assert run_rtl_extract(dict(files=[str(top)], top='uart_top', out=str(tmp_path / 'rtl'), build=True, define=defines), None)['status'] == 'PASS'
+    extracted = json.loads((tmp_path / 'rtl/interface_definition.json').read_text())
+    assert extracted == json.loads((tmp_path / 'interface.json').read_text()) and extracted['defines'] == ['DATA_BUS_WIDTH_8']
+    contract = json.loads((tmp_path / 'code_contract.json').read_text())
+    contract.pop('defines')
+    for agent in contract['agents']:
+        if agent['protocol'] == 'serial':
+            agent['idle_values'] = {agent['bindings']['rx']: 1}
+    contract['coverage'] = [dict(id='line_format', agent='register_bus', fact_ids=['fact_2'], sample_kinds=[1, 2], sample_address=3,
+                                 points=[dict(name='access', field='kind', mask=3, bins=[dict(name='writes', values=[1])])])]
+    (tmp_path / 'code_contract.json').write_text(json.dumps(contract))
+    manifest = build_project(tmp_path / 'testplan.json', tmp_path / 'rtl/interface_definition.json', tmp_path / 'output',
+                             contract_path=tmp_path / 'code_contract.json', rtl_files=list((repo / 'rtl/verilog').glob('*.v')), compile=True)
+    assert manifest['defines'] == ['DATA_BUS_WIDTH_8'] and manifest['compile']['status'] == 'PASS', manifest['compile']
+    result = run_project(manifest, regress=True, timeout=60)
+    assert result['status'] == 'PASS', [(t['name'], t['reason']) for t in result['tests']]
+    assert [t['scoreboard_comparisons'] for t in result['tests']] == [3, 4]
