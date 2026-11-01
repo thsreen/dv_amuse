@@ -27,7 +27,7 @@
     {"id": "testplan", "tool": "dv_testplan", "agent": "dv",
      "description": "Generate the test plan; the RTL graph feeds only the opt-in review-required observations section.",
      "args": {"out": "${out}/dv", "scope": "${scope}", "template": "${template:-}",
-              "rtl_graph": "${out}/rtl_graph/rtl_graph.json", "rtl_scope": ""}},
+              "rtl_graph": "${out}/rtl_graph/rtl_graph.json", "rtl_scope": "", "rtl_interface": "${out}/rtl/interface_definition.json"}},
     {"id": "uvm", "tool": "uvm_build", "agent": "dv",
      "description": "Build the UVM scaffold from the interface JSON and test plan. Owner approval required.",
      "review_gate": true,

@@ -361,9 +361,12 @@ def _doc_summary(doc: dict, out: Path) -> dict:
 def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Path | None = None,
                      cfg: DocConfig | None = None, embedder: Embedder | None = None,
                      force: bool = False, rtl_graph_path: Path | None = None, rtl_scope: str = "",
-                     mode: str = "basic", methodology_rules_path: Path | None = None) -> dict:
+                     mode: str = "basic", methodology_rules_path: Path | None = None,
+                     rtl_interface_path: Path | None = None) -> dict:
     """Generate the template-driven test-plan document (JSON + Markdown + HTML) from the graph."""
     _check_mode(mode)
+    from .plan.configuration import apply_sections, load_configuration
+    configuration = load_configuration(rtl_interface_path)
     if mode == "basic":
         embedder = None
         cfg = cfg or DocConfig(max_chunks=6, max_register_chunks=10, max_entries=12,
@@ -405,6 +408,7 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
                 and prev.get("source_authority", "DOCUMENTED") == G.graph.get("source_authority", "DOCUMENTED")
                 and prev.get("graph_build_trace_id") == G.graph.get("build_trace_id")
                 and prev.get("rtl_input") == rtl_input
+                and (prev.get("configuration") or {}).get("defines") == (configuration or {}).get("defines")
                 and prev.get('generation_status','COMPLETE') == 'COMPLETE'
                 and (prev.get("registers") is None or prev["registers"].get("extraction_signature") == extraction_signature())
                 and all(s["status"] == "PASS" or (s.get("generator") == "rtl_observations" and s["status"] == "NOT_RUN")
@@ -431,6 +435,7 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
             snapshot.update(document_status(snapshot))
             from .plan.testplan_doc import enforce_source_authority
             enforce_source_authority(snapshot, G.graph.get('source_authority','DOCUMENTED'))
+            apply_sections(snapshot, configuration)
             snapshot.update(mode=mode, rtl_input=rtl_input, provenance_policy=POLICY_VERSION)
             snapshot['evidence_index'] = build_evidence_index(G, snapshot)
             save_graph(G, out / GRAPH_FILE)
@@ -440,7 +445,8 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
                  f"to JSON, Markdown and HTML ({snapshot['generation_status']})")
         try:
             doc = build_testplan_doc(G, H, plan_llm, tracer, template, scope, cfg, dense_fn,
-                                    rtl_graph=rtl_graph, rtl_scope=rtl_scope, slim=slim, on_checkpoint=checkpoint)
+                                    rtl_graph=rtl_graph, rtl_scope=rtl_scope, slim=slim, on_checkpoint=checkpoint,
+                                    configuration=configuration)
         except BaseException as exc:
             status = 'INTERRUPTED' if isinstance(exc,(KeyboardInterrupt,SystemExit)) else 'ERROR'
             emit(f"testplan generation {status}: {type(exc).__name__}; completed responses remain cached")
@@ -454,6 +460,7 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
                         emit(f"partial report update failed: {type(save_error).__name__}; original failure preserved")
             raise
         from .plan.section_dependencies import document_status
+        apply_sections(doc, configuration)
         doc.update(document_status(doc))
         doc['generation_status'] = 'COMPLETE' if doc['status'] == 'PASS' else 'PARTIAL'
         doc["mode"] = mode

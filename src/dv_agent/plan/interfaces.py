@@ -272,10 +272,11 @@ def compact(interfaces: dict) -> list[dict]:
                  connected_to=g["connected_to"], peer_type=g["peer_type"], dut_role=g["dut_role"],
                  is_sideband=g["is_sideband"],
                  direction=g["direction_summary"],
-                 signals=[f"{s['name']}[{s['width'] or '?'}] {s['direction']}"
+                 signals=[f"{s['name']}[{s.get('configured_width') or s['width'] or '?'}] {s['direction']}"
                           + (f" active-{s['active_level'].replace('_', '-')}"
                              if s["active_level"] not in ("not_applicable", "unknown") else "")
-                          + (f" (if {s['availability']})" if s["availability"] else "") for s in g["signals"]])
+                          + (f" (if {s['availability']})" if s["availability"] else "") for s in g["signals"]
+                          if not s.get("inactive_in_configuration")])
             for g in interfaces.get("groups", [])]
 
 
@@ -283,6 +284,8 @@ def interface_questions(interfaces: dict) -> list[dict]:
     qs = []
     for g in interfaces.get("groups", []):
         for s in g["signals"]:
+            if s.get("inactive_in_configuration"):
+                continue
             if s["direction"] == "unknown" or not s["direction_documented"]:
                 qs.append(f"What is the direction of {s['name']} ({g['name']})? The specification text cited "
                           "does not state it explicitly.")
@@ -326,8 +329,12 @@ def render(interfaces: dict, heading: str) -> list[str]:
                   "| Signal | Width | Direction (DUT) | Active level / edge (if applicable) | Availability condition | Description |",
                   "|---|---|---|---|---|---|"]
         for s in g["signals"]:
+            if s.get("inactive_in_configuration"):
+                continue
             direction = s["direction"] + ("" if s["direction_documented"] else " (not stated)")
             width = (s["width"] or "?") + ("" if s["width_documented"] or not s["width"] else " (not stated)")
+            if s.get("configured_width"):
+                width = f"{s['configured_width']} (this build; documented: {s['width']})"
             level = s["active_level"].replace("_", " ") + ("" if s["active_level_documented"]
                                                            or s["active_level"] in ("not_applicable", "unknown")
                                                            else " (not stated)")

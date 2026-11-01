@@ -129,7 +129,8 @@ def run_dv_testplan(args: dict, ctx: StepContext) -> dict:
             template_path=Path(template) if template else None,
             embedder=ctx.embedder, force=args.get("force", ctx.force),
             rtl_graph_path=Path(rtl_graph) if rtl_graph else None,
-            rtl_scope=_opt_str(args, "rtl_scope"), mode=_pipeline_mode(args))
+            rtl_scope=_opt_str(args, "rtl_scope"), mode=_pipeline_mode(args),
+            rtl_interface_path=Path(args["rtl_interface"]) if _opt_str(args, "rtl_interface") else None)
     except Exception as exc:
         return _failed("dv_testplan", exc)
     sections = ", ".join(f"{s['id']}:{s['status']}" for s in res.get("sections", []))

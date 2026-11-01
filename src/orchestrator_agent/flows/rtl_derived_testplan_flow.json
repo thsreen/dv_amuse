@@ -22,7 +22,7 @@
      "description": "Create JSON, Markdown and HTML plans; all draft-derived checks remain inferred.",
      "args": {"out": "${out}/dv", "scope": "${scope}", "template": "${template:-}",
               "source_authority": "RTL_INFERRED",
-              "rtl_graph": "${out}/rtl_graph/rtl_graph.json", "rtl_scope": ""}}
+              "rtl_graph": "${out}/rtl_graph/rtl_graph.json", "rtl_scope": "", "rtl_interface": "${out}/rtl/interface_definition.json"}}
   ],
   "policy": {"max_attempts_per_step": 2, "max_revisits_per_step": 1,
              "max_overrides": 3, "max_total_tool_calls": 32,

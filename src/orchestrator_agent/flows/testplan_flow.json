@@ -58,7 +58,7 @@
         "scope": "${scope}",
         "template": "${template:-}",
         "rtl_graph": "${out}/rtl_graph/rtl_graph.json",
-        "rtl_scope": ""
+        "rtl_scope": "", "rtl_interface": "${out}/rtl/interface_definition.json"
       }
     }
   ],
