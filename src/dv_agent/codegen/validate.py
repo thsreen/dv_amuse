@@ -245,11 +245,16 @@ def validate(plan, specification, definition, sources):
                 raise ValueError('Route address filter requires a valid bus address')
         if (route.expected_agent, route.expected_event, route.expected_address) == (route.actual_agent, route.actual_event, route.actual_address):
             raise ValueError("Scoreboard cannot compare an event against itself")
-    for check in plan.checks:
-        if check.agent not in agents or agents[check.agent].protocol != "wishbone":
-            raise ValueError("Built-in protocol checks require a bus agent")
+    bus = sorted(a for a in agents if agents[a].protocol == "wishbone")
+    not_bus = [f"{c.id} (agent {c.agent})" for c in plan.checks if c.agent not in agents or agents[c.agent].protocol != "wishbone"]
+    if not_bus:
+        raise ValueError(f"Built-in protocol checks require a bus agent: {', '.join(not_bus)}. Bus agents: {bus or 'none'}. "
+                         "The clock and reset are common UVCs, not agents; steps about them cannot be checks, so defer them as questions.")
+    unknown = [f"{g.id} (agent {g.agent})" for g in plan.coverage if g.agent not in agents]
+    if unknown:
+        raise ValueError(f"Coverage goal references an unknown monitor agent: {', '.join(unknown)}. Agents: {sorted(agents)}. "
+                         "The clock and reset are common UVCs, not agents; coverage of them cannot be declared here, so defer it as a question.")
     for goal in plan.coverage:
-        if goal.agent not in agents: raise ValueError('Coverage goal references an unknown monitor agent')
         agent=agents[goal.agent]
         names=[identifier(p.name) for p in goal.points]+[identifier(c.name) for c in goal.crosses]
         if len(names)!=len(set(names)): raise ValueError('Duplicate coverage point/cross names')

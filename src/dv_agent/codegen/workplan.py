@@ -753,6 +753,11 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                         evidence=selected)
             def fragment_check(f):
                 row.update(phase='validate');save_execution()
+                from ..quality.quick_testing import enabled as quick_enabled
+                if quick_enabled() and (directory/'quick_testing.json').is_file():
+                    from .defer_unsupported import defer_unknown_agents
+                    deferred=defer_unknown_agents(f,[a.id for a in assembled.agents])
+                    if deferred: emit(f'code work: deferred {len(deferred)} item(s) naming an unknown agent: {", ".join(deferred)}')
                 _facts_in_context(f.facts,selected)
                 validate(_merge(assembled,f),plan,definition,sources)
                 mapped=[m.step for m in f.step_implementations]
@@ -780,7 +785,9 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 'operations; p_sequencer_config declares typed sequencer_variables and Sequence.controls referencing '
                 'operation indexes/fields. Use only supported settings. Unsupported cross-agent inheritance/control '
                 'requires explicit ordering or a question, not arbitrary SV snippets. '
-                'Use existing agent names; namespace NEW IDs with this task ID. facts must include every new '
+                'Use existing agent names only (the ids in shared_agents); the clock and reset are common UVCs, not agents, so '
+                'a step that needs a clock or reset agent is a question, never a check or coverage goal. '
+                'Namespace NEW IDs with this task ID. facts must include every new '
                 'supporting fact. Do not redefine agents or silently omit unsupported steps: put them in questions. '
                 'Map EVERY stimulus_steps/N, check_steps/N and coverage_steps/N to emitted component_ids or an explicit '
                 'question, never both. Use typed coverage goals for specific bins/crosses over cg_item fields; '
@@ -817,6 +824,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 selected=evidence.fetch(task.queries+[task.goal]+[t['text'] for t in targets],source_ids=direct)
                 payload=dict(task=task.model_dump(),planning_intentions=targets,high_level_strategy=strategy,
                              dependencies={d.task_id:completed[d.task_id] for d in task.depends_on},
+                             existing_agent_ids=[a.id for a in assembled.agents],
                              interface=definition,evidence=selected)
                 _write(work/(tid+'.context.json'),payload)
                 categories={intent['category'] for intent in intentions if intent['plan_pointer'] in task.plan_pointers}
@@ -843,6 +851,8 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                     'This is feature planning, not the final runnable CodePlan: retain supported partial algorithms '
                     'even when other features or final bus bindings need clarification. Do not require a complete '
                     'register map or all protocol settings to plan a supported monitor/check/coverage feature. '
+                    'The only testbench agents are the ids in existing_agent_ids; the clock and reset are common UVCs and are not '
+                    'agents, so never name a clock or reset agent: describe such steps in terms of the clock or reset itself. '
                     'Collate this feature and its dependencies into precise language-neutral pseudocode: '
                     'preconditions, stimulus steps, comparisons/checks, monitor-sampled coverage and bounded completion. '
                     'Provide steps for each assigned stimulus/checks/coverage intention; unused categories may be empty. '
