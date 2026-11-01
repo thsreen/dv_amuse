@@ -5,10 +5,10 @@
   "steps": [
     {"id": "rtl_ports", "tool": "rtl_extract", "agent": "rtl",
      "description": "Extract the top-level JSON port interface.",
-     "args": {"files": "${rtl_files}", "top": "${rtl_top}", "out": "${out}/rtl", "build": true}},
+     "args": {"files": "${rtl_files}", "top": "${rtl_top}", "define": "${rtl_defines:-}", "out": "${out}/rtl", "build": true}},
     {"id": "rtl_graph", "tool": "rtl_build_graph", "agent": "rtl",
      "description": "Build the source-backed hierarchy, control, clock and reset graph.",
-     "args": {"files": "${rtl_graph_files}", "top": "${rtl_top}", "out": "${out}/rtl_graph"}},
+     "args": {"files": "${rtl_graph_files}", "top": "${rtl_top}", "define": "${rtl_defines:-}", "out": "${out}/rtl_graph"}},
     {"id": "rtl_spec", "tool": "rtl_build_spec", "agent": "rtl",
      "description": "Draft a specification from the selected RTL using the generic template; every claim is inferred and needs RTL engineer review.",
      "args": {"graph": "${out}/rtl_graph/rtl_graph.json", "out": "${out}/rtl_spec"}},

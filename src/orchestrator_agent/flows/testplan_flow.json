@@ -31,6 +31,7 @@
       "args": {
         "files": "${rtl_files}",
         "top": "${rtl_top}",
+        "define": "${rtl_defines:-}",
         "out": "${out}/rtl",
         "build": true
       }
@@ -43,6 +44,7 @@
       "args": {
         "files": "${rtl_graph_files}",
         "top": "${rtl_top}",
+        "define": "${rtl_defines:-}",
         "out": "${out}/rtl_graph"
       }
     },

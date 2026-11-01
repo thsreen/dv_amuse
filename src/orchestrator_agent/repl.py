@@ -66,6 +66,10 @@ def ask_card(flow: dict, flow_path: Path, variables: dict, requirement: str,
         lines += [f"scanned: {len(scan['specs'])} specification candidate(s), {len(scan['rtl_files'])} RTL module file(s)",
                   f"RTL top: {scan['top'] or '(not identified)'}"]
         lines += [f"note: {note}" for note in scan["notes"]]
+    if variables.get("rtl_define_question"):
+        lines.append(f"RTL configuration: NOT SET. {variables['rtl_define_question']} /plan is blocked until it is named.")
+    elif variables.get("rtl_defines"):
+        lines.append(f"RTL configuration from the request: {', '.join(variables['rtl_defines'])} (passed to RTL extraction and the graph; /code uses that interface).")
     lines.append("/plan will:")
     lines.append("  1. Send startup notification to Hermes/Telegram.")
     for i, step in enumerate(flow["steps"], 2):
@@ -153,6 +157,9 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
         show("On a remote host, forward the printed port to your browser before opening the URL.")
 
     def plan():
+        if variables.get("rtl_define_question"):
+            show(f"Plan blocked: {variables['rtl_define_question']}")
+            return False
         derived = any(s["tool"] == "rtl_build_spec" for s in flow["steps"])
         if not scan or (not scan["specs"] and not derived) or not all(variables.get(k) for k in ("repo", "rtl_files", "rtl_graph_files", "rtl_top")):
             show("Name a local repository with RTL, a clear top module, and a specification or RTL-derived draft path first.")
@@ -285,6 +292,9 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                                      rtl_files=[str(scan["top_file"])] if scan["top_file"] else [],
                                      rtl_graph_files=[str(p) for p in scan["rtl_files"]],
                                      rtl_top=scan["top"])
+                    from orchestrator_agent.request_defines import resolve as resolve_defines
+                    variables["rtl_defines"], define_question = resolve_defines(line, variables["rtl_graph_files"])
+                    if define_question: variables["rtl_define_question"] = define_question
                     if not matches_current_run(out, variables):
                         out = fresh_out()
                 except (OSError, ValueError) as exc:

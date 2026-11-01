@@ -177,6 +177,11 @@ def _rtl_namespace(cmd: str, args: dict, ctx: StepContext, **extra) -> Namespace
     return Namespace(**base)
 
 
+def _defines(args: dict) -> list[str]:
+    """Compile defines from the flow: an unset request resolves to an empty default, which means no defines."""
+    return [d for d in _str_list(args.get("define")) if d.strip()]
+
+
 def _str_list(value) -> list[str]:
     if value is None:
         return []
@@ -193,7 +198,7 @@ def run_rtl_extract(args: dict, ctx: StepContext) -> dict:
                            files=[Path(p) for p in _str_list(args.get("files"))],
                            top=args.get("top", ""),
                            include_dir=[Path(p) for p in _str_list(args.get("include_dir"))],
-                           define=_str_list(args.get("define")),
+                           define=_defines(args),
                            parameter=_str_list(args.get("parameter")),
                            build=bool(args.get("build", True)),
                            emit_sv=bool(args.get("emit_sv", False)),
@@ -203,8 +208,9 @@ def run_rtl_extract(args: dict, ctx: StepContext) -> dict:
     except Exception as exc:
         return _failed("rtl_extract", exc)
     names = ["rtl_interfaces.json"] + (["interface_definition.json"] if ns.build else [])
-    return dict(status="PASS", summary=f"extracted {res.get('ports', 0)} ports",
-                files=_files(out, *names), detail=res)
+    return dict(status="PASS", summary=f"extracted {res.get('ports', 0)} ports"
+                + (f" with defines {', '.join(ns.define)}" if ns.define else ""),
+                files=_files(out, *names), detail=res, defines=ns.define)
 
 
 def run_rtl_build_interface(args: dict, ctx: StepContext) -> dict:
@@ -231,7 +237,7 @@ def run_rtl_build_graph(args: dict, ctx: StepContext) -> dict:
                            files=[Path(p) for p in _str_list(args.get("files"))],
                            top=args.get("top", ""),
                            include_dir=[Path(p) for p in _str_list(args.get("include_dir"))],
-                           define=_str_list(args.get("define")),
+                           define=_defines(args),
                            parameter=_str_list(args.get("parameter")),
                            features=Path(features) if features else None,
                            max_instances=int(args.get("max_instances", 256)))
