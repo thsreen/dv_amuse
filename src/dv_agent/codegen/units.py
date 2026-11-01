@@ -6,7 +6,7 @@ import json
 from pydantic import Field
 
 from .contracts import Model, Fact, Agent, Register, TieOff, Hook, CodePlan, ClockPeriodRange, identifier
-from .validate import canonical_roles
+from .validate import builtin_protocol, canonical_roles
 from .render import ROOT, render, template
 
 CYCLE = ['retrieve', 'understand_and_pseudocode', 'implement', 'validate', 'checkpoint']
@@ -245,13 +245,23 @@ def foundation(run_unit, call, definition, evidence, check_facts, save, validate
             required=set(task.signals) if needs.level in ('full_agent','passive_agent') else {n for n in task.signals if ports[n]['direction']=='input'}
             if not required<=set(used)<=set(task.signals) or any(len(a.bindings)!=len(set(a.bindings.values())) for a in unit.agents):
                 raise ValueError('Implement exactly this interface; bind or explicitly tie every assigned signal once')
-            for agent in unit.agents: agent.bindings=canonical_roles(agent.protocol,agent.bindings,ports)
+            for agent in unit.agents:
+                agent.bindings=canonical_roles(agent.protocol,agent.bindings,ports)
+                if agent.protocol=='custom':
+                    protocol,roles=builtin_protocol(agent.bindings,ports)
+                    if protocol:
+                        agent.protocol,agent.bindings=protocol,roles
+                        unit.questions.append(f'Agent {agent.id} uses the built-in {protocol} protocol: its ports fill every {protocol} role, so its driver and monitor are template-owned.')
             if len(unit.agents)==1 and unit.agents[0].id!=task.id:
                 # The agent id is script-owned: the model is shown the unit id (collateral_<interface>) and commonly uses it.
                 old=unit.agents[0].id;unit.agents[0].id=task.id
                 for item in (*unit.hooks,*unit.registers):
                     for field in ('target','agent'):
                         if getattr(item,field,None)==old: setattr(item,field,task.id)
+            for agent in unit.agents:
+                if agent.protocol!='custom':
+                    # Built-in protocols own their driver and monitor bodies; a hook for them is refused later, so drop it now.
+                    unit.hooks[:]=[h for h in unit.hooks if not (h.target==agent.id and h.slot in ('driver.body','monitor.body'))]
             if unit.agents and unit.agents[0].id!=task.id: raise ValueError('Agent ID must match interface task ID')
             if needs.level=='utility_config' and (unit.agents or unit.hooks or unit.registers):
                 raise ValueError('Configuration-only decision cannot build agents or protocol collateral')

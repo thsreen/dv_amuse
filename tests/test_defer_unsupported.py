@@ -87,3 +87,18 @@ def test_a_normal_build_still_refuses_it_and_says_which_agents_exist(inputs):
     root, plan, definition, contract, rtl = inputs
     with pytest.raises(ValueError, match=r"unknown monitor agent: storage_feature_clk \(agent clock_agent\). Agents: \['control'\]"):
         build_project(root / 'plan.json', root / 'interface.json', root / 'output', llm=clock_coverage_feature(contract), rtl_files=[rtl], compile=False)
+
+
+def test_a_scoreboard_hook_without_a_route_is_deferred_and_one_with_a_route_is_kept():
+    f = fragment(
+        hooks=[dict(id='compare_fifo', target='top_level_scoreboard', slot='scoreboard.compare', purpose='internal FIFO occupancy', fact_ids=[FACT]),
+               dict(id='compare_path', target='transmit_path', slot='scoreboard.compare', purpose='tx path', fact_ids=[FACT])],
+        step_implementations=[dict(step='check_steps/0', component_ids=['compare_fifo'], question=''),
+                              dict(step='check_steps/1', component_ids=['compare_path'], question='')])
+    dropped = defer_unknown_agents(f, ['control'], ['transmit_path'])
+    assert list(dropped) == ['compare_fifo'] and [h.id for h in f.hooks] == ['compare_path']
+    steps = {m.step: m for m in f.step_implementations}
+    assert steps['check_steps/0'].question.startswith('Deferred:') and steps['check_steps/1'].component_ids == ['compare_path']
+    assert any('internal state is not observable' in q for q in f.questions)
+    untouched = fragment(hooks=[dict(id='h', target='nowhere', slot='scoreboard.compare', purpose='x', fact_ids=[FACT])])
+    assert defer_unknown_agents(untouched, ['control']) == {} and len(untouched.hooks) == 1  # routes unknown: nothing is judged

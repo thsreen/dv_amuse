@@ -161,3 +161,25 @@ def test_a_different_fact_under_an_id_another_unit_used_is_renamed_with_its_refe
     again = InterfaceUnit.model_validate(dict(facts=[mine]))
     assert rename_conflicting_facts(again, {'f_source': dict(mine)}) == {}  # an identical fact merges, it is not renamed
     assert rename_conflicting_facts(again, {}) == {}
+
+
+def test_a_bus_the_model_declared_custom_with_hooks_stays_a_built_in_bus(inputs):
+    """Run …0949…: hooks on a built-in bus were refused; the repair made the agent `custom`, losing checks and register access."""
+    from dv_agent.codegen.workplan import design
+    root, spec, definition, contract, _ = inputs
+    llm = workflow_model(contract)
+    normal = llm.handlers['code_interface']
+
+    def collateral(payload):
+        result = normal(payload)
+        agent = dict(result['agents'][0], protocol='custom')
+        result['agents'] = [agent]
+        result['hooks'] = [dict(id='h_drive', target=agent['id'], slot='driver.body', purpose='drive the bus', fact_ids=['behavior']),
+                           dict(id='h_watch', target=agent['id'], slot='monitor.body', purpose='observe the bus', fact_ids=['behavior'])]
+        return result
+    llm.handlers['code_interface'] = collateral
+    plan = design(llm, spec, definition, {'CH-spec': spec['evidence_index']['CH-spec']['excerpt']}, root / 'output')
+    agent = plan.agents[0]
+    assert agent.protocol == 'wishbone' and set(agent.bindings) >= {'addr', 'wdata', 'rdata', 'we', 'stb', 'cyc', 'ack'}
+    assert not [h for h in plan.hooks if h.target == agent.id]  # the template owns the driver and monitor
+    assert any('uses the built-in wishbone protocol' in q for q in plan.questions)

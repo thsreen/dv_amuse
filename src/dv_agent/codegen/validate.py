@@ -46,6 +46,21 @@ def canonical_roles(protocol, bindings, ports):
     return assigned
 
 
+def builtin_protocol(bindings, ports):
+    """(protocol, roles) of the built-in protocol whose roles these bindings fill completely, else (None, bindings).
+
+    A bus whose ports fill every bus role IS a bus, whatever the model called it: its driver and monitor are
+    template-owned, and a `custom` agent would lose the built-in checks, register access and coverage.
+    """
+    for protocol, expected in ROLES.items():
+        roles = canonical_roles(protocol, bindings, ports)
+        required = set(expected) - ({"sel"} if protocol == "wishbone" else set())
+        if (set(roles) <= set(expected) and required <= set(roles) and len(roles) == len(bindings)
+                and all(ports[name]["direction"] == expected[role] for role, name in roles.items())):
+            return protocol, roles
+    return None, bindings
+
+
 def validate(plan, specification, definition, sources):
     if specification.get("source_authority") == "RTL_INFERRED":
         raise ValueError("Unvalidated RTL-derived expectations cannot be compiled into verification code")

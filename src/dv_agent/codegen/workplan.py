@@ -756,7 +756,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 from ..quality.quick_testing import enabled as quick_enabled
                 if quick_enabled() and (directory/'quick_testing.json').is_file():
                     from .defer_unsupported import defer_unknown_agents
-                    deferred=defer_unknown_agents(f,[a.id for a in assembled.agents])
+                    deferred=defer_unknown_agents(f,[a.id for a in assembled.agents],[r.id for r in (*assembled.routes,*f.routes)])
                     if deferred: emit(f'code work: deferred {len(deferred)} item(s) naming an unknown agent: {", ".join(deferred)}')
                 _facts_in_context(f.facts,selected)
                 validate(_merge(assembled,f),plan,definition,sources)

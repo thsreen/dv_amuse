@@ -39,3 +39,18 @@ def test_serial_role_names_map_by_the_model_name_or_the_port_name():
     two_inputs = {'p': dict(direction='input', width=1), 'q': dict(direction='input', width=1)}
     unmatched = {'serial_rx': 'p', 'serial_tx': 'q'}
     assert canonical_roles('serial', unmatched, two_inputs) is unmatched  # a transmit role needs an output: nothing is forced
+
+
+def test_ports_that_fill_every_bus_role_are_a_bus_whatever_the_model_called_the_agent():
+    from dv_agent.codegen.validate import builtin_protocol
+    named = {'address': 'p_adr', 'select': 'p_sel', 'write_data': 'p_dat_i', 'read_data': 'p_dat_o', 'write_enable': 'p_we',
+             'strobe': 'p_stb', 'cycle': 'p_cyc', 'acknowledge': 'p_ack'}
+    assert builtin_protocol(named, PORTS) == ('wishbone', WANT)
+    no_sel = {k: v for k, v in WANT.items() if k != 'sel'}
+    assert builtin_protocol(no_sel, {n: PORTS[n] for n in no_sel.values()})[0] == 'wishbone'  # the byte select is optional
+    missing_strobe = {k: v for k, v in named.items() if k != 'strobe'}
+    assert builtin_protocol(missing_strobe, PORTS) == (None, missing_strobe)  # an incomplete bus stays custom
+    extra = dict(named, other='p_extra')
+    assert builtin_protocol(extra, dict(PORTS, p_extra=dict(direction='input', width=1)))[0] is None
+    serial_ports = {'srx_pad_i': dict(direction='input', width=1), 'stx_pad_o': dict(direction='output', width=1)}
+    assert builtin_protocol({'serial_rx': 'srx_pad_i', 'serial_tx': 'stx_pad_o'}, serial_ports) == ('serial', {'rx': 'srx_pad_i', 'tx': 'stx_pad_o'})
