@@ -7,6 +7,9 @@ from .contracts import digest
 
 ROOT = Path(__file__).resolve().parents[1] / "templates" / "codegen"
 EVENTS = {"write": 1, "read": 2, "rx": 3, "tx": 4, "transaction": 5}
+# A custom agent with no declared protocol behaviour: drive_reset_values holds the inputs, sample_signals keeps the raw values.
+DEFAULT_DRIVER_BODY = "    repeat (tr.cycles) @(posedge cfg.vif.clk);"
+DEFAULT_MONITOR_BODY = "    // No protocol observation is declared for this agent."
 
 
 def template(name, **values):
@@ -91,7 +94,7 @@ def render(plan, ports, hooks=None):
                 MONITOR_SIGNAL_DECLARATIONS='\n'.join(f'  logic [{w-1}:0] sampled_{r};' for r,w in widths.items()),
                 MONITOR_RESET_ASSIGNMENTS='\n'.join(f"    sampled_{r} = '0;" for r in widths),
                 MONITOR_SIGNAL_ASSIGNMENTS='\n'.join(f'    sampled_{r} = cfg.vif.{r};' for r in widths),
-                DRIVER_HOOK=hook(a.id, 'driver.body'), MONITOR_HOOK=hook(a.id, 'monitor.body'), **values)
+                DRIVER_HOOK=hook(a.id, 'driver.body') or DEFAULT_DRIVER_BODY, MONITOR_HOOK=hook(a.id, 'monitor.body') or DEFAULT_MONITOR_BODY, **values)
             add(f"uvm/{a.id}_{component}.svh",text)
         regs = [r for r in plan.registers if r.agent == a.id]
         bins = '\n'.join(f"bins {r.id}={{{i+1}}};" for i, r in enumerate(regs)) or 'bins not_register={0};'

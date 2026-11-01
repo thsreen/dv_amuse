@@ -56,7 +56,7 @@ def builtin_protocol(bindings, ports):
         roles = canonical_roles(protocol, bindings, ports)
         required = set(expected) - ({"sel"} if protocol == "wishbone" else set())
         if (set(roles) <= set(expected) and required <= set(roles) and len(roles) == len(bindings)
-                and all(ports[name]["direction"] == expected[role] for role, name in roles.items())):
+                and all(name in ports and ports[name]["direction"] == expected[role] for role, name in roles.items())):
             return protocol, roles
     return None, bindings
 

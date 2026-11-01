@@ -9,14 +9,18 @@ written into the feature's questions so a reviewer sees what was not built. Noth
 """
 
 
-def defer_unknown_agents(fragment, agent_ids, route_ids=None):
-    """Drop checks and coverage goals whose agent is not in agent_ids, and (given route_ids) scoreboard hooks with no route.
-
-    Returns {dropped item id: reason}.
+def defer_unknown_agents(fragment, agent_ids, route_ids=None, *, bus_ids=None):
+    """Drop checks, coverage goals and sequences whose agent is not in agent_ids, built-in checks on an agent that is not a bus
+    (given bus_ids), and scoreboard hooks with no route (given route_ids). Returns {dropped item id: reason}.
     """
     known = set(agent_ids)
     dropped = {}
-    for kind, items in (("check", fragment.checks), ("coverage goal", fragment.coverage)):
+    if bus_ids is not None:
+        for check in list(fragment.checks):
+            if check.agent in known and check.agent not in bus_ids:
+                dropped[check.id] = f"check {check.id} is a built-in bus check on {check.agent}, which is not a bus agent"
+                fragment.checks.remove(check)
+    for kind, items in (("check", fragment.checks), ("coverage goal", fragment.coverage), ("sequence", fragment.sequences)):
         for item in list(items):
             if item.agent not in known:
                 dropped[item.id] = f"{kind} {item.id} named agent {item.agent}, which does not exist (clock and reset are common UVCs, not agents)"

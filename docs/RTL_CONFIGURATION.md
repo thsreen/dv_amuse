@@ -15,7 +15,11 @@ No design-specific table is used.
    the candidates. Nothing is guessed.
 5. The chosen defines go to `rtl_extract` and `rtl_build_graph` (`define` argument, `${rtl_defines:-}` in the flows). The
    interface JSON the code stage reads is then built with that configuration, so port widths and the bus roles follow it.
-6. The ask card shows the selected configuration, or the open question, before `/plan`.
+6. The interface JSON records its `defines`, and the build compiles the RTL with exactly those, so the simulated design
+   matches the interface. An explicit code contract may add defines; a model may not.
+7. A saved run with a different configuration is not restored, so `/code` never reuses a plan built for another one.
+8. On a narrow bus the byte-select port still exists but is unused: it is held at 0 (`codegen/normalize.py`).
+9. The ask card shows the selected configuration, or the open question, before `/plan`.
 
 ## Limits
 
@@ -23,10 +27,13 @@ No design-specific table is used.
   can be checked before planning.
 - The built-in bus driver supports the configurations its templates were verified for. The UART 8-bit configuration
   (`DATA_BUS_WIDTH_8`) is verified; the 32-bit byte-lane configuration is not supported by the built-in driver.
-- The model-driven `/code` stage is not yet verified live with this configuration. Only the extraction and the wiring are verified.
+- The model-driven `/code` stage is not yet verified live with this configuration. Extraction, compile and simulation are verified
+  from an explicit contract.
 
 ## Verified
 
 - `tests/test_request_defines.py` (7 tests): resolution on generic RTL, the multiple-candidate question, flow substitution,
   the extraction step on the real UART RTL (wb_dat_i 32 -> 8, wb_adr_i 5 -> 3), the full request -> define -> interface chain,
-  and the ask card.
+  the ask card, and saved-run matching.
+- Real Xezim + UVM: request -> flow extraction from the top file -> compile and run PASS with no define in the contract
+  (`DV_AGENT_TEST_SIMULATION=1 pytest tests/test_request_defines.py -k real_uart`).

@@ -338,7 +338,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
     from .units import foundation as build_foundation, CYCLE, InfrastructurePlan, InterfaceBase, infrastructure_profile, INFRASTRUCTURE_INSTRUCTIONS, PROFILE_PATH
     work=directory/'code_work'/digest([plan,definition,comparison,llm.model,INSTRUCTIONS,Path(__file__).read_text(),
                                     Path(__file__).with_name('units.py').read_text(),Path(__file__).with_name('interface_context.py').read_text(),
-                                    [Path(__file__).with_name(n+'.py').read_text() for n in ('interface_base','fact_reconcile')],
+                                    [Path(__file__).with_name(n+'.py').read_text() for n in ('interface_base','fact_reconcile','normalize','defer_unsupported')],
                                     PROFILE_PATH.read_text(),template_hash(),feedback])[:16]
     work.mkdir(parents=True,exist_ok=True)
     evidence=Evidence(plan,sources)
@@ -753,10 +753,13 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                         evidence=selected)
             def fragment_check(f):
                 row.update(phase='validate');save_execution()
+                from .normalize import normalize_fragment
+                normalize_fragment(f,[a.id for a in assembled.agents],{x.id:x.model_dump() for x in assembled.facts})
                 from ..quality.quick_testing import enabled as quick_enabled
                 if quick_enabled() and (directory/'quick_testing.json').is_file():
                     from .defer_unsupported import defer_unknown_agents
-                    deferred=defer_unknown_agents(f,[a.id for a in assembled.agents],[r.id for r in (*assembled.routes,*f.routes)])
+                    deferred=defer_unknown_agents(f,[a.id for a in assembled.agents],[r.id for r in (*assembled.routes,*f.routes)],
+                                                  bus_ids=[a.id for a in assembled.agents if a.protocol=='wishbone'])
                     if deferred: emit(f'code work: deferred {len(deferred)} item(s) naming an unknown agent: {", ".join(deferred)}')
                 _facts_in_context(f.facts,selected)
                 validate(_merge(assembled,f),plan,definition,sources)
@@ -785,8 +788,9 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 'operations; p_sequencer_config declares typed sequencer_variables and Sequence.controls referencing '
                 'operation indexes/fields. Use only supported settings. Unsupported cross-agent inheritance/control '
                 'requires explicit ordering or a question, not arbitrary SV snippets. '
-                'To write a declared register from any sequence use an operation of kind register_write with register_id set to the '
-                'register id (shared_registers) and data to the value; never compute its bus address or pick the bus agent. '
+                'To write a register from any sequence use an operation of kind register_write with register_id set to its id and '
+                'data to the value; never pick the bus agent. If the register is not yet in shared_registers, declare it in registers '
+                'with its documented address, one register per address, access WO unless its readback is documented. '
                 'Use existing agent names only (the ids in shared_agents); the clock and reset are common UVCs, not agents, so '
                 'a step that needs a clock or reset agent is a question, never a check or coverage goal. '
                 'Namespace NEW IDs with this task ID. facts must include every new '

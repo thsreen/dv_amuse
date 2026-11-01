@@ -145,7 +145,8 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
         if agent.protocol=='custom':
             slots={h.slot for h in plan.hooks if h.target==agent.id and hook_code.get(h.id)}
             if not ({'driver.body','monitor.body'} if agent.active else {'monitor.body'}) <= slots:
-                raise ValueError('Custom protocol requires monitor hooks and, for active agents, driver hooks')
+                question=f'Agent {agent.id} has no declared protocol behaviour: its driver holds the input defaults and its monitor only samples.'
+                if question not in plan.questions: plan.questions.append(question)
     with stage('code_render'):
         artifacts,compile_files=render(plan,ports,hook_code)
     rtl=[Path(p).resolve() for p in rtl_files]
