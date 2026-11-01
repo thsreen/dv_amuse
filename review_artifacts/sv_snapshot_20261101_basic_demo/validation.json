@@ -1,0 +1,42 @@
+{
+  "created_at": "2026-11-01T10:49:08.669833+00:00",
+  "source": "Copy of a real quick-testing run (orch-20261031T151451Z-quick-testing-2026-11-01T0949308016730000): its own plan, interface and approvals. Built by '/code demo basic' from demo_scripts/uart_top.json with no model call; NOT an autonomous model-generated testbench.",
+  "generator_commit": "9597ec6",
+  "configuration": {
+    "rtl_top": "uart_top",
+    "defines": [
+      "DATA_BUS_WIDTH_8"
+    ],
+    "note": "The run's interface was re-extracted with this define because the built-in bus driver needs the 8-bit configuration; the 32-bit configuration is not supported by it."
+  },
+  "simulator": "xezim version 0.11.3",
+  "uvm": "uvm-core-2020.3.1",
+  "compile": "PASS",
+  "regression": "PASS",
+  "tests": [
+    {
+      "name": "basic_demo",
+      "status": "PASS",
+      "scoreboard_comparisons": 3,
+      "uvm_counts": {
+        "INFO": 8,
+        "WARNING": 46,
+        "ERROR": 0,
+        "FATAL": 0
+      }
+    }
+  ],
+  "demonstrates": [
+    "named register writes through cg_reg_access::write (divisor, framing, FIFO control)",
+    "read-back of the line-control register",
+    "one byte transmitted through the bus and checked on the serial output",
+    "one byte driven on the serial input and read back from the bus"
+  ],
+  "not_claimed": [
+    "functional sign-off",
+    "complete UART coverage",
+    "behaviour of the 32-bit bus configuration",
+    "an autonomous /code run succeeding"
+  ],
+  "status": "BUILT_NEEDS_REVIEW"
+}
