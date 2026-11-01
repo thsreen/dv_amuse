@@ -7,11 +7,38 @@ from a few retrieved excerpts failed repeatedly: it added context facts (a secti
 text it had not been shown, and the proof check refused them. Roles are not decided here; the next step assesses
 what each interface needs.
 """
+import json
+from pathlib import Path
+
 from .common_binding import _group_fact, _norm
 from .contracts import Fact, safe_identifier
-from .demo_contract import _any_documented_fact, _spec_to_rtl
 
 MAX_FACTS = 16
+
+
+def _spec_to_rtl(directory):
+    """Reviewed spec-name to RTL-port pairs from the port comparison, when a run has one."""
+    path = Path(directory) / "interface_port_comparison.json"
+    try:
+        report = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    from .port_validation import validated
+    if not validated(report): return {}
+    return {r["spec"]: r["rtl"] for r in report['rows'] if isinstance(r, dict) and r.get("status") == "PASS" and r.get("spec") and r.get("rtl")}
+
+
+def _any_documented_fact(plan, sources):
+    """Fallback citation: the first cited DOCUMENTED plan item, quoting the first line of its source."""
+    from .reasoning import eligible_items
+    for item in eligible_items(plan, sources):
+        sid = item["source_ids"][0]
+        quote = next((line.strip()[:160] for line in sources.get(sid, "").splitlines() if len(line.strip()) >= 8), "")
+        if quote:
+            return Fact(id="interface_basis", statement="Cited specification item", source_id=sid, quote=quote,
+                        plan_pointer=item["plan_pointer"])
+    return None
+
 
 
 def _signal_facts(plan, ports, mapping):

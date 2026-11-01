@@ -50,7 +50,7 @@ def test_unmapped_ports_fall_back_to_the_group_then_to_any_documented_item(tmp_p
     assert [f.id for f in group_fact] != ["port_wb_adr_i"]  # no signal maps, so it cites something else documented
     plan["sections"] = [dict(id="s", entries=[dict(provenance="DOCUMENTED", cited_chunk_ids=["CH-1"], text="x")])]
     plan["interfaces"]["groups"] = []
-    assert interface_base(plan, SimpleNamespace(id="zzz", signals=["wb_adr_i"]), SOURCES, tmp_path).facts[0].id == "demo_basis"
+    assert interface_base(plan, SimpleNamespace(id="zzz", signals=["wb_adr_i"]), SOURCES, tmp_path).facts[0].id == "interface_basis"
 
 
 def test_a_port_list_with_duplicates_or_nothing_is_refused(tmp_path):

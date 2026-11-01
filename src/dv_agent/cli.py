@@ -259,9 +259,6 @@ def _main(argv: list[str] | None) -> int:
     pcode.add_argument("--llm", choices=LLM_MODES, default="auto")
     pcode.add_argument("--compile", action="store_true", help="explicit standalone compile; generation normally defers simulation")
     pcode.add_argument("--no-compile", action="store_true", help="record compilation as NOT_RUN")
-    pcode.add_argument("--demo", action="store_true", help="connectivity-only testbench that simulates; no model call, no DUT behaviour checked")
-    pcode.add_argument("--demo-script", type=Path, help="with --demo: a script of registers, sequences, routes and a test (see demo_scripts/); builds register writes and one packet each way")
-    pcode.add_argument("--max-interfaces", type=int, default=2, help="with --demo: build this many interfaces, fewest wires first; the rest are tied off and listed as pending (0 = all)")
 
     prun = sub.add_parser('run-code', help='compile and simulate saved functional verification code; no model calls')
     prun.add_argument('--out',type=Path,required=True,help='run directory containing code_manifest.json')
@@ -333,12 +330,6 @@ def _main(argv: list[str] | None) -> int:
         set_global_sink(stderr_sink)
         llm, _ = _models_for(args.llm)
         try:
-            if args.demo:
-                from .codegen import build_demo
-                result = build_demo(args.testplan,args.interface,args.out,rtl_files=args.rtl_file,expected_top=args.top,
-                                    compile=args.compile and not args.no_compile,max_interfaces=args.max_interfaces or None,script=args.demo_script)
-                print(json.dumps(result,indent=2))
-                return 0 if result['compile']['status'] in ('PASS','NOT_RUN') else 1
             with review_handler(ReviewClient(llm=llm)):
                 result = build_project(args.testplan,args.interface,args.out,llm=llm,contract_path=args.contract,
                                        rtl_files=args.rtl_file,expected_top=args.top,compile=args.compile and not args.no_compile)

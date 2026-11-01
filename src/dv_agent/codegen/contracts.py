@@ -125,7 +125,7 @@ class Test(Model):
     sequencer_settings: list[SequencerSetting] = Field(default_factory=list,max_length=32)
     seed: int = Field(default=1, ge=1, le=2147483647)
     drain_cycles: int = Field(default=1024, ge=1, le=10000000)
-    minimum_comparisons: int = Field(default=1, ge=0)
+    minimum_comparisons: int = Field(default=1, ge=1)
     fact_ids: list[str] = Field(min_length=1)
 
 
@@ -198,7 +198,6 @@ class CodePlan(Model):
     hooks: list[Hook] = Field(default_factory=list, max_length=32)
     coverage: list[CoverageGoal] = Field(default_factory=list,max_length=64)
     questions: list[str] = Field(default_factory=list)
-    demo: bool = False  # connectivity-only testbench: no routes, registers or checks are required
 
 
 def digest(value):

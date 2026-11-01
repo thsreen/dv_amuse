@@ -1,5 +1,5 @@
 import json
-from dv_agent.codegen.demo_contract import _spec_to_rtl
+from dv_agent.codegen.interface_base import _spec_to_rtl
 from dv_agent.codegen.port_comparison import compare
 
 

@@ -1,8 +1,8 @@
 # Choosing an RTL configuration from the request
 
 Ask for the bus width in the request, for example `use the 8 bit version`, or name the macro: `define DATA_BUS_WIDTH_8`.
-The orchestrator turns that into a compile define, and the define flows through the normal planning and code stages. No
-demo path is involved, and no design-specific table is used.
+The orchestrator turns that into a compile define, and the define flows through the normal planning and code stages.
+No design-specific table is used.
 
 ## How it works
 

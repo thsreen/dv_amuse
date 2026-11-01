@@ -46,25 +46,6 @@ def load_sources(plan, graph_path=None):
     return sources
 
 
-def build_demo(plan_path, interface_path, directory, *, rtl_files=(), expected_top=None, compile=False, max_interfaces=None, script=None):
-    """A running-simulation testbench with no model call and no DUT behaviour (see demo_contract)."""
-    from .demo_contract import build_demo_contract
-    plan_path,interface_path,directory=Path(plan_path).resolve(),Path(interface_path).resolve(),Path(directory).resolve()
-    directory.mkdir(parents=True,exist_ok=True)
-    specification=json.loads(plan_path.read_text())
-    pending=[]
-    contract=build_demo_contract(specification,json.loads(interface_path.read_text()),
-                                 load_sources(specification,plan_path.parent/'graph.json'),top=expected_top,directory=directory,
-                                 limit=max_interfaces,pending=pending,script=json.loads(Path(script).read_text()) if script else None)
-    contract_path=directory/'demo_contract.json'
-    atomic_write_text(contract_path,json.dumps(contract,indent=2)+'\n')
-    atomic_write_text(directory/'demo_pending.json',json.dumps(dict(
-        note='Interfaces not built in this prototype; run /code again to build them.',pending_interfaces=pending),indent=2)+'\n')
-    result=build_project(plan_path,interface_path,directory,contract_path=contract_path,rtl_files=rtl_files,
-                         expected_top=expected_top,compile=compile)
-    return dict(result,pending_interfaces=pending)
-
-
 def build_project(plan_path, interface_path, directory, *, llm=None, contract_path=None,
                   rtl_files=(), expected_top=None, compile=False):
     plan_path,interface_path,directory=Path(plan_path).resolve(),Path(interface_path).resolve(),Path(directory).resolve()
@@ -140,18 +121,15 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     if not plan.tests:
         atomic_write_text(directory/'code_plan.json',plan.model_dump_json(indent=2)+'\n')
         raise ValueError('No executable tests: '+'; '.join(plan.questions or ['Implementation contract is incomplete']))
-    if not plan.demo and not plan.routes and not any(r.access!='WO' for r in plan.registers):
+    if not plan.routes and not any(r.access!='WO' for r in plan.registers):
         raise ValueError('Functional tests require an enabled predictor/scoreboard comparison')
     if not llm and not contract_path: raise ValueError('Unreviewable implementation contract')
     atomic_write_text(directory/'code_plan.json',plan.model_dump_json(indent=2)+'\n')
     emit('code [3/5]: implement declared behavior hooks and render reusable templates')
-    if plan.hooks and not llm and not plan.demo:
+    if plan.hooks and not llm:
         raise ValueError('Custom protocol hooks require model implementation and validation')
     with stage('code_hooks') as outcome:
-        if plan.demo:
-            from .demo_contract import demo_hook_code
-            hook_code=demo_hook_code(plan,ports)
-        else: hook_code=implement(llm,plan,directory,compiler_feedback=compiler_feedback) if llm else {}
+        hook_code=implement(llm,plan,directory,compiler_feedback=compiler_feedback) if llm else {}
         if not plan.hooks: outcome['status']='NOT_RUN'
     for agent in plan.agents:
         if agent.protocol=='custom':
@@ -179,7 +157,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
         if target.exists() and target.read_text()!=text:
             raise ValueError(f'Generated file edited; preserve extension files instead: {target.name}')
         if not target.exists(): atomic_write_text(target,text)
-    manifest=dict(contract=plan.contract,status='BUILT_NEEDS_REVIEW',build_id=fingerprint,code_dir=str(code),demo=plan.demo,
+    manifest=dict(contract=plan.contract,status='BUILT_NEEDS_REVIEW',build_id=fingerprint,code_dir=str(code),
                   test_only=bool(specification.get('test_only')),
                   source_plan=str(plan_path),interface=str(interface_path),template_hash=template_hash(),
                   input_hashes={str(path):digest(path.read_text()) for path in (plan_path,interface_path)},

@@ -62,7 +62,7 @@ def test_the_extraction_step_reports_the_widths_of_the_selected_configuration(tm
 
 @needs_uart
 def test_a_request_for_8_bit_goes_all_the_way_to_the_interface_the_code_stage_reads(tmp_path):
-    """The request -> resolved define -> flow arguments -> interface JSON chain, with no demo path."""
+    """The request -> resolved define -> flow arguments -> interface JSON chain. Normal build path."""
     files = [str(p) for p in sorted(UART.glob('*.v'))]
     defines, question = resolve('use the 8 bit version', [Path(f) for f in files])
     assert question is None and defines == ['DATA_BUS_WIDTH_8']

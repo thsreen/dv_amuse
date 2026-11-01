@@ -136,7 +136,7 @@ class QuickTestApprover:
                           'assumptions': dict(type='array', items=dict(type='string'))})
         instructions = (
                 'This is a QUICK-TESTING-ONLY step: its single job is to answer the one clarification request in the payload so a '
-                'demo simulation can run. Nothing you say here is a specification, a design fact or a human decision, and it does '
+                'simulation can run. Nothing you say here is a specification, a design fact or a human decision, and it does '
                 'not change what any other step may rely on. Resolve every requested ambiguity. Prefer the architecture, explicit '
                 'port inventory and source excerpts, but in this step only you may also use general public knowledge of the named '
                 'standard, bus or protocol and common industry conventions, and where nothing else decides you may make a plausible '

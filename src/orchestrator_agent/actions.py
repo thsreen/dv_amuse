@@ -100,32 +100,6 @@ def _smoke_source(top: str, definition: dict, clock: str, reset: str | None, act
     return "\n".join(lines)
 
 
-def apply_demo_defines(out: Path, variables: dict, script: Path) -> list[str]:
-    """Re-extract the interface with the demo script's compile defines (for example a narrower bus), keeping the original.
-
-    A design can be configured by compile defines that change port widths; the script is written for one configuration.
-    The port comparison sees a changed interface and asks for its alignment decisions again, as for any changed input.
-    """
-    defines = [d for d in json.loads(Path(script).read_text(encoding="utf-8")).get("defines", [])]
-    path = out / "rtl" / "interface_definition.json"
-    if not defines or not variables.get("rtl_graph_files"):
-        return []
-    from rtl_agent.builder import interface_definition
-    from rtl_agent.extractor import extract_interface
-    files = [Path(f) for f in variables["rtl_graph_files"]]
-    top_file = next((f for f in files if f.stem == variables.get("rtl_top")), files[0])
-    contract = extract_interface(files, variables["rtl_top"], include_dirs=[top_file.parent], defines={d: "1" for d in defines})
-    definition = interface_definition(contract)
-    current = json.loads(path.read_text(encoding="utf-8"))
-    if definition["ports"] == current["ports"]:
-        return defines
-    keep = out / "rtl" / "interface_definition.before_demo_defines.json"
-    if not keep.exists():
-        shutil.copy2(path, keep)
-    atomic_write_text(path, json.dumps(definition, indent=2) + "\n")
-    return defines
-
-
 def build_code(out: Path, variables: dict, *, llm=None) -> dict:
     plan_path = out / "dv" / "testplan_doc.json"
     interface_path = out / "rtl" / "interface_definition.json"
@@ -135,15 +109,6 @@ def build_code(out: Path, variables: dict, *, llm=None) -> dict:
     if plan.get("source_authority") == "RTL_INFERRED":
         raise ValueError("/code requires RTL engineer validation of the RTL-derived specification; all current checks are INFERRED")
     contract=variables.get("code_contract")
-    if variables.get("code_demo"):
-        from dv_agent.codegen import build_demo
-        script=None
-        if variables.get("code_demo_script"):
-            from dv_agent.codegen.demo_contract import demo_script_path
-            script=demo_script_path(variables.get("rtl_top"))
-            apply_demo_defines(out, variables, script)
-        return build_demo(plan_path,interface_path,out,rtl_files=variables.get("rtl_graph_files", []),
-                          expected_top=variables.get("rtl_top"),compile=False,max_interfaces=variables.get("code_demo_limit"),script=script)
     if llm is not None or contract:
         from dv_agent.codegen import build_project
         return build_project(plan_path,interface_path,out,llm=llm,contract_path=contract,

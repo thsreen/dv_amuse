@@ -338,7 +338,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
     from .units import foundation as build_foundation, CYCLE, InfrastructurePlan, InterfaceBase, infrastructure_profile, INFRASTRUCTURE_INSTRUCTIONS, PROFILE_PATH
     work=directory/'code_work'/digest([plan,definition,comparison,llm.model,INSTRUCTIONS,Path(__file__).read_text(),
                                     Path(__file__).with_name('units.py').read_text(),Path(__file__).with_name('interface_context.py').read_text(),
-                                    [Path(__file__).with_name(n+'.py').read_text() for n in ('interface_base','fact_reconcile','demo_contract')],
+                                    [Path(__file__).with_name(n+'.py').read_text() for n in ('interface_base','fact_reconcile')],
                                     PROFILE_PATH.read_text(),template_hash(),feedback])[:16]
     work.mkdir(parents=True,exist_ok=True)
     evidence=Evidence(plan,sources)

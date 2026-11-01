@@ -18,21 +18,20 @@ def test_idle_setting_uses_agent_driver_without_permanent_tie(inputs):
     assert not result.get('tie_offs')
 
 
-def test_generic_driver_and_monitor_share_full_interface_and_reset_defaults(inputs):
-    from test_demo_contract import demo
-    from pathlib import Path
-    result=demo(inputs)
-    code=Path(result['code_dir'])
-    driver=next((code/'uvm').glob('*_driver.svh')).read_text()
-    monitor=next((code/'uvm').glob('*_monitor.svh')).read_text()
+def test_generic_driver_and_monitor_templates_share_full_interface_and_reset_defaults():
+    """The custom (hook-based) driver and monitor templates: defaults in one reset function, full signal access, monitor reads only."""
+    from dv_agent.codegen.render import template
+    driver = template('custom_driver.svh', AGENT='control', RESET_ASSIGNMENTS="    cfg.vif.writing = 64'h0;",
+                      DRIVER_HOOK='      repeat (req.cycles) @(posedge cfg.vif.clk);')
+    monitor = template('custom_monitor.svh', AGENT='control', MONITOR_SIGNAL_DECLARATIONS='  logic sampled_writing;',
+                       MONITOR_RESET_ASSIGNMENTS="    sampled_writing = 1'b0;",
+                       MONITOR_SIGNAL_ASSIGNMENTS='    sampled_writing = cfg.vif.writing;', MONITOR_HOOK='    // observe')
     assert 'virtual function void drive_reset_values()' in driver
     assert 'drive_reset_values();' in driver and 'virtual task drive_item(cg_item tr)' in driver
-    reset=driver.split('virtual function void drive_reset_values()',1)[1].split('endfunction',1)[0]
+    reset = driver.split('virtual function void drive_reset_values()', 1)[1].split('endfunction', 1)[0]
     assert 'cfg.vif.writing =' in reset and 'cfg.vif.pull =' not in reset
-    assert 'sampled_writing = cfg.vif.writing;' in monitor
-    assert 'sampled_pull = cfg.vif.pull;' in monitor
-    assert 'virtual function void reset_values()' in monitor
-    assert 'cfg.vif.pull =' not in monitor
+    assert 'sampled_writing = cfg.vif.writing;' in monitor and 'virtual function void reset_values()' in monitor
+    assert 'cfg.vif.pull =' not in monitor  # the monitor never drives DUT signals
 
 
 @pytest.mark.parametrize('values',[{'pull':0},{'writing':2},{'missing':0}])
