@@ -1,0 +1,95 @@
+// Shared register access. Registers are declared once from the code contract. Any sequence writes one with
+//   cg_reg_access::write(this, "<register id>", <value>);
+// The write runs on the sequencer of the agent that owns the register, as a child of the calling sequence.
+class cg_reg_info extends uvm_object;
+  string reg_name;
+  string agent;
+  longint unsigned address;
+  int width;
+  string access;
+  longint unsigned mask;
+  bit has_reset;
+  longint unsigned reset_value;
+  `uvm_object_utils(cg_reg_info)
+  function new(string name="cg_reg_info"); super.new(name); endfunction
+endclass
+
+class cg_reg_map extends uvm_object;
+  `uvm_object_utils(cg_reg_map)
+  protected cg_reg_info regs[string];
+  protected uvm_sequencer_base sequencers[string];
+  protected static cg_reg_map shared;
+  function new(string name="cg_reg_map"); super.new(name); endfunction
+  static function cg_reg_map get_map();
+    if (shared == null) begin
+      shared = new("cg_reg_map");
+      shared.populate();
+    end
+    return shared;
+  endfunction
+  function void add(string reg_name, string agent, longint unsigned address, int width, string access,
+                    longint unsigned mask, bit has_reset, longint unsigned reset_value);
+    cg_reg_info info = new(reg_name);
+    info.reg_name = reg_name; info.agent = agent; info.address = address; info.width = width;
+    info.access = access; info.mask = mask; info.has_reset = has_reset; info.reset_value = reset_value;
+    regs[reg_name] = info;
+  endfunction
+  function void populate();
+{{REGISTERS}}
+  endfunction
+  function void bind_sequencer(string agent, uvm_sequencer_base sqr);
+    sequencers[agent] = sqr;
+  endfunction
+  function string declared();
+    string names;
+    foreach (regs[n]) names = {names, n, " "};
+    return names;
+  endfunction
+  function cg_reg_info lookup(string reg_name);
+    if (!regs.exists(reg_name))
+      `uvm_fatal("REG_UNKNOWN", $sformatf("register %s is not declared; declared: %s", reg_name, declared()))
+    return regs[reg_name];
+  endfunction
+  function uvm_sequencer_base sequencer_of(cg_reg_info info);
+    if (!sequencers.exists(info.agent))
+      `uvm_fatal("REG_SEQUENCER", $sformatf("no sequencer is bound for agent %s (register %s)", info.agent, info.reg_name))
+    return sequencers[info.agent];
+  endfunction
+endclass
+
+class cg_reg_write_seq extends uvm_sequence #(cg_item);
+  `uvm_object_utils(cg_reg_write_seq)
+  string reg_name;
+  longint unsigned value;
+  int gap_cycles;
+  function new(string name="cg_reg_write_seq"); super.new(name); endfunction
+  task body();
+    cg_reg_info info = cg_reg_map::get_map().lookup(reg_name);
+    cg_item tr;
+    if (info.access == "RO")
+      `uvm_fatal("REG_READ_ONLY", $sformatf("register %s is read-only", reg_name))
+    if (info.width < 64 && (value >> info.width) != 0)
+      `uvm_fatal("REG_VALUE", $sformatf("value 0x%0h does not fit the %0d-bit register %s", value, info.width, reg_name))
+    tr = cg_item::type_id::create({"write_", reg_name});
+    start_item(tr);
+    tr.kind = 1; tr.address = info.address; tr.data = value; tr.mask = info.mask; tr.cycles = gap_cycles;
+    finish_item(tr);
+  endtask
+endclass
+
+class cg_reg_access;
+  // One register write, from any sequence. gap_cycles are idle bus cycles after the transfer.
+  static task write(uvm_sequence_base parent, string reg_name, longint unsigned value, int gap_cycles = 0);
+    cg_reg_map map = cg_reg_map::get_map();
+    cg_reg_info info = map.lookup(reg_name);
+    cg_reg_write_seq seq = cg_reg_write_seq::type_id::create({"write_", reg_name});
+    seq.reg_name = reg_name; seq.value = value; seq.gap_cycles = gap_cycles;
+    seq.start(map.sequencer_of(info), parent);
+  endtask
+  // Several registers in order: names[i] receives values[i].
+  static task write_all(uvm_sequence_base parent, string names[$], longint unsigned values[$], int gap_cycles = 0);
+    if (names.size() != values.size())
+      `uvm_fatal("REG_LIST", $sformatf("%0d register names but %0d values", names.size(), values.size()))
+    foreach (names[i]) write(parent, names[i], values[i], gap_cycles);
+  endtask
+endclass

@@ -204,6 +204,19 @@ def validate(plan, specification, definition, sources):
         for op in seq.operations:
             if op.kind == "idle":
                 continue
+            if op.kind == "register_write":
+                register = next((r for r in plan.registers if r.id == op.register_id), None)
+                if register is None:
+                    raise ValueError(f"register_write names {op.register_id!r}, which is not a declared register: {sorted(r.id for r in plan.registers)}")
+                if register.access == "RO":
+                    raise ValueError(f"register_write targets read-only register {register.id}")
+                if op.data >= 1 << register.width:
+                    raise ValueError(f"register_write value does not fit the {register.width}-bit register {register.id}")
+                if register.agent not in agents or not agents[register.agent].active:
+                    raise ValueError(f"register_write needs the active agent that owns {register.id}")
+                continue
+            if op.register_id is not None:
+                raise ValueError("Only register_write operations name a register")
             bus = op.kind in ("read", "write", "random_write", "poll")
             if ((agent.protocol=='custom' and op.kind!='custom') or
                     (agent.protocol!='custom' and (op.kind=='custom' or bus != (agent.protocol == "wishbone")))):

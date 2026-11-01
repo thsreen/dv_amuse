@@ -53,7 +53,8 @@ class TieOff(Model):
 
 
 class Operation(Model):
-    kind: Literal["read", "write", "send", "idle", "random_write", "random_send", "poll", "custom"]
+    kind: Literal["read", "write", "send", "idle", "random_write", "random_send", "poll", "custom", "register_write"]
+    register_id: str | None = None  # register_write: the declared register id; its address and agent come from the register
     address: int = Field(default=0, ge=0)
     data: int = Field(default=0, ge=0)
     mask: int = Field(default=255, ge=0)

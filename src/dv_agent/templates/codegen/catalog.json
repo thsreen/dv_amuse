@@ -6,10 +6,11 @@
     "serial": {"driver": "serial_driver.svh.tmpl", "monitor": "serial_monitor.svh.tmpl", "events": ["rx", "tx"], "roles": ["rx", "tx"]},
     "custom": {"driver": "custom_driver.svh.tmpl", "monitor": "custom_monitor.svh.tmpl", "requires": ["driver.body", "monitor.body"]}
   },
-  "components": ["item", "cfg", "sequencer", "driver", "monitor", "coverage", "plan_coverage", "agent", "scoreboard", "env", "sequence", "virtual_sequence", "test", "package", "top", "assertions"],
+  "components": ["item", "reg_access", "cfg", "sequencer", "driver", "monitor", "coverage", "plan_coverage", "agent", "scoreboard", "env", "sequence", "virtual_sequence", "test", "package", "top", "assertions"],
   "artifacts": [
     {"id": "interface", "template": "interface.sv.tmpl", "output": "interfaces/<agent>_if.sv", "inputs": ["port bindings", "resolved widths", "clock", "reset"], "dependencies": []},
     {"id": "item", "template": "item.svh.tmpl", "output": "uvm/cg_item.svh", "inputs": [], "dependencies": []},
+    {"id": "reg_access", "template": "reg_access.svh.tmpl", "output": "uvm/cg_reg_access.svh", "inputs": ["declared registers (id, agent, address, width, access, mask, reset)"], "dependencies": ["item"]},
     {"id": "configuration", "template": "cfg.svh.tmpl", "output": "uvm/<agent>_cfg.svh", "inputs": ["protocol parameters", "active/passive", "operational limits"], "dependencies": ["interface"]},
     {"id": "sequencer", "template": "sequencer.svh.tmpl", "output": "uvm/<agent>_sequencer.svh", "inputs": ["agent id"], "dependencies": ["item", "configuration"]},
     {"id": "coverage", "template": "coverage.svh.tmpl", "output": "uvm/<agent>_coverage.svh", "inputs": ["observed event kinds", "register classifications", "data classifications"], "dependencies": ["item", "configuration"]},

@@ -785,6 +785,8 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                 'operations; p_sequencer_config declares typed sequencer_variables and Sequence.controls referencing '
                 'operation indexes/fields. Use only supported settings. Unsupported cross-agent inheritance/control '
                 'requires explicit ordering or a question, not arbitrary SV snippets. '
+                'To write a declared register from any sequence use an operation of kind register_write with register_id set to the '
+                'register id (shared_registers) and data to the value; never compute its bus address or pick the bus agent. '
                 'Use existing agent names only (the ids in shared_agents); the clock and reset are common UVCs, not agents, so '
                 'a step that needs a clock or reset agent is a question, never a check or coverage goal. '
                 'Namespace NEW IDs with this task ID. facts must include every new '

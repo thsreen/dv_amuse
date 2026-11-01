@@ -53,6 +53,11 @@ def render(plan, ports, hooks=None):
     def hook(target, slot):
         return '\n'.join(hooks[h.id] for h in plan.hooks if h.target == target and h.slot == slot and h.id in hooks)
     add("uvm/cg_item.svh", template("item.svh"))
+    if plan.registers:
+        # Included before every sequence so any of them can call cg_reg_access::write.
+        lines = [f'    add("{r.id}","{r.agent}",{sv(r.address)},{r.width},"{r.access}",{sv(r.mask)},'
+                 f'{int(r.reset is not None)},{sv(r.reset or 0)});' for r in plan.registers]
+        add("uvm/cg_reg_access.svh", template("reg_access.svh", REGISTERS="\n".join(lines)))
     if plan.clock_period_ranges:
         bins=[]
         for r in plan.clock_period_ranges:
@@ -201,6 +206,10 @@ def render(plan, ports, hooks=None):
             def value(field,default):
                 binding=next((b for b in seq.controls if b.operation==index and b.field==field),None)
                 return 'p_sequencer.'+binding.variable if binding else default
+            if op.kind == 'register_write':
+                operations += [f"    repeat({value('count',op.count)}) begin",
+                               f'      cg_reg_access::write(this,"{op.register_id}",{value("data",sv(op.data))},{value("cycles",op.cycles)});', '    end']
+                continue
             kind = 0 if op.kind == 'idle' else 1 if op.kind in ('write', 'random_write') else 2 if op.kind == 'read' else 6 if op.kind=='poll' else 5 if op.kind=='custom' else 3
             operations += [f"    repeat({value('count',op.count)}) begin", '      tr=cg_item::type_id::create("request");',
                            '      start_item(tr);', f"      tr.kind={kind}; tr.address={value('address',sv(op.address))}; tr.mask={sv(op.mask)}; tr.cycles={value('cycles',op.cycles)};"]
@@ -241,6 +250,9 @@ def render(plan, ports, hooks=None):
                 stages += [f"    begin {drain_name} drain; drain={drain_name}::type_id::create(\"drain\"); drain.start({a.id}_sqr); end"]
         add(f"sequences/{test.id}_vseq.svh", template('virtual_sequence.svh', TEST=test.id, DECLARATIONS='\n'.join(members), STAGES='\n'.join(stages)))
         test_members, test_build, handles = [], [], []
+        for agent_id in sorted({r.agent for r in plan.registers}):
+            if any(a.id == agent_id and a.active for a in plan.agents):
+                handles += [f'    cg_reg_map::get_map().bind_sequencer("{agent_id}",cmn_env.{agent_id}.sqr);']
         for a in plan.agents:
             test_members += [f"  {a.id}_cfg {a.id}_control;"]
             test_build += [f'    {a.id}_control={a.id}_cfg::type_id::create("{a.id}_control");',
