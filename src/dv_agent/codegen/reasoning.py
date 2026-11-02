@@ -8,6 +8,7 @@ from ..core.fsutil import atomic_write_text
 from ..graph.graph_checkpoint import CheckpointLLM
 from ..core.progress import emit
 from ..core.trace import Tracer
+from ..quality.quick_testing import enabled
 from ..uvm import _checked_code
 from .contracts import CodePlan, digest, pointer
 from .render import ROOT
@@ -268,9 +269,13 @@ def implement(llm, plan, directory, *, compiler_feedback=None):
                 code=check_hook(result.data['code'],hook,plan)
                 break
             except ValueError as exc:
-                if attempt==1: raise
+                if attempt==1:
+                    # A prototype builds without this hook; the agent keeps its default body and the gap is a question.
+                    if not (enabled() and (directory/'quick_testing.json').is_file()): raise
+                    plan.questions.append(f'Deferred (quick testing): hook {hook.id} was not built: {str(exc)[:240]}')
+                    return hook.id,None
                 feedback={'previous_code':result.data['code'],'error':str(exc)}
         atomic_write_text(path,json.dumps(dict(id=hook.id,code=code,fact_ids=hook.fact_ids),indent=2)+'\n')
         return hook.id,code
     with ThreadPoolExecutor(max_workers=2) as executor:
-        return dict(executor.map(cancel.bind(task),plan.hooks))
+        return {hook_id:code for hook_id,code in executor.map(cancel.bind(task),plan.hooks) if code is not None}

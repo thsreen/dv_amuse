@@ -12,6 +12,14 @@ DEFAULT_DRIVER_BODY = "    repeat (tr.cycles) @(posedge cfg.vif.clk);"
 DEFAULT_MONITOR_BODY = "    // No protocol observation is declared for this agent."
 
 
+def join_hook_bodies(bodies, slot):
+    """Features add hooks independently: each keeps its own scope, and observers that loop forever run side by side."""
+    if len(bodies) < 2:
+        return '\n'.join(bodies)
+    scoped = '\n'.join(f'begin\n{body}\nend' for body in bodies)
+    return f'fork\n{scoped}\njoin' if slot == 'monitor.body' else scoped
+
+
 def template(name, **values):
     source = (ROOT / (name + ".tmpl")).read_text()
     def replace(match):
@@ -54,7 +62,7 @@ def render(plan, ports, hooks=None):
         if path.endswith('.svh'):
             includes.append(f'  `include "{path}"')
     def hook(target, slot):
-        return '\n'.join(hooks[h.id] for h in plan.hooks if h.target == target and h.slot == slot and h.id in hooks)
+        return join_hook_bodies([hooks[h.id] for h in plan.hooks if h.target == target and h.slot == slot and h.id in hooks], slot)
     add("uvm/cg_item.svh", template("item.svh"))
     if plan.registers:
         # Included before every sequence so any of them can call cg_reg_access::write.

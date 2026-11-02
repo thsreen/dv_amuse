@@ -97,3 +97,17 @@ def test_code_after_a_restart_resumes_the_newest_copy_of_the_same_plan(tmp_path,
     os.utime(plan,(later,later))  # the saved plan changed after the copy was made
     second=prepare_run(source)
     assert second!=first and not (second/'llm_cache').exists()
+
+
+def test_a_hook_that_stays_invalid_is_left_out_only_in_quick_testing(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    from dv_agent.codegen import reasoning
+    hook=SimpleNamespace(id='h',slot='driver.body',target='a',fact_ids=[],model_dump=lambda:dict(id='h',slot='driver.body'))
+    plan=SimpleNamespace(hooks=[hook],facts=[],agents=[],questions=[],model_dump=lambda:{})
+    llm=FakeLLM({'code_hook':lambda p:dict(code='$system("x");')})
+    monkeypatch.setenv(ENV,'1')
+    with pytest.raises(ValueError,match='allowed system function|forbidden'):
+        reasoning.implement(llm,plan,tmp_path)  # a normal run still stops
+    (tmp_path/'quick_testing.json').write_text('{}')
+    assert reasoning.implement(llm,plan,tmp_path)=={}
+    assert plan.questions and plan.questions[0].startswith('Deferred (quick testing): hook h')

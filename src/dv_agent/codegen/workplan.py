@@ -95,6 +95,10 @@ class Integration(Model):
     questions: list[str] = Field(default_factory=list)
 
 
+INTEGRATION_APPROACH_BUDGET=10000
+COMPONENT_VIEW=('understanding','sequences','checks','routes','coverage')
+
+
 class ImplementationApproach(Model):
     shared_setup: list[str]
     execution_order: list[list[str]]
@@ -262,18 +266,51 @@ def _collate(call, strategy, tasks, pseudocode):
                 groups.append(group);group=[]
             group.append(node)
         if group: groups.append(group)
+        # Summaries too large to pair cannot shrink further: join them here, keeping every step, instead of asking again.
+        if level and len(groups)>=len(nodes): return _join_approaches(nodes,tasks)
         reduced=[]
         for batch,group in enumerate(groups):
+            if len(group)==1 and 'approach' in group[0]:  # nothing to collate it with at this level
+                reduced.append(group[0]);continue
             data=payload(group,level);data['batch']=batch
             ids=[tid for node in group for tid in node['feature_ids']]
             approach=call('code_collation',data,ImplementationApproach,rules,
                           lambda result: _approach_check(result,tasks,ids))
             reduced.append(dict(feature_ids=ids,approach=approach.model_dump()))
         if len(reduced)==1: return approach
-        if level and len(reduced)>=len(nodes):
-            raise ValueError('Collated summaries exceed context budget; split feature work rather than discarding steps')
         nodes=reduced
     raise ValueError('Collation exceeded bounded reduction depth')
+
+
+def _join_approaches(nodes, tasks):
+    """One approach from collated groups, by script: every step kept, order taken from the feature dependencies."""
+    known={tid for node in nodes for tid in node['feature_ids']}
+    waves=[];done=set()
+    while done!=known:
+        wave=sorted(tid for tid in known-done if {d.task_id for d in tasks[tid].depends_on}&known<=done)
+        if not wave: raise ValueError('Collated pseudocode violates feature dependencies')
+        waves.append(wave);done.update(wave)
+    keys=('shared_setup','stimulus_approach','check_approach','coverage_approach','questions')
+    joined={key:list(dict.fromkeys(step for node in nodes for step in node['approach'][key])) for key in keys}
+    approach=ImplementationApproach(execution_order=waves,**joined)
+    _approach_check(approach,tasks,sorted(known))
+    return approach
+
+
+def _approach_view(approach, budget=INTEGRATION_APPROACH_BUDGET):
+    """The approach for a prompt: the full text is saved in COLLATED_PSEUDOCODE; a long one has each step shortened evenly."""
+    data=approach.model_dump()
+    if len(json.dumps(data))<=budget: return data
+    keys=('shared_setup','stimulus_approach','check_approach','coverage_approach','questions')
+    room=max(80,(budget-len(json.dumps(data['execution_order'])))//max(1,sum(len(data[key]) for key in keys)))
+    for key in keys: data[key]=[step if len(step)<=room else step[:room-3]+'...' for step in data[key]]
+    return data
+
+
+def _components_view(completed):
+    """What choosing tests needs from each feature: what it is and which items it built. Its questions are already in the plan."""
+    return {tid:{key:(value[:240] if key=='understanding' else value) for key,value in component.items() if key in COMPONENT_VIEW}
+            for tid,component in completed.items()}
 
 
 def _merge(plan, fragment):
@@ -924,8 +961,8 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             return work_manifest
         # Collate interfaces and completed component signatures, never all specification text.
         integration_payload=dict(understanding=graph.understanding,dependency_waves=approach.execution_order,
-            collated_pseudocode=approach.model_dump(),
-            components=completed,agents=[dict(id=a.id,protocol=a.protocol) for a in assembled.agents],
+            collated_pseudocode=_approach_view(approach),
+            components=_components_view(completed),agents=[dict(id=a.id,protocol=a.protocol) for a in assembled.agents],
             sequences=[dict(id=s.id,agent=s.agent,purpose=s.purpose,fact_ids=s.fact_ids) for s in assembled.sequences],
             sequencer_variables=[v.model_dump() for v in assembled.sequencer_variables],
             available_fact_ids=[f.id for f in assembled.facts])
