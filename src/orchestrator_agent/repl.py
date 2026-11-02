@@ -375,7 +375,8 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                              f"  coverage: assertions {summary['assertions_passed']} of {summary['assertions']}")
                         show(f"  coverage report: {test['coverage_report']}")
                     if wave:
-                        show(f"  waveform: {test['waveform']}" if test.get("waveform") else "  waveform: not produced")
+                        show(f"  waveform: {test['waveform']}" if test.get("waveform")
+                             else f"  waveform: not produced: {test.get('waveform_reason', 'this build has no functional test')}")
                 show(f"{line[1:]}: {result['status']}")
                 if result.get('reason'): show(result['reason'])
                 if result.get('compile',{}).get('reason'): show(result['compile']['reason'])

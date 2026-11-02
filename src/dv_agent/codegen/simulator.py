@@ -87,7 +87,7 @@ def compile_project(manifest, timeout=180):
     if result_file.is_file():
         previous=json.loads(result_file.read_text())
         if previous.get('status')=='PASS' and previous.get('fingerprint')==fingerprint:
-            return previous | {'reused':True}
+            return report | previous | {'reused':True}  # a saved result may predate a capability the simulator reports now
     try:
         result=subprocess.run(command(manifest,report),cwd=code,text=True,stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT,timeout=timeout,check=False)
@@ -194,6 +194,8 @@ def run_project(manifest, *, regress=False, timeout=180, wave=False):
         results.append(dict(name=test['name'],status=status,reason=reason,seed=test['seed'],coverage_summary=summary,
                             coverage_report=str(directory/'coverage_report.md'),
                             waveform=str(waveform) if waveform and waveform.is_file() else None,
+                            **({'waveform_reason':'The simulator does not offer --fst' if not waveform else 'The simulator wrote no waveform file'}
+                               if wave and not (waveform and waveform.is_file()) else {}),
                             clock_case=test.get('clock_case'),observed_clock_periods_ps=observed_periods,
                             scoreboard_comparisons=sum(comparisons),uvm_counts=uvm_counts,
                             log=str(directory/'simulation.log'),coverage=coverage,assertion_results=assertion_results))
