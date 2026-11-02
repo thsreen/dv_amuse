@@ -45,16 +45,17 @@ def discover():
     return dict(status='PASS' if library else 'BLOCKED',reason='' if library else 'Set XEZIM_UVM_DIR to a UVM source release',
                 binary=str(Path(binary).resolve()),version=version.stdout.strip(),
                 uvm=str(library) if library else None, error_exit='--error-exit' in help_text,
-                code_coverage='--code-coverage' in help_text)
+                code_coverage='--code-coverage' in help_text, waveform='--fst' in help_text)
 
 
-def command(manifest, capabilities, *, simulate=False, test=None):
+def command(manifest, capabilities, *, simulate=False, test=None, waveform=None):
     code=Path(manifest['code_dir']).resolve()
     rtl=[str(Path(p).resolve()) for p in manifest['rtl_files']]
     library=Path(capabilities['uvm'])
     directories={code,code/'common_uvc'/'clock',code/'common_uvc'/'reset',code/'common_uvc'/'common',library.parent}
     directories.update(Path(p).parent for p in rtl)
     cmd=[capabilities['binary'],'--simulate' if simulate else '--compile','-s','verification_top']
+    if waveform: cmd+=['--fst',str(waveform)]
     for directory in sorted(directories): cmd+=['-I',str(directory)]
     cmd+=['-D','UVM_NO_DPI','-D','UVM_REPORT_DISABLE_FILE_LINE']
     for define in manifest.get('defines',[]): cmd+=['-D',define]
@@ -101,7 +102,31 @@ def compile_project(manifest, timeout=180):
     return report
 
 
-def run_project(manifest, *, regress=False, timeout=180):
+COVERAGE_LINE=re.compile(r'\[(PLAN|OBSERVED|SYSTEM)_COVERAGE\]\s+(?:(\S+)\s+)?samples=(\d+)\s+coverage=([\d.]+)')
+
+
+def coverage_summary(log, assertion_results):
+    """What the testbench reported at the end of a test: each coverage group, and the assertions."""
+    groups=[dict(kind=kind.lower(),name=name or kind.lower(),samples=int(samples),percent=float(percent))
+            for kind,name,samples,percent in COVERAGE_LINE.findall(log)]
+    plan=[g for g in groups if g['kind']=='plan']
+    return dict(groups=groups,plan_groups=len(plan),plan_full=sum(g['percent']>=100 for g in plan),
+                plan_unsampled=sum(g['samples']==0 for g in plan),
+                plan_average=round(sum(g['percent'] for g in plan)/len(plan),1) if plan else None,
+                assertions_passed=sum(r['status']=='PASS' for r in assertion_results),assertions=len(assertion_results))
+
+
+def coverage_markdown(name, summary):
+    lines=[f'# Coverage: {name}','',f"Assertions passed: {summary['assertions_passed']} of {summary['assertions']}",'']
+    if summary['plan_groups']:
+        lines+=[f"Plan coverage groups: {summary['plan_groups']}, simple average {summary['plan_average']}%, "
+                f"{summary['plan_full']} at 100%, {summary['plan_unsampled']} with no samples",'']
+    lines+=['| Group | Kind | Samples | Coverage |','|---|---|---|---|']
+    lines+=[f"| {g['name']} | {g['kind']} | {g['samples']} | {g['percent']:.2f}% |" for g in sorted(summary['groups'],key=lambda g:(g['percent'],g['name']))]
+    return '\n'.join(lines)+'\n'
+
+
+def run_project(manifest, *, regress=False, timeout=180, wave=False):
     compile_result=compile_project(manifest,timeout)
     if compile_result['status']!='PASS':
         return dict(status='BLOCKED',reason='Functional compilation unavailable or failed',compile=compile_result,tests=[])
@@ -111,11 +136,12 @@ def run_project(manifest, *, regress=False, timeout=180):
         directory=code/'simulation'/test['name']/str(test['seed'])/str(time.time_ns())
         directory.mkdir(parents=True,exist_ok=True)
         env=dict(os.environ,XEZIM_COV_DB=str(directory/'coverage.json'))
+        waveform=directory/f"{test['name']}.fst" if wave and compile_result.get('waveform') else None
         comparisons=[]
         observed_periods=[]
         uvm_counts={}
         try:
-            completed=subprocess.run(command(manifest,compile_result,simulate=True,test=test),cwd=directory,env=env,
+            completed=subprocess.run(command(manifest,compile_result,simulate=True,test=test,waveform=waveform),cwd=directory,env=env,
                                      text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=timeout,check=False)
             log=completed.stdout
             marker='FUNCTIONAL_TEST_PASS '+test.get('uvm_testname',test['name'])
@@ -163,7 +189,11 @@ def run_project(manifest, *, regress=False, timeout=180):
         if status=='PASS' and (coverage.get('status')!='RECORDED' or not any(
                 group.get('samples',0)>0 for group in coverage.get('data',{}).get('covergroups',[]))):
             status,reason='BLOCKED','No sampled functional coverage evidence was produced'
-        results.append(dict(name=test['name'],status=status,reason=reason,seed=test['seed'],
+        summary=coverage_summary(log,assertion_results)
+        atomic_write_text(directory/'coverage_report.md',coverage_markdown(test['name'],summary))
+        results.append(dict(name=test['name'],status=status,reason=reason,seed=test['seed'],coverage_summary=summary,
+                            coverage_report=str(directory/'coverage_report.md'),
+                            waveform=str(waveform) if waveform and waveform.is_file() else None,
                             clock_case=test.get('clock_case'),observed_clock_periods_ps=observed_periods,
                             scoreboard_comparisons=sum(comparisons),uvm_counts=uvm_counts,
                             log=str(directory/'simulation.log'),coverage=coverage,assertion_results=assertion_results))

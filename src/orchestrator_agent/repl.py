@@ -21,7 +21,7 @@ from .saved_runs import latest_successful, matches_current_run
 from .code_run import execute as execute_code, preview as code_preview
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
-HELP = "Commands: /plan  /code  /run  /regress  /fresh  (Ctrl-D to leave)"
+HELP = "Commands: /plan  /code  /run  /run wave  /regress  /fresh  (Ctrl-D to leave)"
 
 
 def _builtin_flow() -> Path:
@@ -84,7 +84,7 @@ def ask_card(flow: dict, flow_path: Path, variables: dict, requirement: str,
               *( [f"inferred RTL specification: {out / 'rtl_spec' / 'doc' / 'rtl_derived_spec.md'}",
                   "All draft-derived checks remain INFERRED and require RTL engineer validation."] if derived else []),
               "Then /code builds only cited DOCUMENTED plan items (it warns first; /abort stops it).",
-              "/run executes the basic built test; /regress executes every built test.",
+              "/run executes the basic built test; /run wave also saves a waveform; /regress executes every built test.",
               f"ready: {'yes' if ready else 'no — name a local repository with RTL and a clear top module'}"]
     return "\n".join(lines)
 
@@ -359,12 +359,23 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                 show(f"Code blocked: {exc}")
                 if (out/'code_work_manifest.json').is_file():
                     show(f"Partial feature documents: {out/'code_work_manifest.json'}")
-        elif line in ("/run", "/regress"):
+        elif line in ("/run", "/run wave", "/regress"):
             try:
-                result = run_tests(out, regress=line == "/regress")
+                wave = line == "/run wave"
+                result = run_tests(out, regress=line == "/regress", wave=wave)
                 for test in result["tests"]:
                     show(f"{test['name']}: {test['status']} — {test['reason']}"
                          + (f" ({test['log']})" if test.get("log") else ""))
+                    summary = test.get("coverage_summary")
+                    if summary:
+                        show(f"  coverage: {summary['plan_groups']} plan groups, simple average {summary['plan_average']}%, "
+                             f"{summary['plan_full']} at 100%, {summary['plan_unsampled']} with no samples; "
+                             f"assertions {summary['assertions_passed']} of {summary['assertions']}"
+                             if summary["plan_groups"] else
+                             f"  coverage: assertions {summary['assertions_passed']} of {summary['assertions']}")
+                        show(f"  coverage report: {test['coverage_report']}")
+                    if wave:
+                        show(f"  waveform: {test['waveform']}" if test.get("waveform") else "  waveform: not produced")
                 show(f"{line[1:]}: {result['status']}")
                 if result.get('reason'): show(result['reason'])
                 if result.get('compile',{}).get('reason'): show(result['compile']['reason'])

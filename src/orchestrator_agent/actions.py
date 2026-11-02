@@ -159,7 +159,7 @@ def build_code(out: Path, variables: dict, *, llm=None) -> dict:
     return manifest | {"reused": False}
 
 
-def run_tests(out: Path, *, regress: bool = False) -> dict:
+def run_tests(out: Path, *, regress: bool = False, wave: bool = False) -> dict:
     state_path=out/'code_generation_state.json'
     if state_path.is_file() and json.loads(state_path.read_text()).get('status') in ('BLOCKED','BUILDING','WAITING_HUMAN'):
         return dict(status='BLOCKED',reason='Latest code generation did not complete; run /code successfully first',tests=[])
@@ -169,7 +169,7 @@ def run_tests(out: Path, *, regress: bool = False) -> dict:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if manifest.get("contract") == "verification_codegen_v1":
         from dv_agent.codegen.simulator import run_project
-        return run_project(manifest,regress=regress,timeout=SIM_TIMEOUT_S)
+        return run_project(manifest,regress=regress,timeout=SIM_TIMEOUT_S,wave=wave)
     tests = manifest.get("tests", [])
     if not tests:
         raise ValueError("code manifest has no built tests")

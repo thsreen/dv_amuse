@@ -409,7 +409,7 @@ def test_repl_prompt_previews_english_steps_and_only_four_commands(tmp_path, mon
     assert "--- testplan preview ---" in text
     assert "Read specification files" in text and "Recover registers" in text
     assert "RTL top: chip_top" in text and "ready: yes" in text
-    assert terminal.HELP == "Commands: /plan  /code  /run  /regress  /fresh  (Ctrl-D to leave)"
+    assert terminal.HELP == "Commands: /plan  /code  /run  /run wave  /regress  /fresh  (Ctrl-D to leave)"
 
 
 def test_repl_four_commands_run_in_order_without_manual_variables(tmp_path, monkeypatch):
@@ -427,7 +427,7 @@ def test_repl_four_commands_run_in_order_without_manual_variables(tmp_path, monk
         calls.append(("code", variables))
         return dict(code_dir=str(out_dir / "code"), policy=dict(kept=1, skipped=2),
                     tests=[dict(name="basic_smoke")])
-    def fake_tests(out_dir, *, regress):
+    def fake_tests(out_dir, *, regress, wave=False):
         calls.append(("regress" if regress else "run", out_dir))
         return dict(status="PASS", tests=[dict(name="basic_smoke", status="PASS", reason="exit 0")])
     monkeypatch.setattr(terminal, "run_flow", fake_flow)

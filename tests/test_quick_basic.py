@@ -102,7 +102,11 @@ def test_real_uart_script_chosen_test_passes_with_real_comparisons(tmp_path, mon
     manifest = build_project(tmp_path / 'testplan.json', tmp_path / 'interface.json', tmp_path / 'output', contract_path=tmp_path / 'code_contract.json',
                              rtl_files=list((repo / 'rtl/verilog').glob('*.v')), compile=True)
     assert manifest['compile']['status'] == 'PASS', manifest['compile']
-    result = run_project(manifest, regress=True, timeout=60)
+    result = run_project(manifest, regress=True, timeout=60, wave=True)
     assert result['status'] == 'PASS', [(t['name'], t['reason'], t['log']) for t in result['tests']]
     test = result['tests'][0]
     assert test['name'] == TEST_ID and test['scoreboard_comparisons'] == 2 and test['uvm_counts']['ERROR'] == 0
+    assert Path(test['waveform']).stat().st_size > 1000 and Path(test['waveform']).read_bytes()[0] == 0  # an FST header block
+    assert test['coverage_summary']['assertions_passed'] == test['coverage_summary']['assertions'] > 0
+    assert '| Group | Kind | Samples | Coverage |' in Path(test['coverage_report']).read_text()
+    assert test['coverage_summary']['groups']

@@ -231,3 +231,11 @@ retrieval, pseudocode, implementation, validation and checkpointing. See
 `build-code` defer compilation by default; `/run`/`/regress` compile later, or standalone
 `build-code --compile` explicitly opts in. Sequence inheritance and typed `p_sequencer`
 variables/settings are schema-controlled, width-checked extensions to the reusable templates.
+
+## Waveforms and coverage
+
+`/run wave` runs the first test and also saves `<test>.fst` beside its `simulation.log`. Open it with GTKWave or Surfer.
+
+Every `/run` and `/regress` prints a coverage line per test and saves `coverage_report.md` beside the log: each coverage group with its samples
+and percentage, and the assertions that passed. The percentages are what the testbench reported. The average is a plain mean of the plan
+groups, not a weighted coverage figure. The raw simulator data is in `coverage.json` in the same folder.
