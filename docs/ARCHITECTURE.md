@@ -8,29 +8,29 @@ test plan, using Meta's Muse Spark model for the semantic work and deterministic
 Functional testplan-to-code contracts, reusable templates, monitor-fed coverage and
 execution evidence are described in [CODE_GENERATION.md](CODE_GENERATION.md).
 
-![Silicon Copilot system overview](architecture_system.png)
+![Silicon Copilot end-to-end architecture](architecture/end_to_end.svg)
 
 Three independent agents sit under one orchestrator. Specifications stay authoritative for intended
 behavior; RTL contributes only wiring facts to generated code and review-required observations to the plan.
-Each component has its own diagram:
+These diagrams show the architecture as designed. Current run status is in [agent/CURRENT.md](agent/CURRENT.md).
 
-| Component | Diagram | Source |
+| Flow | Diagram | More |
 |---|---|---|
-| Specification test-plan pipeline (`dv_agent`) | [below](#specification-pipeline) | [`architecture.svg`](architecture.svg) |
-| Orchestrator (`orchestrator_agent`) | [architecture_orchestrator.png](architecture_orchestrator.png), see [ORCHESTRATOR.md](ORCHESTRATOR.md) | [`architecture_orchestrator.svg`](architecture_orchestrator.svg) |
-| RTL agent (`rtl_agent`) | [architecture_rtl_agent.png](architecture_rtl_agent.png), see [RTL_GRAPH_RAG.md](RTL_GRAPH_RAG.md) | [`architecture_rtl_agent.svg`](architecture_rtl_agent.svg) |
-| UVM builder and simulation | [architecture_uvm.png](architecture_uvm.png), see [UVM_SCAFFOLD.md](UVM_SCAFFOLD.md) | [`architecture_uvm.svg`](architecture_uvm.svg) |
-
-The SVG files are the editable sources; regenerate each PNG after an edit.
+| `/plan` orchestration | [plan_orchestration.svg](architecture/plan_orchestration.svg) | [ORCHESTRATOR.md](ORCHESTRATOR.md) |
+| Inside the test plan | [testplan_sections.svg](architecture/testplan_sections.svg) | [below](#specification-pipeline) |
+| Request selects the RTL configuration | [request_configuration.svg](architecture/request_configuration.svg) | [RTL_CONFIGURATION.md](RTL_CONFIGURATION.md) |
+| `/code` stages | [code_generation.svg](architecture/code_generation.svg) | [CODE_WORK_PACKAGES.md](CODE_WORK_PACKAGES.md) |
+| Contract to simulation | [code_to_simulation.svg](architecture/code_to_simulation.svg) | [CODE_GENERATION.md](CODE_GENERATION.md) |
+| Generated testbench | [testbench_runtime.svg](architecture/testbench_runtime.svg) | [REGISTER_WRITE.md](REGISTER_WRITE.md) |
 
 ## Specification pipeline
 
 dv_agent turns a design repository's specification documents into a reviewed, traceable verification
 test plan, using Meta's Muse Spark model for the semantic work and deterministic checks to keep it honest.
 
-![dv_agent architecture](architecture.png)
+![Inside the test plan](architecture/testplan_sections.svg)
 
-The diagram shows the default specification path. The opt-in [RTL observations extension](RTL_OBSERVATIONS.md) runs before strategy and does not change specification authority.
+The diagram shows the live basic-mode path; the graph stages in the table below run in graph mode. The opt-in [RTL observations extension](RTL_OBSERVATIONS.md) runs before strategy and does not change specification authority.
 
 ## Principles
 

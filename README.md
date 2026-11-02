@@ -1,6 +1,6 @@
 # dv_agent
 
-Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ([diagram](docs/architecture.png)).
+Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ([diagram](docs/architecture/end_to_end.svg)).
 
 Current review/status: [docs/CODE_REVIEW_STATUS.md](docs/CODE_REVIEW_STATUS.md).
 Separate RTL coding flow: [JSON interface extractor and builder](docs/RTL_INTERFACES.md), using the
