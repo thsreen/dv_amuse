@@ -36,3 +36,16 @@ Quick testing builds a prototype, so a run does not stop on what it cannot build
 
 `/code` resumes from the newest quick-testing copy of the same saved plan, also after a restart. Model answers come back from its
 cache until a request differs. A new `/plan`, or `/fresh`, starts a new copy. Normal runs still stop and ask.
+
+## The script-chosen test
+
+Under quick testing, `/code` replaces the model's tests and scoreboard routes with one test, `quick_basic` (`codegen/quick_basic.py`).
+All tests share one scoreboard, so a test that does not exercise every route fails on the others. `quick_basic` runs the model's
+own bus setup writes, writes one byte out, sends one byte in and reads it back, and compares only those two paths. The data address and
+its condition come from the model's routes; nothing is design-specific.
+
+- The model's tests, routes, any register mirrored at the data address and scoreboard hooks are saved in `quick_basic_set_aside.json` and
+  listed as one question. The model's sequences, assertions and coverage stay in the project.
+- A plan without an active bus agent, an active serial agent, a receive route with a bus address and a bus setup sequence keeps
+  the model's tests, and a question says why.
+- A pass shows that one write and one receive matched on this build. It is not verification of the design, and normal runs never use it.

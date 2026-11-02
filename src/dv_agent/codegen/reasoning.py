@@ -231,8 +231,19 @@ ALLOWED_SYSTEM_CALLS=frozenset({
     'past','rose','fell','stable','changed','error','warning','info','typename'})
 
 
+HOOK_WRAPPER=re.compile(r'\s*(?:task|function)\b[^;]*?\(\s*\)\s*;(.*)\b(?:endtask|endfunction)(?:\s*:\s*\w+)?\s*|\s*task\s+(?:automatic\s+)?\w+\s*;(.*)\bendtask(?:\s*:\s*\w+)?\s*',re.S)
+
+
+def unwrap_hook(code):
+    """The template owns the task or function; a hook is its statements, whichever way the model wrote them."""
+    match=HOOK_WRAPPER.fullmatch(code)
+    return (match.group(1) or match.group(2) or '') if match else code
+
+
 def check_hook(code, task, plan):
-    code=_checked_code(code,task.id)
+    code=_checked_code(unwrap_hook(code),task.id)
+    if re.search(r'(?m)^\s*(?:task|function|endtask|endfunction)\b',code):
+        raise ValueError('A hook is the statements of its body; do not declare a task or function')
     for name in dict.fromkeys(re.findall(r'\$(\w+)',re.sub(r'"(?:\\.|[^"\\])*"','""',code))):
         if name not in ALLOWED_SYSTEM_CALLS:
             raise ValueError(f'Hook uses ${name}, which is not an allowed system function')
@@ -257,6 +268,7 @@ def implement(llm, plan, directory, *, compiler_feedback=None):
             with Tracer(directory/'trace.jsonl','code_hook',input={'id':hook.id,'attempt':attempt}) as tracer:
                 result=CheckpointLLM(llm,directory/'llm_cache'/'hooks',stage='code_hook').structured(
                 name='code_hook',instructions='Implement only this declared SystemVerilog task/function hook from cited facts. '
+                'Return only the statements of its body, without a task or function wrapper. '
                 'Use cfg.vif canonical roles and cg_item fields. No new classes/modules/includes, external system/file access, '
                 'hierarchical DUT access, invented expectations, state-machine reference model or p_sequencer. '
                 'Monitor publishes a new cg_item per completed observation on ap. Never mutate received transactions.',

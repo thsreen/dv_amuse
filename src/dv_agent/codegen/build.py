@@ -86,6 +86,7 @@ def build_project(plan_path, interface_path, directory, *, llm=None, contract_pa
 def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expected_top,compile,compiler_feedback=None):
     specification=json.loads(plan_path.read_text())
     from ..quality.quick_testing import enabled, WARNING
+    from .quick_basic import apply_basic_test
     if specification.get('test_only') and not enabled():
         raise ValueError('Quick-testing plan requires --quick-testing-auto-approve-inferences; it is not a normal approved plan')
     if specification.get('source_authority')=='RTL_INFERRED':
@@ -106,6 +107,8 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
     if expected_top and plan.top!=expected_top:
         raise ValueError('Code contract top does not match the selected design')
     _apply_configuration(plan,definition,explicit=bool(contract_path))
+    quick_run=not contract_path and enabled() and (directory/'quick_testing.json').is_file()
+    if quick_run: apply_basic_test(plan,directory)
     emit('code [2/5]: validate evidence, ownership, protocol bindings and comparisons')
     if not plan.clock_period_ranges:
         question='Clock-period randomization is not configured: confirm operating bands; the nominal testbench period does not establish DUT limits.'
@@ -133,6 +136,7 @@ def _build(plan_path,interface_path,directory,*,llm,contract_path,rtl_files,expe
             if expected_top and plan.top!=expected_top:
                 raise ValueError('Repaired code contract top does not match the selected design')
             _apply_configuration(plan,definition,explicit=False)
+            if quick_run: apply_basic_test(plan,directory)
     if not plan.tests:
         atomic_write_text(directory/'code_plan.json',plan.model_dump_json(indent=2)+'\n')
         raise ValueError('No executable tests: '+'; '.join(plan.questions or ['Implementation contract is incomplete']))
