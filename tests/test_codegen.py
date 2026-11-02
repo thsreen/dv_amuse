@@ -541,6 +541,35 @@ def test_real_uart_simulation_opt_in(tmp_path,monkeypatch):
                for t in result['tests'])
 
 
+def test_an_integration_answer_with_no_tests_is_refused_and_asked_again(inputs):
+    root, _, _, contract, rtl = inputs
+    answers=[dict(tests=[],questions=['What should run?']),dict(tests=contract['tests'],questions=[])]
+    payloads=[]
+    def integration(p):
+        payloads.append(p);return answers[len(payloads)-1]
+    manifest=build_project(root/'plan.json',root/'interface.json',root/'output',
+                           llm=workflow_model(contract,code_integration=integration),rtl_files=[rtl],compile=False)
+    assert manifest['tests'] and len(payloads)==2
+    assert 'at least one test' in payloads[1]['repair_feedback'] and 'repair_feedback' not in payloads[0]
+
+
+def test_a_refused_answer_too_large_to_repeat_still_gets_its_repair_attempt(inputs):
+    root, _, _, contract, rtl = inputs
+    payloads=[]
+    def integration(p):
+        payloads.append(p)
+        return dict(tests=contract['tests'],questions=[]) if len(payloads)==2 else dict(tests=[],questions=['q'*1000]*11)
+    llm=workflow_model(contract,code_integration=integration)
+    import dv_agent.codegen.workplan as workplan
+    original=workplan._components_view
+    workplan._components_view=lambda completed:{'padding':'p'*42000,**original(completed)}
+    try:
+        manifest=build_project(root/'plan.json',root/'interface.json',root/'output',llm=llm,rtl_files=[rtl],compile=False)
+    finally:
+        workplan._components_view=original
+    assert manifest['tests'] and 'repair_feedback' in payloads[1] and 'previous_output' not in payloads[1]
+
+
 def test_workflow_emits_real_feature_phases_in_execution_order(inputs):
     from dv_agent.core.progress import reporting
     root, _, _, contract, rtl = inputs

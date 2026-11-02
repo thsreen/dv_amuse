@@ -298,13 +298,29 @@ def _join_approaches(nodes, tasks):
 
 
 def _approach_view(approach, budget=INTEGRATION_APPROACH_BUDGET):
-    """The approach for a prompt: the full text is saved in COLLATED_PSEUDOCODE; a long one has each step shortened evenly."""
-    data=approach.model_dump()
+    """The approach for a prompt, without its questions (already in the plan): the full text is saved in COLLATED_PSEUDOCODE; a long one has each step shortened evenly."""
+    data=approach.model_dump();data.pop('questions')
     if len(json.dumps(data))<=budget: return data
-    keys=('shared_setup','stimulus_approach','check_approach','coverage_approach','questions')
+    keys=('shared_setup','stimulus_approach','check_approach','coverage_approach')
     room=max(80,(budget-len(json.dumps(data['execution_order'])))//max(1,sum(len(data[key]) for key in keys)))
     for key in keys: data[key]=[step if len(step)<=room else step[:room-3]+'...' for step in data[key]]
     return data
+
+
+def integration_rules(quick=False):
+    rules=('Collate completed feature pseudocode/components into cohesive tests. Respect feature dependency order '
+           'and explicit setup before dependent traffic. Select one basic test first and additional supported tests. '
+           'Virtual sequences spawn only; no concurrent sequences on one agent sequencer. Use only available fact IDs. '
+           'Do not invent new expected behavior; unsupported or unresolved flows are questions.')
+    if quick:
+        rules+=(' QUICK TESTING ONLY: open questions do not stop test composition. Compose tests from the sequences that exist '
+                'and leave only the gaps as questions.')
+    return rules
+
+
+def _quick_run(directory):
+    from ..quality.quick_testing import enabled
+    return enabled() and (directory/'quick_testing.json').is_file()
 
 
 def _components_view(completed):
@@ -425,6 +441,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                     payload=payload|dict(repair_feedback=str(exc),repair_rules=dict(identifiers=IDENTIFIER_RULE),
                                          **({'previous_output':refused} if refused is not None else {}))
                     if recover is not None: payload=recover(payload,result.data,str(exc))
+                    if len(json.dumps(payload))>48000: payload.pop('previous_output',None)  # the refusal alone still says what to fix
                     continue
                 records.append(dict(stage=name,input_chars=len(json.dumps(payload)),cached=result.cached,
                                     **({'renamed_fact_ids':renamed} if renamed else {})))
@@ -967,6 +984,8 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             sequencer_variables=[v.model_dump() for v in assembled.sequencer_variables],
             available_fact_ids=[f.id for f in assembled.facts])
         def integration_check(i):
+            if not i.tests and assembled.sequences:
+                raise ValueError('Compose at least one test from the available sequences; keep what is unresolved as questions')
             validate(_merge(assembled,i),plan,definition,sources)
             owners={}
             for tid,component in completed.items():
@@ -987,10 +1006,7 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
                                 raise ValueError(f'Test {test.id} starts {tid} before dependency {dep}')
                     seen.update(stage)
         integration=call('code_integration',integration_payload,Integration,
-            'Collate completed feature pseudocode/components into cohesive tests. Respect feature dependency order '
-            'and explicit setup before dependent traffic. Select one basic test first and additional supported tests. '
-            'Virtual sequences spawn only; no concurrent sequences on one agent sequencer. Use only available fact IDs. '
-            'Do not invent new expected behavior; unsupported or unresolved flows are questions.',integration_check)
+            integration_rules(_quick_run(directory)),integration_check)
         assembled=_merge(assembled,integration)
         assembled.questions=list(dict.fromkeys(assembled.questions+graph.questions))
         _write(work/'collated_understanding.json',dict(dependencies=graph.model_dump(),components=completed,

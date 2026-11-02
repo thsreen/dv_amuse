@@ -3,7 +3,7 @@ import json
 from types import SimpleNamespace
 
 from dv_agent.codegen.render import join_hook_bodies
-from dv_agent.codegen.workplan import ImplementationApproach, Pseudocode, _approach_view, _collate, _components_view
+from dv_agent.codegen.workplan import ImplementationApproach, Pseudocode, _approach_view, _collate, _components_view, integration_rules
 
 
 def task(*requires):
@@ -55,9 +55,10 @@ def test_integration_prompt_views_stay_small_and_keep_the_order_and_item_ids():
                                       check_approach=['c'], coverage_approach=['v'], questions=['q' * 900] * 20)
     view = _approach_view(approach, budget=10000)
     assert len(json.dumps(view)) < 12000 and view['execution_order'] == [['a'], ['b']] and view['check_approach'] == ['c']
+    assert 'questions' not in view and not view['shared_setup'][0].endswith('s' * 5000)
     assert len(approach.shared_setup[0]) == 5000  # the saved approach is untouched
     small = approach.model_copy(update=dict(shared_setup=['s'], stimulus_approach=['t'], questions=[]))
-    assert _approach_view(small, budget=10000) == small.model_dump()
+    assert _approach_view(small, budget=10000) == {k: v for k, v in small.model_dump().items() if k != 'questions'}
     components = _components_view({'a': dict(understanding='u' * 900, completion=['c'] * 50, sequences=['s1'], checks=['k'], routes=[], coverage=[], questions=['q'] * 50)})
     assert components == {'a': dict(understanding='u' * 240, sequences=['s1'], checks=['k'], routes=[], coverage=[])}
 
@@ -66,3 +67,8 @@ def test_several_hooks_on_one_slot_keep_their_own_declarations_and_observers_run
     assert join_hook_bodies(['int a;'], 'driver.body') == 'int a;'
     assert join_hook_bodies(['int a;', 'int a;'], 'driver.body') == 'begin\nint a;\nend\nbegin\nint a;\nend'
     assert join_hook_bodies(['forever x;', 'forever y;'], 'monitor.body') == 'fork\nbegin\nforever x;\nend\nbegin\nforever y;\nend\njoin'
+
+
+def test_only_quick_testing_is_told_that_open_questions_do_not_stop_tests():
+    assert 'QUICK TESTING ONLY' in integration_rules(True) and 'QUICK TESTING' not in integration_rules(False)
+    assert integration_rules(True).startswith(integration_rules(False))
