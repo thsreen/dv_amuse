@@ -120,7 +120,7 @@ def _multipart(fields,filename,content,mime):
     return b''.join(parts),f'multipart/form-data; boundary={boundary}'
 
 
-def send_document(path,caption=''):
+def send_document(path,caption='',mime='text/html'):
     """Send one file to the configured Telegram chat. Uses the Bot API with the token Hermes already holds.
 
     The Hermes CLI has no verified file option, so transport 'hermes' is refused rather than guessed.
@@ -138,7 +138,7 @@ def send_document(path,caption=''):
     except OSError: return dict(status='DELIVERY_FAILED',reason='Document is not readable')
     if not content or len(content)>MAX_DOCUMENT_BYTES:
         return dict(status='SKIPPED',reason='Document is empty or larger than Telegram allows')
-    body,content_type=_multipart(dict(chat_id=target.split(':',1)[1],caption=caption[:MAX_CAPTION]),path.name,content,'text/html')
+    body,content_type=_multipart(dict(chat_id=target.split(':',1)[1],caption=caption[:MAX_CAPTION]),path.name,content,mime)
     return dict(_api_call('sendDocument',body,content_type,60),transport='telegram_api',file=path.name,bytes=len(content))
 
 
@@ -167,6 +167,23 @@ def notify_testplan(plan_dir,event=None):
     result=dict(send_document(html,caption),at=stamp,sha256=digest)
     _save(report,result)
     if event: event('testplan_notification',status=result['status'],reason=result.get('reason',''),file=html.name)
+    return result
+
+
+def notify_waveform(path,test_name='',status=''):
+    """Send a waveform to the configured chat, and record the outcome beside it. A failure never affects the run.
+
+    A waveform holds the design's signal values, so it goes only to the configured chat, and DV_AGENT_SEND_WAVEFORM=0 turns this off.
+    """
+    path=Path(path)
+    if os.getenv('DV_AGENT_SEND_WAVEFORM','1').lower() in ('0','off','false'):
+        return dict(status='SKIPPED',reason='waveform delivery disabled')
+    if not _target(): return dict(status='SKIPPED',reason='no Telegram target configured')
+    if not path.is_file(): return dict(status='SKIPPED',reason='no waveform file to send')
+    label=' '.join(part for part in (test_name or path.stem,status) if part)
+    result=dict(send_document(path,f'Silicon Copilot waveform: {label}. Open with GTKWave or Surfer.','application/octet-stream'),
+                at=datetime.now(timezone.utc).isoformat(timespec='seconds'))
+    _save(path.with_name('notification_waveform.json'),result)
     return result
 
 
@@ -229,18 +246,21 @@ def main():
     action.add_argument('--flush',type=Path,help='runs directory containing notification outboxes')
     action.add_argument('--test',action='store_true',help='send one delivery-check message and print the provider receipt')
     action.add_argument('--send-testplan',type=Path,help='send testplan_doc.html from this plan directory (the dv folder of a run)')
+    action.add_argument('--send-waveform',type=Path,help='send this waveform file')
     args=parser.parse_args()
     # Use project configuration without copying Hermes credentials into this file.
     from orchestrator_agent.cli import load_env_file
     load_env_file(Path(__file__).resolve().parents[3]/'.env')
-    if args.send_testplan:
+    if args.send_waveform:
+        result=notify_waveform(args.send_waveform)
+    elif args.send_testplan:
         # Explicit resend: forget the recorded delivery so identical content is sent again on request.
         (args.send_testplan/'notification_testplan.json').unlink(missing_ok=True)
         result=notify_testplan(args.send_testplan)
     else:
         result=send_message('Silicon Copilot: Telegram delivery check. No approval is requested.') if args.test else flush_outbox(args.flush)
     print(json.dumps(result,indent=2))
-    if (args.test or args.send_testplan) and result['status'] not in ('SENT',): raise SystemExit(1)
+    if (args.test or args.send_testplan or args.send_waveform) and result['status'] not in ('SENT',): raise SystemExit(1)
 
 
 if __name__=='__main__': main()

@@ -257,3 +257,40 @@ def test_orchestrator_sends_the_plan_when_the_testplan_step_passes(monkeypatch,t
     result=runner.run_flow(flow_path,out_dir=tmp_path/'run',variables={},registry={'dv_testplan':ToolSpec(
         'dv',SPEC,False,lambda args,ctx:dict(status='PASS',summary='ok',files=[str(plan/'testplan_doc.json')]))})
     assert result['status']=='PASS' and calls==[plan]
+
+
+def _capture_upload(monkeypatch):
+    from dv_agent.core import notifications
+    calls=[]
+    monkeypatch.setenv('DV_HITL_HERMES_TARGET','telegram:123')
+    monkeypatch.delenv('DV_AGENT_SEND_WAVEFORM',raising=False)
+    monkeypatch.setenv('DV_AGENT_NOTIFICATION_TRANSPORT','auto')
+    def api(method,body,content_type,timeout):
+        calls.append((method,body));return dict(status='SENT',message_id=7)
+    monkeypatch.setattr(notifications,'_api_call',api)
+    return notifications,calls
+
+
+def test_a_waveform_is_uploaded_as_a_binary_file_and_the_outcome_is_recorded(tmp_path,monkeypatch):
+    notifications,calls=_capture_upload(monkeypatch)
+    fst=tmp_path/'quick_basic.fst';fst.write_bytes(b'\x00fst data')
+    result=notifications.notify_waveform(fst,'quick_basic','PASS')
+    assert result['status']=='SENT' and calls[0][0]=='sendDocument'
+    assert b'filename="quick_basic.fst"' in calls[0][1] and b'application/octet-stream' in calls[0][1] and b'\x00fst data' in calls[0][1]
+    assert b'quick_basic PASS' in calls[0][1]
+    assert json.loads((tmp_path/'notification_waveform.json').read_text())['status']=='SENT'
+
+
+def test_a_waveform_is_not_sent_when_disabled_unconfigured_missing_or_too_large(tmp_path,monkeypatch):
+    notifications,calls=_capture_upload(monkeypatch)
+    fst=tmp_path/'t.fst';fst.write_bytes(b'x')
+    assert notifications.notify_waveform(tmp_path/'missing.fst')['status']=='SKIPPED'
+    monkeypatch.setattr(notifications,'MAX_DOCUMENT_BYTES',0)
+    assert notifications.notify_waveform(fst)['status']=='SKIPPED'
+    monkeypatch.setenv('DV_AGENT_SEND_WAVEFORM','0')
+    assert notifications.notify_waveform(fst)['reason']=='waveform delivery disabled'
+    monkeypatch.delenv('DV_AGENT_SEND_WAVEFORM')
+    monkeypatch.delenv('DV_HITL_HERMES_TARGET')
+    assert notifications.notify_waveform(fst)['status']=='SKIPPED'
+    assert not calls
+

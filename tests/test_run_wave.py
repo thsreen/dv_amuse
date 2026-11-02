@@ -47,6 +47,9 @@ def test_repl_routes_run_wave_and_shows_the_waveform_and_coverage(monkeypatch, t
                                                coverage_report='r.md', coverage_summary=dict(plan_groups=2, plan_average=50.0, plan_full=1, plan_unsampled=1,
                                                                                             assertions_passed=3, assertions=3))])
     monkeypatch.setattr(terminal, 'run_tests', run_tests)
+    from dv_agent.core import notifications
+    sent = []
+    monkeypatch.setattr(notifications, 'notify_waveform', lambda *a: sent.append(a) or dict(status='SENT'))
     lines = iter(['/run wave', '/run'])
     def read(prompt):
         try:
@@ -57,6 +60,7 @@ def test_repl_routes_run_wave_and_shows_the_waveform_and_coverage(monkeypatch, t
     assert terminal.repl(input_fn=read, output_fn=shown.append, llm_mode='off') == 0
     text = '\n'.join(shown)
     assert calls == [(False, True), (False, False)]
+    assert sent == [('t.fst', 't', 'PASS')] and 'waveform sent to Telegram' in '\n'.join(shown)
     assert 'waveform: t.fst' in text and 'run wave: PASS' in text and 'coverage report: r.md' in text
     assert 'simple average 50.0%' in text and 'assertions 3 of 3' in text
 

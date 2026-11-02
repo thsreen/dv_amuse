@@ -234,7 +234,7 @@ variables/settings are schema-controlled, width-checked extensions to the reusab
 
 ## Waveforms and coverage
 
-`/run wave` runs the first test and also saves `<test>.fst` beside its `simulation.log`. Open it with GTKWave or Surfer.
+`/run wave` runs the first test and also saves `<test>.fst` beside its `simulation.log`. Open it with GTKWave or Surfer. It is also sent to the configured Telegram chat, up to Telegram's 50 MB bot limit; `DV_AGENT_SEND_WAVEFORM=0` turns that off, and `python -m dv_agent.core.notifications --send-waveform <file>` sends one by hand.
 
 Every `/run` and `/regress` prints a coverage line per test and saves `coverage_report.md` beside the log: each coverage group with its samples
 and percentage, and the assertions that passed. The percentages are what the testbench reported. The average is a plain mean of the plan

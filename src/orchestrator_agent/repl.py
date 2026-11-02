@@ -377,6 +377,11 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                     if wave:
                         show(f"  waveform: {test['waveform']}" if test.get("waveform")
                              else f"  waveform: not produced: {test.get('waveform_reason', 'this build has no functional test')}")
+                        if test.get("waveform"):
+                            from dv_agent.core.notifications import notify_waveform
+                            sent = notify_waveform(test["waveform"], test["name"], test["status"])
+                            show("  waveform sent to Telegram" if sent["status"] == "SENT"
+                                 else f"  waveform not sent to Telegram: {sent['status']}: {sent.get('reason', '')}")
                 show(f"{line[1:]}: {result['status']}")
                 if result.get('reason'): show(result['reason'])
                 if result.get('compile',{}).get('reason'): show(result['compile']['reason'])

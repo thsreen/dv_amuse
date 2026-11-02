@@ -192,4 +192,5 @@ def disable_live_start_notifications(monkeypatch):
     """Tests never send messages using a developer's real bot configuration."""
     monkeypatch.setenv('DV_AGENT_START_NOTIFICATION','0')
     monkeypatch.setenv('DV_AGENT_SEND_TESTPLAN','0')
+    monkeypatch.setenv('DV_AGENT_SEND_WAVEFORM','0')
     monkeypatch.setenv('DV_HITL_DEMO_PAUSE_SECONDS','0')
