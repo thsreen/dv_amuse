@@ -209,6 +209,7 @@ def review(llm, plan, directory):
             if len(json.dumps(payload))>48000:
                 if len(batch)<2: raise ValueError('One review component exceeds its scoped context; decompose it')
                 middle=len(batch)//2;batches[:0]=[batch[:middle],batch[middle:]];continue
+            emit(f'code review: batch {len(records)+1} of {len(records)+len(batches)+1}')
             result=client.structured(name='code_review',instructions='Independently audit these implementation components '
                 'against their cited facts and shared foundation. Quotes are stored once in quoted_evidence. '
                 'Reject unsupported expectations, protocol bindings, register addresses/data lanes, serial configuration/timing, '
@@ -289,5 +290,10 @@ def implement(llm, plan, directory, *, compiler_feedback=None):
                 feedback={'previous_code':result.data['code'],'error':str(exc)}
         atomic_write_text(path,json.dumps(dict(id=hook.id,code=code,fact_ids=hook.fact_ids),indent=2)+'\n')
         return hook.id,code
+    emit(f'code hooks: 0 of {len(plan.hooks)} done')
+    implemented={}
     with ThreadPoolExecutor(max_workers=2) as executor:
-        return {hook_id:code for hook_id,code in executor.map(cancel.bind(task),plan.hooks) if code is not None}
+        for done,(hook_id,code) in enumerate(executor.map(cancel.bind(task),plan.hooks),1):
+            emit(f'code hooks: {done} of {len(plan.hooks)} done')  # from this thread: progress sinks are per thread
+            if code is not None: implemented[hook_id]=code
+    return implemented

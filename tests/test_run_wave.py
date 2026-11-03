@@ -88,3 +88,39 @@ def test_run_wave_says_why_when_there_is_no_waveform(monkeypatch):
     shown = []
     terminal.repl(input_fn=read, output_fn=shown.append, llm_mode='off')
     assert 'waveform: not produced: The simulator does not offer --fst' in '\n'.join(shown)
+
+
+def test_code_summary_separates_what_was_built_deferred_and_set_aside(tmp_path):
+    import json
+    from orchestrator_agent.actions import code_summary
+    code = tmp_path / 'code'
+    code.mkdir()
+    (tmp_path / 'code_work_manifest.json').write_text(json.dumps(dict(features=dict(passed=['a', 'b'], deferred=['c'], deferred_items=4))))
+    (tmp_path / 'contract_review.json').write_text(json.dumps(dict(problems=['x', 'y', 'z'])))
+    (tmp_path / 'quick_basic_set_aside.json').write_text(json.dumps(dict(tests=[1, 2], routes=[1])))
+    (code / 'code_plan.json').write_text(json.dumps(dict(tests=[dict(id='quick_basic')], sequences=[1] * 5, routes=[1, 2], checks=[1], coverage=[1, 2, 3], questions=[1] * 9)))
+    lines = code_summary(tmp_path, dict(status='BUILT_NEEDS_REVIEW', code_dir=str(code), compile=dict(status='NOT_RUN')))
+    assert lines == ['Status: generation BUILT_NEEDS_REVIEW; compile NOT_RUN; simulation NOT_RUN until /run.',
+                     'Features: 2 built, 1 deferred, 4 items deferred.',
+                     'Built: 1 tests, 5 sequences, 2 routes, 1 checks, 3 coverage groups.',
+                     'Open: 9 questions, 3 review objections.',
+                     'Set aside for the script-chosen test: 2 model tests, 1 model routes.']
+
+
+def test_code_summary_of_a_plain_build_says_only_what_it_has(tmp_path):
+    from orchestrator_agent.actions import code_summary
+    assert code_summary(tmp_path, dict(status='BUILT_NEEDS_REVIEW')) == ['Status: generation BUILT_NEEDS_REVIEW; compile NOT_RUN; simulation NOT_RUN until /run.']
+
+
+def test_review_and_hooks_report_how_far_they_have_got(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from dv_agent.codegen import reasoning
+    from dv_agent.core.llm import FakeLLM
+    from dv_agent.core.progress import reporting
+    messages = []
+    hooks = [SimpleNamespace(id=name, slot='monitor.body', target='a', fact_ids=[], model_dump=lambda name=name: dict(id=name, slot='monitor.body')) for name in 'xy']
+    plan = SimpleNamespace(hooks=hooks, facts=[], agents=[], questions=[], model_dump=lambda: {})
+    with reporting(sink=messages.append):
+        assert set(reasoning.implement(FakeLLM(dict(code_hook=lambda p: dict(code='x = 1;'))), plan, tmp_path)) == {'x', 'y'}
+    counted = [m for m in messages if m.startswith('code hooks:')]
+    assert counted == ['code hooks: 0 of 2 done', 'code hooks: 1 of 2 done', 'code hooks: 2 of 2 done']

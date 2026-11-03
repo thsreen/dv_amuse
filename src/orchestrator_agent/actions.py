@@ -159,6 +159,30 @@ def build_code(out: Path, variables: dict, *, llm=None) -> dict:
     return manifest | {"reused": False}
 
 
+def code_summary(out: Path, result: dict) -> list[str]:
+    """What a finished /code built and left out, read from what it saved. A built project is not a passing one."""
+    def saved(path):
+        try:
+            return json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+    features = saved(out / "code_work_manifest.json").get("features") or {}
+    review = saved(out / "contract_review.json")
+    plan = saved(Path(result.get("code_dir", "")) / "code_plan.json")
+    aside = saved(out / "quick_basic_set_aside.json")
+    lines = [f"Status: generation {result.get('status', 'UNKNOWN')}; compile {result.get('compile', {}).get('status', 'NOT_RUN')}; "
+             "simulation NOT_RUN until /run."]
+    if features:
+        lines.append(f"Features: {len(features['passed'])} built, {len(features['deferred'])} deferred, {features['deferred_items']} items deferred.")
+    if plan:
+        lines.append(f"Built: {len(plan['tests'])} tests, {len(plan['sequences'])} sequences, {len(plan['routes'])} routes, "
+                     f"{len(plan['checks'])} checks, {len(plan['coverage'])} coverage groups.")
+        lines.append(f"Open: {len(plan['questions'])} questions, {len(review.get('problems', []))} review objections.")
+    if aside and plan and any(t["id"] == "quick_basic" for t in plan["tests"]):
+        lines.append(f"Set aside for the script-chosen test: {len(aside['tests'])} model tests, {len(aside['routes'])} model routes.")
+    return lines
+
+
 def run_tests(out: Path, *, regress: bool = False, wave: bool = False) -> dict:
     state_path=out/'code_generation_state.json'
     if state_path.is_file() and json.loads(state_path.read_text()).get('status') in ('BLOCKED','BUILDING','WAITING_HUMAN'):

@@ -570,6 +570,16 @@ def test_a_refused_answer_too_large_to_repeat_still_gets_its_repair_attempt(inpu
     assert manifest['tests'] and 'repair_feedback' in payloads[1] and 'previous_output' not in payloads[1]
 
 
+def test_review_reports_which_batch_it_is_on(inputs):
+    from dv_agent.core.progress import reporting
+    root, _, _, contract, rtl = inputs
+    messages = []
+    with reporting(sink=messages.append):
+        build_project(root/'plan.json', root/'interface.json', root/'output', llm=workflow_model(contract), rtl_files=[rtl], compile=False)
+    batches = [m for m in messages if m.startswith('code review: batch')]
+    assert batches and batches[0].startswith('code review: batch 1 of ') and batches[-1].split()[-1] == batches[-1].split()[-3]
+
+
 def test_workflow_emits_real_feature_phases_in_execution_order(inputs):
     from dv_agent.core.progress import reporting
     root, _, _, contract, rtl = inputs

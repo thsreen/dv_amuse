@@ -11,7 +11,7 @@ from urllib.parse import quote
 from dv_agent.quality.code_notice import abort_requested, code_notice
 from dv_agent.report.testplan_viewer import create_report_server
 
-from .actions import build_code, run_tests
+from .actions import build_code, code_summary, run_tests
 from .assist import explain_run, interpret, rerun_help, rerun_plan, show_text, status_text, validate_text
 from .flow import load_flow
 from .repo_intake import find_repo, inspect_repo
@@ -339,13 +339,8 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
                     show(f"Code: {result['code_dir']} ({policy['kept']} documented items retained as code input; "
                          f"{policy['skipped']} unsupported or inferred items excluded).")
                 show(f"Built tests: {', '.join(t['name'] for t in result['tests'])}.")
-                try:
-                    features = json.loads((out / "code_work_manifest.json").read_text()).get("features")
-                except (OSError, ValueError):
-                    features = None
-                if features and (features["deferred"] or features["deferred_items"]):
-                    show(f"Quick testing: {len(features['passed'])} features passed, {len(features['deferred'])} deferred, "
-                         f"{features['deferred_items']} items deferred; the reasons are in the code questions.")
+                for summary_line in code_summary(out, result):
+                    show(summary_line)
                 if result.get('work_documents'):
                     show(f"Feature dependencies and pseudocode: {result['work_documents']}")
                 if result.get("contract"):
