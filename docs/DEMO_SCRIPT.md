@@ -1,101 +1,106 @@
-# Silicon Copilot (dv_agent) — 3-minute demo video script (v2, evidence-checked)
+# Silicon Copilot (dv_agent) — 3-minute demo video script (v3, reviewed against saved runs)
 
-Speaker: Sreenath. Total: ~180 seconds (~435 spoken words at ~145 wpm).
-Cut to a timer in editing; each beat lists voiceover (VO) plus what is on screen.
-Every on-screen claim below is backed by a real artifact named in Recording notes.
+Speaker: Sreenath. Total: ~180 seconds (~390 spoken words at ~145 wpm, leaving room for footage).
 Pre-generate everything; record saved outputs, not live runs.
 
-## 0:00–0:20 — Hook: the problem (20s, ~50 words)
+## 0:00–0:20 — Hook
 
-**VO:** "Hi, I'm Sreenath. Every chip ships with a verification test plan — hundreds of checks
-that prove the design does what its specification promises. Today engineers write those plans by
-hand, over weeks, from hundred-page specs. I built Silicon Copilot: an agent that drafts the plan
-from the spec, with every statement traced back to the exact line it came from."
+**VO:** "Hi, I'm Sreenath. Every chip ships with a verification plan and a testbench that prove it does
+what its specification promises. Engineers build them by hand, over weeks. Silicon Copilot is an agent
+that drafts both from the spec, with every statement traced back to the line it came from."
 
-**On screen:** Title card → a real spec PDF (UART16550) → a finished test-plan HTML report.
+**On screen:** Title card → the UART16550 spec → the finished test-plan HTML report.
 
-## 0:20–0:45 — Spec in, structure out (25s, ~60 words)
+## 0:20–0:45 — One sentence selects the build
 
-**VO:** "I point it at the spec. Muse Spark reads the prose and tables, and isolates the design's
-interface groups and its register map. Notice every signal and every register carries its citation —
-document, chunk, page. The deterministic layer then verifies each quote is a verbatim substring of the
-source. Nothing the model invents can slip through as fact."
+**VO:** "I ask in one line: verification collateral for the 8-bit UART. The macro comes from the RTL
+itself, so the plan covers only that build. Registers and ports it doesn't have are listed as left out.
+Muse Spark then reads the spec and builds the interface groups and register map, each with its
+citation. A script checks that every quote is verbatim."
 
-**On screen:** Terminal `/plan` running with the live dashboard; interface groups and register map
-rendering with green DOCUMENTED badges and source tooltips.
+**On screen:** The request and the ask card showing `DATA_BUS_WIDTH_8` → the plan's "Build
+configuration" block → interface and register tables with their source tooltips.
 
-## 0:45–1:05 — Refuse and repair, for real (20s, ~50 words)
+## 0:45–1:05 — Refuse and repair
 
-**VO:** "Here's the part I'm proudest of. In this run the model emitted six empty configurations —
-fields with no names the checks couldn't resolve. The checker refused the whole section, handed the
-failure back with reasons, and the model repaired it. That refusal is saved in the report, and the
-model never approves its own work."
+**VO:** "Here's what I'm proudest of. Muse Spark does the reasoning, but scripts it can't override have
+the last word. Here it cited a quote that isn't in the retrieved source. It was refused, told why, and
+it repaired the answer. Here it ran a test before its dependency. Refused again."
 
-**On screen:** Saved report excerpt: `Refused (attempt 1): configuration for '' dropped…` →
-`Repaired after 1 refusal(s).` (runs/uart16550/testplan_doc.md, Configurations.)
+**On screen:** `code_trace.jsonl` lines: `code_pseudocode:t_serial_seq — Fact quote must occur in a
+retrieved source excerpt`, then `code_integration — Test test_lsr_errors starts t_lsr_dr_cov before
+dependency t_modem_seq`.
 
-## 1:05–1:30 — Strategy and the claims check (25s, ~60 words)
+## 1:05–1:25 — The plan and its lineage
 
-**VO:** "Next the agent proposes the verification strategy: which UVM agent drives and monitors each
-interface, what each scoreboard compares. Architecture choices stay visibly marked as engineering
-proposals, never spec claims. Then a separate claims-check call judges documented entries against
-their own cited text — thirteen claims checked against their quotes in this section, all supported."
+**VO:** "The result is a thirteen-section plan: strategy, stimulus, checks, coverage. Entries are tagged
+as documented, inferred or assumed, and RTL observations are marked for engineer review. One command
+walks a section back to its exact spec pages. Thirty-two Muse Spark calls, every section passed."
 
-**On screen:** Strategy bullets with provenance badges; `Claims check: 13 claim(s) judged against
-their cited text; all supported.` (runs/uart16550/testplan_doc.md, Feature Description.)
+**On screen:** HTML report scroll; a source tooltip; `dv-agent lineage` on a `TPS-` node showing chunk
+and pages; the token table.
 
-## 1:30–1:52 — The plan and its lineage (22s, ~55 words)
+## 1:25–1:50 — It writes the testbench
 
-**VO:** "The result is a complete fifteen-section test plan: stimulus, checks, coverage, all cross
-linked. Green means documented, yellow means inferred, red means no verified reference — and each
-badge links to the source appendix. And any entry traces back with one command, through retrieval
-and extraction, to the exact spec line. If the evidence isn't there, the plan says so."
+**VO:** "Then it writes the testbench, one unit at a time, smallest interface first, saving each so a run
+resumes where it stopped. Four interfaces and twenty-one features became forty-nine sequences and
+thirty-seven checks, rendered through fixed templates. Four features it couldn't support are deferred
+with reasons, not faked."
 
-**On screen:** Full HTML report scroll; click a badge → appendix excerpt; `dv-agent lineage`
-walking one entry back to its chunk.
+**On screen:** `/code` dashboard; the closing summary lines (Status, Features, Built, Open, Set aside);
+one generated monitor or sequence.
 
-## 1:52–2:20 — It runs: code, compile, simulation (28s, ~68 words)
+## 1:50–2:20 — It runs
 
-**VO:** "The plan isn't the end. Documented items feed code generation: a UVM testbench with
-sequences, scoreboards, and assertions. It compiles clean under Xezim — and then it simulates.
-Forty-five hundred assertion passes, zero failures, with functional coverage recorded. Spec to plan
-to passing sim, every step traceable."
+**VO:** "And it runs, on the real RTL, under Xezim and UVM. This first test is chosen by script: the
+model's setup writes, one byte out, one byte in. Two scoreboard comparisons, thirty-seven of
+thirty-seven assertions, zero errors. Here's the waveform: 5A written on the bus leaves on the serial
+line, and A5 sent in comes back. The file even arrives on Telegram."
 
-**On screen:** Terminal: compile PASS → simulation log tail → `assertion_pass_total: 4516,
-assertion_fail_total: 0` → coverage excerpt. (codegen-acceptance build 0f231192803d1ef2.)
+**On screen:** `/run wave` output: `quick_basic: PASS`, coverage line, waveform path, `waveform sent to
+Telegram` → GTKWave with `wb_dat_i`, `stx_pad_o`, `srx_pad_i`, `wb_dat_o` → the Telegram message.
 
-## 2:20–2:40 — Human sign-off, and why the model matters (20s, ~50 words)
+## 2:20–2:42 — What it does not claim
 
-**VO:** "Finally, a verification engineer signs off — rejection notes feed back into revision. And to
-prove the model does load-bearing work, here's the same run with the model disabled: structure, but
-no requirements, no strategy, no judgment. The semantic work is all Muse Spark; the honesty is all
-deterministic checks."
+**VO:** "It's a prototype, and it says so. Five model-designed tests and nine routes are set aside
+because they don't pass yet. Hundreds of questions wait for a designer, and approvals here are
+test-only. Nothing is signed off. An engineer stays in charge."
 
-**On screen:** `review` command; side-by-side `--llm off` vs `--llm on` plans.
+**On screen:** The summary's Open and Set aside lines; `Review status: NEEDS_REVIEW`; the `QUICK TESTING
+ONLY` banner; `quick_basic_set_aside.json`.
 
-## 2:40–3:00 — Close (20s, ~40 words)
+## 2:42–3:00 — Close
 
-**VO:** "Silicon Copilot: from specification to a traceable, reviewable verification plan — and a
-simulation that proves it. Honest about what it knows and what it doesn't. Repo link below. Thanks
-for watching."
+**VO:** "Silicon Copilot: from one sentence and a spec to a traceable plan and a running testbench,
+honest about what it knows and what it doesn't. Repo link below. Thanks for watching."
 
-**On screen:** Title card with repo URL and run stats (32 model calls, 15 of 15 sections PASS).
+**On screen:** Title card with repo URL and: 13 of 13 sections, 32 plan model calls, `quick_basic` PASS,
+2 comparisons, 37 of 37 assertions.
 
 ---
 
 ## Recording notes (not spoken)
 
-- Pre-generate the plan; record the dashboard replay plus the saved HTML and trace excerpts, not a
-  live 20-minute run. No live API calls on camera.
-- Footage map (all verified 2026-11-02): interface/register badges —
-  runs/uart_fast/testplan_doc.html (114 DOCUMENTED badges, 65/65 coverage) or the Nov 1 run's
-  dv/testplan_doc.html (15/15 PASS, 20 registers, 7 groups); refusal excerpt —
-  runs/uart16550/testplan_doc.md Configurations; claims line — same file, Feature Description;
-  token table (32 calls) — Nov 1 run dv/testplan_doc.md; lineage — `dv-agent lineage` on any
-  TPS-/REQ- node; sim — codegen-acceptance build 0f231192803d1ef2 simulation/run.json and log.
-- Do NOT show: Langfuse waterfall (no keys configured — use lineage instead), the orch runs'
-  coverage denominator (empty in basic mode — use uart_fast's 65/65 if coverage is shown),
-  anything from `runs/uart16550` beyond the two cited excerpts (it has BLOCKED sections).
-- Blur or confirm the spec license before showing pages (UART16550; record source and revision).
-- Keep the `--llm off` contrast to one split-screen shot; it exists to answer the tooling question.
-- Sync the closing numbers to whatever run is filmed (currently: 32 calls, 15/15 PASS).
+- **Source of every figure:** the 2026-11-01 8-bit plan `runs/orch-20261101T140654Z` and its quick-testing
+  copy `…-quick-testing-2026-11-01T1423204743620000` (code project `3ab3bda06154454c`).
+  Plan: 13 of 13 sections, 32 requests, 20 registers, 7 interface groups. Build: 4 agents, 21 features
+  built, 4 deferred, 84 items deferred, 49 sequences (4 of them the script-chosen test's), 37 checks,
+  25 plan coverage groups, 399 questions. Run: 2 comparisons, 37 of 37 assertions, 0 UVM errors.
+- **Capture the terminal again:** restart the orchestrator, send the 8-bit request and run `/code`, then
+  `/run wave`, to film the summary lines and the Telegram line. Saved answers make this about a minute.
+  Update the figures above if a new run changes them.
+- **Do not use:** `runs/orch-20261103T050924Z`, whose plan timed out and is BLOCKED; build `0f231192…`,
+  which came from the hand-written test contract, so it is not what the agent designed; `runs/uart16550`,
+  which has BLOCKED sections.
+- **Removed from v2, with the reason:**
+  - The `--llm off` side-by-side: no such plan is saved.
+  - The `review` command and "rejection notes feed back": the CLI has `review-feedback` only, and it was
+    not exercised for this film.
+  - The claims-check line: it comes from an older run with BLOCKED sections. Basic-mode plans call the
+    separate judge for RTL observations only.
+  - "Green, yellow, red": the colours were not confirmed in the current report.
+  - Coverage 65/65: from a different mode (`uart_fast`), and the filmed runs have no such figure.
+- Do not call this RAG or lead with retrieval. The rules list basic RAG apps as an anti-project.
+- Do not quote the 58.5% coverage average as a result. It is a plain mean from one test.
+- Confirm the UART16550 licence before showing spec pages, and record its source and revision.
+- The Langfuse waterfall has no keys configured; use lineage instead.

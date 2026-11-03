@@ -1,5 +1,36 @@
 # dv_agent
 
+Silicon Copilot is a design-verification agent. From a one-line request, a specification and RTL it produces a
+cited test plan and a UVM testbench, then compiles and simulates the testbench. Muse Spark does the semantic work;
+checks outside the model refuse what they cannot verify; an engineer has the final say.
+
+## Quickstart
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -e '.[test]'
+cp .env.example .env   # add MODEL_API_KEY
+tmux new -s dv         # so a dropped connection cannot stop a run
+.venv/bin/python -m orchestrator_agent --mode basic --quick-testing-auto-approve-inferences
+```
+
+Then describe the design, for example `Verification collateral for the 8 bit UART in ../baseline_repos/uart16550`, and run:
+
+| Command | What it does |
+|---|---|
+| `/plan` | Writes the cited test plan for the build the request selected |
+| `/code` | Generates the testbench one unit at a time, resuming from saved answers, and ends with a summary of what was built, deferred, set aside and left open |
+| `/run` | Compiles and simulates the first test, and saves a coverage report |
+| `/run wave` | Also saves an FST waveform and sends it to the configured Telegram chat |
+| `/regress` | Runs every built test |
+
+`/run`, `/run wave` and `/regress` need `xezim` and a UVM source release (`XEZIM_BIN`, `XEZIM_UVM_DIR`). If the model API is slow and
+plan sections time out, set `META_REQUEST_TIMEOUT_SECONDS=300`.
+
+**Current status:** the 8-bit UART16550 runs end to end live: 13 of 13 plan sections, and a script-chosen test, `quick_basic`, passes on the real
+RTL with 2 scoreboard comparisons, 37 of 37 assertions and 0 UVM errors. This is a prototype result under quick testing, with test-only approvals,
+the model's own tests set aside and 4 features deferred. It is not verification of the design. See [docs/CODE_REVIEW_STATUS.md](docs/CODE_REVIEW_STATUS.md)
+and [docs/QUICK_TESTING.md](docs/QUICK_TESTING.md).
+
 Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ([diagram](docs/architecture/end_to_end.svg)).
 
 Current review/status: [docs/CODE_REVIEW_STATUS.md](docs/CODE_REVIEW_STATUS.md).

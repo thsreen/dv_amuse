@@ -1,5 +1,25 @@
 # Review and current status
 
+## Current status (2026-11-03)
+
+Evidence is from saved runs on one design, UART16550, 8-bit build.
+
+| Capability | Status |
+|---|---|
+| Request selects the RTL configuration, and the plan and compile follow it | PASS: live plans and a real simulator test |
+| `/plan` in basic mode (lexical retrieval, Meta API live) | PASS on 15 of 17 saved runs; the newest is BLOCKED on 150 s request timeouts |
+| Graph mode (Graph-RAG retrieval) | Older runs only; retrieval benefit not measured |
+| `/code` under quick testing, model designing the contract | PASS live: `BUILT_NEEDS_REVIEW`, 21 features built, 4 deferred, 84 items deferred |
+| `/code` in normal mode, with human review | NOT_RUN end to end |
+| `/run` and `/run wave` on that build | PASS live: `quick_basic`, 2 comparisons, 37 of 37 assertions, 0 UVM errors; FST written and delivered to Telegram |
+| The model's own tests on that build | FAIL in a preview on a copy; set aside. Routes are global across tests, and expected-error tests need their own classification |
+| Design verification and sign-off | NEEDS_REVIEW; no behavioral verification is claimed |
+
+Offline tests run with mocks; real simulator tests run with `DV_AGENT_TEST_SIMULATION=1`. Open findings are in
+[agent/reviews/2026-11-02-consolidated.md](agent/reviews/2026-11-02-consolidated.md).
+
+## Earlier review (historical, at `bad38bd`)
+
 Reviewed `main` at `bad38bd` and its recent changes. The initial working tree was clean. Baseline:
 `.venv/bin/python -m pytest -q` — **155 passed, 2 deselected**. The latest commit adds combined graph
 fetch and token accounting; earlier recent commits add refuse-and-repair and specification steps.

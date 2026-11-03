@@ -182,6 +182,7 @@ The interactive terminal has five commands:
 | `/plan` | Ingest specifications, or draft one from RTL with inferred authority; build graphs, recover registers/configurable controls, and write `testplan_doc.json`, editable Markdown and readable HTML. |
 | `/code` | Generate `/plan` if needed. With a configured model, design/review a documented-source implementation contract, incrementally render reusable UVM components; defer compilation to `/run` or `/regress`. Without a model or explicit code contract, retain the labeled legacy smoke scaffold. |
 | `/run` | Execute the first built test with local Xezim; functional UVM tests require UVM sources and real checking/coverage evidence. |
+| `/run wave` | The same, and also save an FST waveform beside the log and send it to the configured Telegram chat (`DV_AGENT_SEND_WAVEFORM=0` turns that off) |
 | `/regress` | Execute all tests in the current code manifest and retain per-test/seed logs and coverage. |
 | `/fresh` | Start over: new run directory, no cached state reused. The earlier run is kept for review. Saying "start fresh" works too. |
 
