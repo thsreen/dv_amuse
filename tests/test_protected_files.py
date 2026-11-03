@@ -50,4 +50,4 @@ def test_agent_permissions_deny_writes_and_shell_access_to_every_protected_file(
     owners = (ROOT / ".github/CODEOWNERS").read_text()
     for path in PROTECTED:
         assert f"/{path}" in owners, path
-    assert "docs/PROTECTED_FILES.md" in (ROOT / "AGENTS.md").read_text()
+    assert "docs/PROTECTED_FILES.md" in (ROOT / "README.md").read_text()

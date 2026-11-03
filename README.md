@@ -238,3 +238,5 @@ checks pass, a separate `claims_check` model call judges each DOCUMENTED or INFE
 cites. Unsupported claims are refused back to the author call (refuse-and-repair); any still unsupported after the
 repair budget are downgraded to ASSUMED and raised as a designer question. Off for Assumptions and Questions; a
 failed judge call is reported as BLOCKED and never blocks the section (D-025).
+
+Repository protection policy: [Protected files](docs/PROTECTED_FILES.md).
