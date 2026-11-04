@@ -146,7 +146,7 @@ Existing environment variables take precedence over that file.
 |---|---|
 | `MODEL_API_KEY` | Credentials for model-backed planning and generation. |
 | `META_MODEL`, `META_BASE_URL`, `META_API_STYLE` | Model, compatible API endpoint and request style. |
-| `META_REQUEST_TIMEOUT_SECONDS` | Per-request timeout; default 150 seconds. |
+| `META_REQUEST_TIMEOUT_SECONDS` | Per-request timeout; default 150 seconds. Use 300 if plan or code calls time out. |
 | `DV_AGENT_LLM_MODE` | `auto`, `on` or `off`; `auto` enables model use when credentials are configured. |
 | `XEZIM_BIN`, `XEZIM_UVM_DIR` | Local simulation dependencies. |
 

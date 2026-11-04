@@ -186,7 +186,7 @@ def run_build_graph(out: Path, llm: LLM | None, cfg: ExtractConfig | None = None
         G = build_structure(manifest, chunks)
         stats: dict = {}
         if mode == "basic":
-            stats["llm"] = {"status": "NOT_RUN", "reason": "basic RAG: direct lexical chunk retrieval"}
+            stats["llm"] = {"status": "NOT_RUN", "reason": "basic mode: direct lexical chunk retrieval"}
             stats["analysis_scope"] = "No model requirement/dependency extraction; no graph coverage claim."
         elif llm is None:
             stats["llm"] = {"status": "NOT_RUN", "reason": "no LLM configured (MODEL_API_KEY unset)"}
@@ -465,7 +465,7 @@ def run_testplan_doc(out: Path, llm: LLM, *, scope: str = "", template_path: Pat
         doc['generation_status'] = 'COMPLETE' if doc['status'] == 'PASS' else 'PARTIAL'
         doc["mode"] = mode
         if mode == "basic":
-            doc["analysis_scope"] = ("Basic RAG demo draft: lexical source-chunk retrieval; no extracted requirement/dependency graph "
+            doc["analysis_scope"] = ("Basic mode draft: lexical source-chunk retrieval; no extracted requirement/dependency graph "
                                      "or requirement-coverage measurement. Model claim judging disabled; source citation/quote "
                                      "checks remain active. Engineer review required.")
         save_graph(G, out / GRAPH_FILE)

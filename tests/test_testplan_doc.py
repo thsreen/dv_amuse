@@ -785,7 +785,7 @@ def test_basic_plan_uses_chunks_and_reports_reduced_analysis(spec_repo, tmp_path
     assert not any(name in ("spec_requirements", "requirement_dependencies", "testplan_claims") for name, _ in llm.calls)
     assert doc["registers"]["registers"]
     assert (out / "testplan_doc.html").is_file()
-    assert "Basic RAG demo draft" in (out / "testplan_doc.md").read_text()
+    assert "Basic mode draft" in (out / "testplan_doc.md").read_text()
     assert run_testplan_doc(out, llm, mode="basic")["reused"]
 
 

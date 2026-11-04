@@ -122,7 +122,7 @@ def repl(*, llm_mode: str | None = None, input_fn=None, output_fn=None,
     show("Describe the design and local repository. I will scan it and show the testplan steps.")
     show(HELP)
     if os.getenv("DV_AGENT_MODE", "basic") == "basic":
-        show("Basic RAG demo: direct source retrieval, no model requirement/dependency graph; target 10–15 minutes.")
+        show("Basic mode: direct source retrieval, no model requirement/dependency graph; target 10–15 minutes.")
 
     def models():
         nonlocal llm, embedder
