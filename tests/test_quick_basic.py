@@ -35,26 +35,47 @@ def test_the_test_replaces_the_model_tests_and_routes_and_saves_what_it_set_asid
 
 def test_the_data_address_condition_comes_from_a_data_path_or_is_the_opposite_of_a_bus_to_bus_route(tmp_path):
     from dv_agent.codegen.contracts import Condition, Route
-    from dv_agent.codegen.quick_basic import _data_condition
+    from dv_agent.codegen.quick_basic import _data_condition, _setup_operations
     plan, _ = fixture_plan(tmp_path)
     bus = next(a for a in plan.agents if a.protocol == 'wishbone')
     facts = plan.sequences[0].fact_ids
     bank = Condition(agent=bus.id, address=3, mask=128, value=128, initial_value=0)
     plan.routes = [Route(id='bank', expected_agent=bus.id, expected_event='write', expected_address=0, actual_agent=bus.id, actual_event='read',
                          actual_address=0, when=[bank], fact_ids=facts)]
-    assert _data_condition(plan, bus, 0)[0].value == 0
+    assert _data_condition(plan, bus, 0, _setup_operations(plan, bus))[0].value == 0
     data = bank.model_copy(update=dict(value=0))
     plan.routes.append(Route(id='path', expected_agent=bus.id, expected_event='write', expected_address=0, actual_agent='serial_link', actual_event='tx',
                              when=[data], fact_ids=facts))
-    assert _data_condition(plan, bus, 0)[0].value == 0
+    assert _data_condition(plan, bus, 0, _setup_operations(plan, bus))[0].value == 0
     plan.routes = plan.routes[1:]
-    assert _data_condition(plan, bus, 0)[0].value == 0
-    assert _data_condition(plan, bus, 7) == []
+    assert _data_condition(plan, bus, 0, _setup_operations(plan, bus))[0].value == 0
+
+
+def test_the_data_address_can_come_from_a_bus_write_and_read_and_the_condition_from_the_setup(tmp_path):
+    from dv_agent.codegen.contracts import Condition, Operation, Route, Sequence
+    plan, _ = fixture_plan(tmp_path)
+    bus = next(a for a in plan.agents if a.protocol == 'wishbone')
+    facts = plan.sequences[0].fact_ids
+    bank = Condition(agent=bus.id, address=3, mask=128, value=128, initial_value=0)
+    plan.routes = [Route(id='loop', expected_agent=bus.id, expected_event='write', expected_address=0, actual_agent=bus.id, actual_event='read', actual_address=0, fact_ids=facts),
+                   Route(id='other', expected_agent=bus.id, expected_event='write', expected_address=1, actual_agent=bus.id, actual_event='read', actual_address=1, when=[bank], fact_ids=facts)]
+    sweep = Sequence(id='sweep', agent=bus.id, purpose='sweep', fact_ids=facts, operations=[Operation(kind='write', address=1, data=d) for d in (0, 1, 2)])
+    plan.sequences.insert(0, sweep)
+    assert _setup_name(plan, bus) == 'initialize_link'  # the sweep is passed over
+    assert apply_basic_test(plan, tmp_path)
+    receive = plan.routes[1]
+    assert receive.actual_address == 0 and plan.tests[0].id == TEST_ID
+    assert (receive.when[0].address, receive.when[0].mask, receive.when[0].value) == (3, 128, 0)  # the setup leaves that state
+
+
+def _setup_name(plan, bus):
+    from dv_agent.codegen.quick_basic import _setup_operations
+    return _setup_operations(plan, bus).id
 
 
 def test_a_plan_without_the_parts_it_needs_keeps_the_model_tests_and_says_so(tmp_path):
     plan, _ = fixture_plan(tmp_path)
-    plan.routes = [r for r in plan.routes if r.expected_event != 'rx']
+    plan.routes = []
     tests = [t.id for t in plan.tests]
     assert not apply_basic_test(plan, tmp_path)
     assert [t.id for t in plan.tests] == tests and 'the model tests were kept' in plan.questions[-1]

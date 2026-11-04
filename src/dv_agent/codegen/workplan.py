@@ -983,30 +983,47 @@ def design(llm, plan, definition, sources, directory, *, previous=None, feedback
             sequences=[dict(id=s.id,agent=s.agent,purpose=s.purpose,fact_ids=s.fact_ids) for s in assembled.sequences],
             sequencer_variables=[v.model_dump() for v in assembled.sequencer_variables],
             available_fact_ids=[f.id for f in assembled.facts])
+        owners={}
+        for tid,component in completed.items():
+            for sid in component.get('sequences',[]): owners.setdefault(sid,set()).add(tid)
+        def check_test_order(test):
+            seen=set()
+            for stage in test.stages:
+                for sid in stage:
+                    if len(owners.get(sid,set()))!=1: continue  # shared reusable sequence; its role is reviewed in pseudocode
+                    tid=next(iter(owners[sid]))
+                    for dep in ancestors[tid]:
+                        required=set(completed[dep].get('sequences',[]))
+                        inherited=set();base=next(s.extends for s in assembled.sequences if s.id==sid)
+                        while base:
+                            inherited.add(base)
+                            base=next(s.extends for s in assembled.sequences if s.id==base)
+                        if required and not (seen|inherited) & required:
+                            raise ValueError(f'Test {test.id} starts {tid} before dependency {dep}')
+                seen.update(stage)
         def integration_check(i):
             if not i.tests and assembled.sequences:
                 raise ValueError('Compose at least one test from the available sequences; keep what is unresolved as questions')
+            if quick_integration:
+                # A prototype keeps the tests that fit and lists the rest.
+                kept=[]
+                for test in i.tests:
+                    try:
+                        validate(_merge(assembled,Integration(tests=[test])),plan,definition,sources)
+                        check_test_order(test)
+                        kept.append(test)
+                    except ValueError as exc:
+                        i.questions.append(f'Deferred (quick testing): test {test.id} was left out: {str(exc)[:240]}')
+                i.tests=kept
+                return
             validate(_merge(assembled,i),plan,definition,sources)
-            owners={}
-            for tid,component in completed.items():
-                for sid in component.get('sequences',[]): owners.setdefault(sid,set()).add(tid)
-            for test in i.tests:
-                seen=set()
-                for stage in test.stages:
-                    for sid in stage:
-                        if len(owners.get(sid,set()))!=1: continue  # shared reusable sequence; its role is reviewed in pseudocode
-                        tid=next(iter(owners[sid]))
-                        for dep in ancestors[tid]:
-                            required=set(completed[dep].get('sequences',[]))
-                            inherited=set();base=next(s.extends for s in assembled.sequences if s.id==sid)
-                            while base:
-                                inherited.add(base)
-                                base=next(s.extends for s in assembled.sequences if s.id==base)
-                            if required and not (seen|inherited) & required:
-                                raise ValueError(f'Test {test.id} starts {tid} before dependency {dep}')
-                    seen.update(stage)
-        integration=call('code_integration',integration_payload,Integration,
-            integration_rules(_quick_run(directory)),integration_check)
+            for test in i.tests: check_test_order(test)
+        quick_integration=_quick_run(directory)
+        try:
+            integration=call('code_integration',integration_payload,Integration,integration_rules(quick_integration),integration_check)
+        except ValueError as exc:
+            if not quick_integration: raise
+            integration=Integration(tests=[],questions=[f'Deferred (quick testing): no model test was kept: {str(exc)[:240]}'])
         assembled=_merge(assembled,integration)
         assembled.questions=list(dict.fromkeys(assembled.questions+graph.questions))
         _write(work/'collated_understanding.json',dict(dependencies=graph.model_dump(),components=completed,

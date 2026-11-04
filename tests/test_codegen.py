@@ -570,6 +570,29 @@ def test_a_refused_answer_too_large_to_repeat_still_gets_its_repair_attempt(inpu
     assert manifest['tests'] and 'repair_feedback' in payloads[1] and 'previous_output' not in payloads[1]
 
 
+def test_quick_testing_keeps_the_tests_that_fit_and_lists_the_rest(inputs,monkeypatch):
+    from dv_agent.codegen import workplan
+    root, _, _, contract, rtl = inputs
+    monkeypatch.setattr(workplan,'_quick_run',lambda directory:True)
+    payloads=[]
+    def integration(p):
+        payloads.append(p)
+        return dict(tests=contract['tests']+[dict(contract['tests'][0],id='unknown_stage',stages=[['no_such_sequence']])],questions=[])
+    build_project(root/'plan.json', root/'interface.json', root/'output', llm=workflow_model(contract,code_integration=integration), rtl_files=[rtl], compile=False)
+    assert len(payloads)==1
+    tests=json.loads(next((root/'output/code').glob('*/tests.json')).read_text())['tests']
+    assert 'unknown_stage' not in [t['name'] for t in tests] and tests
+    plan=json.loads(next((root/'output/code').glob('*/code_plan.json')).read_text())
+    assert any(q.startswith('Deferred (quick testing): test unknown_stage was left out') for q in plan['questions'])
+
+
+def test_a_normal_run_still_stops_on_a_test_it_refuses(inputs):
+    root, _, _, contract, rtl = inputs
+    integration=lambda p:dict(tests=[dict(contract['tests'][0],id='unknown_stage',stages=[['no_such_sequence']])],questions=[])
+    with pytest.raises(ValueError):
+        build_project(root/'plan.json', root/'interface.json', root/'output', llm=workflow_model(contract,code_integration=integration), rtl_files=[rtl], compile=False)
+
+
 def test_review_reports_which_batch_it_is_on(inputs):
     from dv_agent.core.progress import reporting
     root, _, _, contract, rtl = inputs
