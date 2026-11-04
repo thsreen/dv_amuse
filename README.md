@@ -5,6 +5,10 @@ plan, generated SystemVerilog/UVM collateral, and simulation results. The intera
 coordinates specification analysis, RTL analysis and code generation through four main commands:
 `/plan`, `/code`, `/run` and `/regress`.
 
+Meta's Muse Spark model interprets specification evidence, proposes verification plans and implements
+bounded code-generation work packages. Reusable templates provide the testbench structure, while
+validation, source citations and simulator results expose unsupported or incomplete output.
+
 Specifications define intended behavior. Configured RTL supplies physical interface information;
 source references, deterministic checks and review decisions connect the two. Generated collateral
 requires engineering review.
