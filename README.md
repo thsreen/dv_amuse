@@ -50,8 +50,11 @@ Then enter:
 /regress
 ```
 
-The UART baseline is an example input and is not bundled with this repository. You can provide
-another local design repository with its specifications and supported RTL sources.
+The reference design used for the UART example is the
+[OpenCores UART16550 GitHub repository](https://github.com/freecores/uart16550), at
+[revision `2b0ad80`](https://github.com/freecores/uart16550/tree/2b0ad80d0968f201f95506854ad769c8a44abe2b).
+The UART baseline is not bundled with this repository. You can provide another local design
+repository with its specifications and supported RTL sources.
 
 | Command | Result |
 |---|---|
@@ -84,8 +87,8 @@ select a script-built bring-up test. Review the generated summary to see what wa
 **Recorded result:** the published 8-bit UART16550 example passed `quick_basic` on real RTL with
 two scoreboard comparisons, 15 passing assertions and zero UVM errors. This is a bounded
 quick-testing result, not evidence that every generated scenario or the complete design passes.
-Inspect the [saved testplan and logs](review_artifacts/run_20261104_8bit_pass/),
-[current capability status](docs/CODE_REVIEW_STATUS.md), and [quick-testing limits](docs/QUICK_TESTING.md).
+Inspect the [saved testplan and logs](review_artifacts/run_20261104_8bit_pass/)
+and [quick-testing limits](docs/QUICK_TESTING.md).
 
 ## Review artifacts
 
@@ -105,9 +108,9 @@ inspect the recorded result without API credentials or a simulator installation.
 | 7 | [Generated testbench](review_artifacts/run_20261104_8bit_pass/testbench/) and [design records](review_artifacts/run_20261104_8bit_pass/design/) | SV and UVM sources, review objections, test-only approvals and what was set aside |
 
 It records one quick-testing configuration and its script-selected test;
-the complete testplan and all model-proposed scenarios have not thereby been verified. Check
-[current status and limitations](docs/CODE_REVIEW_STATUS.md) alongside the logs. Runtime outputs
-from your own runs remain under the ignored `runs/` directory.
+the complete testplan and all model-proposed scenarios have not thereby been verified. Check the
+[review pack guide](review_artifacts/run_20261104_8bit_pass/README.md) for results and limitations.
+Runtime outputs from your own runs remain under the ignored `runs/` directory.
 
 ## Simulation setup
 

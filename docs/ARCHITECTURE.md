@@ -12,7 +12,8 @@ execution evidence are described in [CODE_GENERATION.md](CODE_GENERATION.md).
 
 Three independent agents sit under one orchestrator. Specifications stay authoritative for intended
 behavior; RTL contributes only wiring facts to generated code and review-required observations to the plan.
-These diagrams show the architecture as designed. Current run status is in [CODE_REVIEW_STATUS.md](CODE_REVIEW_STATUS.md).
+These diagrams show the architecture as designed. Recorded results and limitations are in the
+[review pack guide](../review_artifacts/run_20261104_8bit_pass/README.md).
 
 | Flow | Diagram | More |
 |---|---|---|
