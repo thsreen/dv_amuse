@@ -82,7 +82,7 @@ labels. Quick testing can defer unsupported features, set aside generated tests 
 select a script-built bring-up test. Review the generated summary to see what was actually built.
 
 **Recorded result:** the published 8-bit UART16550 example passed `quick_basic` on real RTL with
-two scoreboard comparisons, 37 passing assertions and zero UVM errors. This is a bounded
+two scoreboard comparisons, 15 passing assertions and zero UVM errors. This is a bounded
 quick-testing result, not evidence that every generated scenario or the complete design passes.
 Inspect the [saved testplan and logs](review_artifacts/run_20261104_8bit_pass/),
 [current capability status](docs/CODE_REVIEW_STATUS.md), and [quick-testing limits](docs/QUICK_TESTING.md).
