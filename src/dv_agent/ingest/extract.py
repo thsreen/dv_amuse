@@ -98,6 +98,30 @@ def locate_quote(text: str, quote: str) -> tuple[int, int] | None:
     return (m.start(), m.end()) if m else None
 
 
+MACRO_RE = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
+NEGATION_RE = re.compile(r"\b(?:not|never|undefined|unless)\b|\bifndef\b|n't\b", re.I)
+
+
+def condition_stated(text: str, condition: str) -> bool:
+    """A signal's condition is in its source: the same words, or every build macro it names in a sentence that does not negate it."""
+    condition = condition.strip()
+    if not condition:
+        return False
+    lowered = text.casefold()
+    span = locate_quote(lowered, condition.casefold())
+    if span:
+        return not re.search(r"\b(?:not|never)\s+$", lowered[:span[0]])
+    macros = MACRO_RE.findall(condition)
+    if not macros or NEGATION_RE.search(condition):
+        return False
+    sentences = re.split(r"(?<=[.;])\s+|\n\s*\n", text)
+    for macro in macros:
+        found = [s for s in sentences if re.search(rf"\b{re.escape(macro)}\b", s)]
+        if not found or any(NEGATION_RE.search(s) for s in found):
+            return False
+    return True
+
+
 def normalize_name(name: str) -> str:
     name = re.sub(r"[‘’`´]", "'", name).lower()
     return re.sub(r"\s+", " ", name).strip(" .,:;'\"")

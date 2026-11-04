@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 from ..core.fsutil import atomic_write_text
 from ..quality.human_review import sha
+from ..ingest.extract import condition_stated
+from ..core.progress import emit
 
 
 def width(value):
@@ -104,8 +106,29 @@ def compare(plan, definition, decisions=None, *, validate=True):
     return report
 
 
+def recheck_conditions(plan, out):
+    """Quick testing only: a saved plan may have marked a port's condition undocumented over its wording. Check again against the saved source."""
+    from ..quality.quick_testing import enabled
+    if not (enabled() and plan.get('test_only') and (out/'quick_testing.json').is_file() and (out/'dv/chunks.jsonl').is_file()): return []
+    interfaces=plan.get('interfaces') or {}
+    signals=list(interfaces.get('signals') or [])+[s for g in interfaces.get('groups',[]) for s in g.get('signals',[])]
+    pending=[s for s in signals if s.get('availability') and s.get('documented',{}).get('availability') is False]
+    if not pending: return []
+    sources={}
+    for line in (out/'dv/chunks.jsonl').read_text().splitlines():
+        chunk=json.loads(line);sources[chunk.get('chunk_id')]=chunk.get('text','')
+    confirmed=[s for s in pending if condition_stated(sources.get(s.get('chunk_id'),''),s['availability'])]
+    for s in confirmed: s['documented']['availability']=True
+    if confirmed:
+        from ..quality.human_review import current_plan_path
+        path=current_plan_path(out);atomic_write_text(path,json.dumps(plan,indent=2)+'\n')
+    return sorted({s['name'] for s in confirmed})
+
+
 def enforce(plan, definition, out, *, resolve=True):
     out=Path(out);file=out/'interface_port_mapping.json'
+    rechecked=recheck_conditions(plan,out)
+    if rechecked: emit('code: port conditions confirmed from the saved source: '+', '.join(rechecked))
     decisions=json.loads(file.read_text()) if file.is_file() else None
     if decisions is None:
         from .port_reconciliation import recover_decisions

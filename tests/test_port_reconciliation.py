@@ -150,3 +150,37 @@ def test_a_port_it_cannot_settle_says_why_review_was_not_requested(tmp_path):
         enforce(plan,rtl,out)
     assert not list(out.glob('human_review/*/request.json'))
 
+
+def _reworded(tmp_path, monkeypatch, *, quick=True):
+    source,_,rtl=seed(tmp_path)
+    path=source/'dv/testplan_doc.json';plan=json.loads(path.read_text())
+    trace=next(s for s in plan['interfaces']['signals'] if s['name']=='TRACE')
+    trace.update(availability='TRACE_ENABLE defined',quote='TRACE is optional.')
+    path.write_text(json.dumps(plan))
+    (source/'dv/chunks.jsonl').write_text(json.dumps(dict(chunk_id='CH-trace',text='TRACE is optional. It is enabled if TRACE_ENABLE\nis defined'))+'\n')
+    if not quick: return source,json.loads(path.read_text()),rtl
+    monkeypatch.setenv(ENV,'1');monkeypatch.setenv('DV_HITL_DEMO_PAUSE_SECONDS','0')
+    out=prepare_run(source)
+    return out,json.loads((out/'dv/testplan_doc.json').read_text()),rtl
+
+
+def test_a_saved_quick_plan_with_a_reworded_condition_reaches_the_port_review_and_passes(tmp_path,monkeypatch):
+    out,plan,rtl=_reworded(tmp_path,monkeypatch)
+    with review_handler(ReviewClient(llm=evaluator(),show=lambda x:None,interactive=False)):
+        with pytest.raises(PlanUpdated): enforce(plan,rtl,out)
+        saved=json.loads((out/'dv/testplan_doc.json').read_text())
+        assert next(s for s in saved['interfaces']['signals'] if s['name']=='TRACE')['documented']['availability'] is True
+        report=enforce(saved,rtl,out)
+    assert report['status']=='PASS' and report['independent_validation']['status']=='PASS'
+
+
+def test_a_normal_plan_is_not_rewritten_and_a_condition_the_source_lacks_stays_unconfirmed(tmp_path,monkeypatch):
+    source,plan,rtl=_reworded(tmp_path,monkeypatch,quick=False)
+    before=(source/'dv/testplan_doc.json').read_text()
+    with pytest.raises(ValueError,match='Not sent for review because TRACE'): enforce(plan,rtl,source)
+    assert (source/'dv/testplan_doc.json').read_text()==before
+    out,plan,rtl=_reworded(tmp_path/'other',monkeypatch)
+    next(s for s in plan['interfaces']['signals'] if s['name']=='TRACE')['availability']='OTHER_MACRO defined'
+    (out/'dv/testplan_doc.json').write_text(json.dumps(plan))
+    with pytest.raises(ValueError,match='Not sent for review because TRACE'): enforce(plan,rtl,out)
+

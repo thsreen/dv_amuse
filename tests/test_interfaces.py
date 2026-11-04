@@ -251,4 +251,12 @@ def test_a_condition_is_found_whatever_its_capitalization_or_line_breaks_unless_
     assert not condition_stated(source, "Enabled if SOMETHING_ELSE is defined")
     assert not condition_stated(source, "")
     assert not condition_stated("It is not enabled if FEATURE_X is defined", "Enabled if FEATURE_X is defined")
+    for wording in ("UART_HAS_BAUDRATE_OUTPUT defined", "if UART_HAS_BAUDRATE_OUTPUT is defined", "Requires UART_HAS_BAUDRATE_OUTPUT"):
+        assert condition_stated(source, wording), wording
+    assert not condition_stated(source, "UART_HAS_BAUDRATE_OUTPUT not defined")
+    assert not condition_stated(source, "UART_HAS_BAUDRATE_OUTPUT and OTHER_MACRO defined")
+    assert not condition_stated("It is not enabled if FEATURE_X\nis defined", "FEATURE_X defined")
+    assert not condition_stated("FEATURE_X is never defined here", "FEATURE_X defined")
+    assert not condition_stated(source, "32-bit mode")
+    assert condition_stated("Not used here. It is enabled if FEATURE_X is defined.", "FEATURE_X defined")
 
