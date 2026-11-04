@@ -98,17 +98,17 @@ def apply_basic_test(plan, directory=None):
         for operation in s.operations:
             if operation.kind == 'register_write' and operation.register_id in aliased_ids:
                 operation.kind, operation.register_id = 'write', None
-    kept_routes = {r.id for r in routes}
-    dropped_hooks = [h for h in plan.hooks if h.slot == 'scoreboard.compare']
+    # The test uses only the bus and serial agents. A model hook on anything else cannot help it and can stop it finishing.
+    dropped_hooks = [h for h in plan.hooks if h.target not in (bus.id, serial.id)]
     aside = dict(tests=[t.model_dump() for t in plan.tests], routes=[r.model_dump() for r in plan.routes],
                  registers=[r.model_dump() for r in aliased], hooks=[h.model_dump() for h in dropped_hooks])
     if directory is not None:
         atomic_write_text(directory/'quick_basic_set_aside.json', json.dumps(aside, indent=2)+'\n')
     plan.questions.append(f"Quick testing: {TEST_ID} is chosen by script, not designed by the model. Set aside to get a passing test: "
                           f"{len(aside['tests'])} model tests, {len(aside['routes'])} model routes, {len(aliased)} registers at the data address and "
-                          f"{len(dropped_hooks)} scoreboard hooks (quick_basic_set_aside.json). Only the transmit and receive paths are compared.")
+                          f"{len(dropped_hooks)} hooks on agents and routes it does not use (quick_basic_set_aside.json). Only the transmit and receive paths are compared.")
     plan.sequences = plan.sequences + sequences
     plan.routes, plan.tests = routes, [test]
     plan.registers = [r for r in plan.registers if r.id not in aliased_ids]
-    plan.hooks = [h for h in plan.hooks if h.slot != 'scoreboard.compare' or h.target in kept_routes]
+    plan.hooks = [h for h in plan.hooks if h.target in (bus.id, serial.id)]
     return True

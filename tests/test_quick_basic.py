@@ -73,6 +73,21 @@ def _setup_name(plan, bus):
     return _setup_operations(plan, bus).id
 
 
+def test_hooks_on_agents_and_routes_the_test_does_not_use_are_set_aside(tmp_path):
+    from dv_agent.codegen.contracts import Hook
+    plan, _ = fixture_plan(tmp_path)
+    facts = plan.sequences[0].fact_ids
+    bus = next(a for a in plan.agents if a.protocol == 'wishbone')
+    plan.hooks = [Hook(id='on_bus', target=bus.id, slot='coverage.sample', purpose='p', fact_ids=facts),
+                  Hook(id='on_modem', target='modem', slot='monitor.body', purpose='p', fact_ids=facts),
+                  Hook(id='on_route', target=plan.routes[0].id, slot='scoreboard.compare', purpose='p', fact_ids=facts)]
+    assert apply_basic_test(plan, tmp_path)
+    assert [h.id for h in plan.hooks] == ['on_bus']
+    aside = json.loads((tmp_path / 'quick_basic_set_aside.json').read_text())
+    assert sorted(h['id'] for h in aside['hooks']) == ['on_modem', 'on_route']
+    assert any('2 hooks on agents and routes it does not use' in q for q in plan.questions)
+
+
 def test_a_plan_without_the_parts_it_needs_keeps_the_model_tests_and_says_so(tmp_path):
     plan, _ = fixture_plan(tmp_path)
     plan.routes = []
