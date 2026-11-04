@@ -1,0 +1,5 @@
+Parsed 23 file(s): 23 descriptions, 0 errors, 0 warnings
+[warn] module 'raminfr' has no timescale directive; defaulting its timescale to 1ns/1ns
+[xezim][warning] implicit 1-bit net created for undeclared identifier 'dut.regs.rf_overrun' (IEEE 1800-2017 §6.10, instance port connection). Add an explicit declaration to silence.
+[xezim][warning] implicit 1-bit net created for undeclared identifier 'dut.regs.rf_push_pulse' (IEEE 1800-2017 §6.10, instance port connection). Add an explicit declaration to silence.
+Elaboration successful

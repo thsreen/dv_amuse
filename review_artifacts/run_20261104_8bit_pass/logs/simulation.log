@@ -1,0 +1,133 @@
+=== xezim 0.11.3 ===
+git 058f2bb (2026-10-23T17:05:55-07:00)
+[warn] module 'raminfr' has no timescale directive; defaulting its timescale to 1ns/1ns
+[xezim][warning] implicit 1-bit net created for undeclared identifier 'dut.regs.rf_overrun' (IEEE 1800-2017 §6.10, instance port connection). Add an explicit declaration to silence.
+[xezim][warning] implicit 1-bit net created for undeclared identifier 'dut.regs.rf_push_pulse' (IEEE 1800-2017 §6.10, instance port connection). Add an explicit declaration to silence.
+Warning: FST skips unsupported variable-length string variables: s_connection_error_id, s_connection_warning_id, s_spaces, uvm_aa_string_key
+[FST] dumping 809 signals (scopes=0)
+(verification_top.dut) UART INFO: Data bus width is 8. No Debug interface.
+
+(verification_top.dut) UART INFO: Doesn't have baudrate output
+
+UVM_INFO @ 0: reporter [UVM/RELNOTES] 
+  ***********       IMPORTANT RELEASE NOTES         ************
+
+  This implementation of the UVM Library deviates from the 1800.2-2020
+  standard.  See the DEVIATIONS.md file contained in the release
+  for more details.
+
+----------------------------------------------------------------
+Accellera:1800.2:UVM:2020.3.1
+
+All copyright owners for this kit are listed in NOTICE.txt
+All Rights Reserved Worldwide
+----------------------------------------------------------------
+
+      (Specify +UVM_NO_RELNOTES to turn off this notice)
+
+UVM_WARNING @ 0: reporter [NO_DPI_USED] We are thinking of removing support for UVM_NO_DPI.  Please try this test without it and evaluate the impact
+UVM_INFO @ 0: reporter [NO_DPI_TSTNAME] UVM_NO_DPI defined--getting UVM_TESTNAME directly, without DPI
+UVM_INFO @ 0: reporter [RNTST] Running test quick_basic...
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_INFO @ 0: reporter [UVM/COMP/NAMECHECK] This implementation of the component name checks requires DPI to be enabled
+UVM_WARNING @ 0: reporter [NO_VISIT_CHECK] Because UVM_REGEX_NO_DPI is defined, no uvm component name constraints will be checked
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+[xezim][warning] a #delay evaluated to a pathological real value 9.2000e15 at /proj/work/silicon_copilot/dv_agent/.deps/uvm-core-2020.3.1/src/base/uvm_phase_hopper.svh:561:17 at time 0 — the process is parked far in the future, so a clock driven by it will appear to stop. This usually means the delay expression produced NaN/inf or IEEE-754 bit garbage.
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_WARNING @ 0: reporter [QUEUEDEL] delete: given index out of range for queue of size 0. Ignoring delete request
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_clk_cov_raw_cov [PLAN_COVERAGE] t_clk_cov_raw_cov samples=6 coverage=100.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_divisor_cov_cg_dlab_divisor [PLAN_COVERAGE] t_divisor_cov_cg_dlab_divisor samples=5 coverage=60.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_divisor_cov_rc_divisor_bytes [PLAN_COVERAGE] t_divisor_cov_rc_divisor_bytes samples=5 coverage=75.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_irq_baud_mon_cov_int_o [PLAN_COVERAGE] t_irq_baud_mon_cov_int_o samples=0 coverage=0.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_irq_id_cov_cg_iir [PLAN_COVERAGE] t_irq_id_cov_cg_iir samples=0 coverage=0.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_modem_irq_cov_delta [PLAN_COVERAGE] t_modem_irq_cov_delta samples=0 coverage=0.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_modem_irq_cov_ier [PLAN_COVERAGE] t_modem_irq_cov_ier samples=1 coverage=50.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_modem_irq_cov_iir [PLAN_COVERAGE] t_modem_irq_cov_iir samples=0 coverage=0.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_modem_traffic_cov_cg [PLAN_COVERAGE] t_modem_traffic_cov_cg samples=0 coverage=0.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_traffic_seq_cov_ier [PLAN_COVERAGE] t_traffic_seq_cov_ier samples=1 coverage=25.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_traffic_seq_cov_modem [PLAN_COVERAGE] t_traffic_seq_cov_modem samples=0 coverage=0.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_traffic_seq_cov_payload_uart [PLAN_COVERAGE] t_traffic_seq_cov_payload_uart samples=2 coverage=0.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_traffic_seq_cov_payload_wb [PLAN_COVERAGE] t_traffic_seq_cov_payload_wb samples=3 coverage=0.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_wb_init_cfg_cg_dlab_divisor [PLAN_COVERAGE] t_wb_init_cfg_cg_dlab_divisor samples=6 coverage=60.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_wb_init_cfg_rc_divisor_bytes [PLAN_COVERAGE] t_wb_init_cfg_rc_divisor_bytes samples=6 coverage=51.85
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_wb_reg_cov_rc_write [PLAN_COVERAGE] t_wb_reg_cov_rc_write samples=5 coverage=50.00
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.plan_cov_t_wb_top_seq_cg_dlab_divisor [PLAN_COVERAGE] t_wb_top_seq_cg_dlab_divisor samples=5 coverage=62.50
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.sb [SCOREBOARD_SUMMARY] comparisons=2
+UVM_INFO @ 17290000: uvm_test_top.cmn_env.system_cov [SYSTEM_COVERAGE] samples=4 coverage=100.00
+FUNCTIONAL_TEST_PASS quick_basic
+UVM_INFO @ 17290000: reporter [UVM/REPORT/SERVER] 
+--- UVM Report Summary ---
+
+** Report counts by severity
+UVM_INFO :   23
+UVM_WARNING :   61
+UVM_ERROR :    0
+UVM_FATAL :    0
+** Report counts by id
+[NO_DPI_TSTNAME]     1
+[NO_DPI_USED]     1
+[NO_VISIT_CHECK]     1
+[PLAN_COVERAGE]    17
+[QUEUEDEL]    59
+[RNTST]     1
+[SCOREBOARD_SUMMARY]     1
+[SYSTEM_COVERAGE]     1
+[UVM/COMP/NAMECHECK]     1
+[UVM/RELNOTES]     1
+
+Simulation finished at time 17290000 ($finish called)

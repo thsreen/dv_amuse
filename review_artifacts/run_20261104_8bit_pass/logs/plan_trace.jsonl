@@ -1,0 +1,184 @@
+{"ts": "2026-11-04T14:52:56.124+00:00", "event": "run_start", "flow": "/proj/work/silicon_copilot/dv_agent/src/orchestrator_agent/flows/testplan_flow.json", "steps": ["spec_ingest", "spec_graph", "rtl_ports", "rtl_graph", "testplan"], "dry_run": false, "approvals": []}
+{"ts": "2026-11-04T14:52:56.126+00:00", "event": "notification_start", "id": "startup_notification", "operation": "plan"}
+{"ts": "2026-11-04T14:52:58.340+00:00", "event": "notification_done", "id": "startup_notification", "status": "SENT", "reason": "", "operation": "plan"}
+{"ts": "2026-11-04T14:52:58.341+00:00", "event": "tool_start", "step": "spec_ingest", "tool": "dv_ingest", "attempt": 1, "revisit": 0, "extra_prompt": null, "request_timeout_s": 300.0, "request_attempts": 2}
+{"ts": "2026-11-04T14:52:58.517+00:00", "event": "tool_done", "step": "spec_ingest", "status": "PASS", "summary": "ingested 21 chunks", "elapsed_s": 0.176}
+{"ts": "2026-11-04T14:52:58.518+00:00", "event": "tool_start", "step": "spec_graph", "tool": "dv_build_graph", "attempt": 1, "revisit": 0, "extra_prompt": null, "request_timeout_s": 300.0, "request_attempts": 2}
+{"ts": "2026-11-04T14:52:58.523+00:00", "event": "tool_done", "step": "spec_graph", "status": "PASS", "summary": "graph: {'document': 1, 'section': 22, 'chunk': 21}", "elapsed_s": 0.005}
+{"ts": "2026-11-04T14:52:58.524+00:00", "event": "tool_start", "step": "rtl_ports", "tool": "rtl_extract", "attempt": 1, "revisit": 0, "extra_prompt": null, "request_timeout_s": 300.0, "request_attempts": 2}
+{"ts": "2026-11-04T14:52:58.530+00:00", "event": "tool_done", "step": "rtl_ports", "status": "PASS", "summary": "extracted 19 ports with defines DATA_BUS_WIDTH_8", "elapsed_s": 0.006}
+{"ts": "2026-11-04T14:52:58.531+00:00", "event": "tool_start", "step": "rtl_graph", "tool": "rtl_build_graph", "attempt": 1, "revisit": 0, "extra_prompt": null, "request_timeout_s": 300.0, "request_attempts": 2}
+{"ts": "2026-11-04T14:53:00.329+00:00", "event": "tool_done", "step": "rtl_graph", "status": "PASS", "summary": "rtl graph PARTIAL: {'nodes': 1656, 'edges': 4028, 'instances': 10, 'resolved_instances': 10, 'kinds': {'community': 38, 'condition': 218, 'excerpt': 931, 'instance': 10, 'module': 9, 'parameter': 36, 'process': 132, 'signal': 282}}", "elapsed_s": 1.798}
+{"ts": "2026-11-04T14:53:00.330+00:00", "event": "tool_start", "step": "testplan", "tool": "dv_testplan", "attempt": 1, "revisit": 0, "extra_prompt": null, "request_timeout_s": 300.0, "request_attempts": 2}
+{"ts": "2026-11-04T14:53:00.357+00:00", "event": "substep_start", "step": "testplan", "id": "interfaces", "label": "Identify specification interfaces"}
+{"ts": "2026-11-04T14:53:00.358+00:00", "event": "task_progress", "step": "testplan", "message": "isolating interfaces from 12 chunks with muse-spark-1.3"}
+{"ts": "2026-11-04T14:53:00.359+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_interfaces' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T14:53:00.588+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_interfaces': input-sized output budget 32768"}
+{"ts": "2026-11-04T14:53:00.589+00:00", "event": "task_progress", "step": "testplan", "message": "model request 34eabeaf633247f0 'testplan_interfaces': attempt 1/2, timeout 300s, input 10367 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T14:55:18.965+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_interfaces batch"}
+{"ts": "2026-11-04T14:55:18.966+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_interfaces' done (138.6s, attempts 1, in 4606/out 19101)"}
+{"ts": "2026-11-04T14:55:18.977+00:00", "event": "task_progress", "step": "testplan", "message": "interfaces done: 20 signals in 7 groups"}
+{"ts": "2026-11-04T14:55:18.978+00:00", "event": "substep_done", "step": "testplan", "id": "interfaces", "status": "PASS"}
+{"ts": "2026-11-04T14:55:18.979+00:00", "event": "substep_start", "step": "testplan", "id": "registers", "label": "Recover registers and configurable controls"}
+{"ts": "2026-11-04T14:55:18.983+00:00", "event": "task_progress", "step": "testplan", "message": "register inventory: 13 source table rows retained before model extraction"}
+{"ts": "2026-11-04T14:55:18.984+00:00", "event": "task_progress", "step": "testplan", "message": "extracting registers from 17 chunks in 17 batches with muse-spark-1.3"}
+{"ts": "2026-11-04T14:55:26.835+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [1/17]: CH-2baa4497c0"}
+{"ts": "2026-11-04T14:55:26.836+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [2/17]: CH-63ad4d61a5"}
+{"ts": "2026-11-04T14:56:14.667+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [3/17]: CH-f88915355b"}
+{"ts": "2026-11-04T14:56:14.671+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [4/17]: CH-de51b2eafc"}
+{"ts": "2026-11-04T14:56:50.888+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [5/17]: CH-f91cbf1c05"}
+{"ts": "2026-11-04T14:57:09.253+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [6/17]: CH-dfb1048908"}
+{"ts": "2026-11-04T14:57:35.619+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [7/17]: CH-bc7559f2ec"}
+{"ts": "2026-11-04T14:59:15.934+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [8/17]: CH-6abe65aeff"}
+{"ts": "2026-11-04T14:59:15.937+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [9/17]: CH-a2dd758e55"}
+{"ts": "2026-11-04T14:59:15.939+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [10/17]: CH-4e1d3a956c"}
+{"ts": "2026-11-04T14:59:48.794+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [11/17]: CH-0174a058ac"}
+{"ts": "2026-11-04T14:59:48.797+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [12/17]: CH-06bad6ffcd"}
+{"ts": "2026-11-04T15:00:34.527+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [13/17]: CH-413817cb30"}
+{"ts": "2026-11-04T15:00:34.530+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [14/17]: CH-14d29943cf"}
+{"ts": "2026-11-04T15:00:44.967+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [15/17]: CH-419b99d7d8"}
+{"ts": "2026-11-04T15:02:38.869+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [16/17]: CH-1e2324cfc3"}
+{"ts": "2026-11-04T15:02:38.871+00:00", "event": "task_progress", "step": "testplan", "message": "registers completed [17/17]: CH-d62a4ba2db"}
+{"ts": "2026-11-04T15:02:38.873+00:00", "event": "task_progress", "step": "testplan", "message": "registers done: 24 registers, 4 conflicts, PASS"}
+{"ts": "2026-11-04T15:02:38.875+00:00", "event": "substep_done", "step": "testplan", "id": "registers", "status": "PASS"}
+{"ts": "2026-11-04T15:02:38.876+00:00", "event": "task_progress", "step": "testplan", "message": "writing 13 test-plan sections with muse-spark-1.3"}
+{"ts": "2026-11-04T15:02:38.877+00:00", "event": "task_progress", "step": "testplan", "message": "[1/13] section title: 1. Document Overview (title)"}
+{"ts": "2026-11-04T15:02:38.878+00:00", "event": "substep_start", "step": "testplan", "id": "title", "label": "1. Document Overview"}
+{"ts": "2026-11-04T15:02:38.917+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 1/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:02:38.918+00:00", "event": "substep_done", "step": "testplan", "id": "title", "status": "PASS"}
+{"ts": "2026-11-04T15:02:38.919+00:00", "event": "task_progress", "step": "testplan", "message": "[2/13] section feature_description: 2. Feature Description (entries)"}
+{"ts": "2026-11-04T15:02:38.920+00:00", "event": "substep_start", "step": "testplan", "id": "feature_description", "label": "2. Feature Description"}
+{"ts": "2026-11-04T15:02:38.922+00:00", "event": "task_progress", "step": "testplan", "message": "section feature_description: retrieved 0 requirements / 6 chunks; previous context 0 sections"}
+{"ts": "2026-11-04T15:02:38.924+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:02:38.925+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_entries': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:02:38.926+00:00", "event": "task_progress", "step": "testplan", "message": "model request c4988495a8a94e82 'testplan_entries': attempt 1/2, timeout 300s, input 11099 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:04:00.048+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_entries batch"}
+{"ts": "2026-11-04T15:04:00.051+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' done (81.1s, attempts 1, in 4293/out 10484)"}
+{"ts": "2026-11-04T15:04:00.088+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 2/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:04:00.089+00:00", "event": "substep_done", "step": "testplan", "id": "feature_description", "status": "PASS"}
+{"ts": "2026-11-04T15:04:00.091+00:00", "event": "task_progress", "step": "testplan", "message": "[3/13] section register_map: 3. Register Map (register_map)"}
+{"ts": "2026-11-04T15:04:00.092+00:00", "event": "substep_start", "step": "testplan", "id": "register_map", "label": "3. Register Map"}
+{"ts": "2026-11-04T15:04:00.126+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 3/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:04:00.128+00:00", "event": "substep_done", "step": "testplan", "id": "register_map", "status": "PASS"}
+{"ts": "2026-11-04T15:04:00.129+00:00", "event": "task_progress", "step": "testplan", "message": "[4/13] section rtl_observations: 4. Observations from RTL (rtl_observations)"}
+{"ts": "2026-11-04T15:04:00.130+00:00", "event": "substep_start", "step": "testplan", "id": "rtl_observations", "label": "4. Observations from RTL"}
+{"ts": "2026-11-04T15:04:00.239+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'rtl_observation_fetch' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:04:00.240+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'rtl_observation_fetch': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:04:00.242+00:00", "event": "task_progress", "step": "testplan", "message": "model request 42c2cef5828847ae 'rtl_observation_fetch': attempt 1/2, timeout 300s, input 15242 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:04:44.530+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed rtl_observation_fetch batch"}
+{"ts": "2026-11-04T15:04:44.531+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'rtl_observation_fetch' done (44.3s, attempts 1, in 5546/out 1312)"}
+{"ts": "2026-11-04T15:04:44.671+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'rtl_observation_fetch' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:04:44.673+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'rtl_observation_fetch': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:04:44.674+00:00", "event": "task_progress", "step": "testplan", "message": "model request 71866e9df4754fbf 'rtl_observation_fetch': attempt 1/2, timeout 300s, input 40405 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:04:58.505+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed rtl_observation_fetch batch"}
+{"ts": "2026-11-04T15:04:58.507+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'rtl_observation_fetch' done (13.8s, attempts 1, in 14342/out 1492)"}
+{"ts": "2026-11-04T15:04:58.582+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'rtl_observations' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:04:58.584+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'rtl_observations': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:04:58.586+00:00", "event": "task_progress", "step": "testplan", "message": "model request 9dc2498c441f41af 'rtl_observations': attempt 1/2, timeout 300s, input 44136 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:06:19.958+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed rtl_observations batch"}
+{"ts": "2026-11-04T15:06:19.960+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'rtl_observations' done (81.4s, attempts 1, in 17066/out 10225)"}
+{"ts": "2026-11-04T15:06:19.962+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'rtl_observation_claims' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:06:19.964+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'rtl_observation_claims': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:06:19.965+00:00", "event": "task_progress", "step": "testplan", "message": "model request 33462026d65a47a8 'rtl_observation_claims': attempt 1/2, timeout 300s, input 54505 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:07:03.377+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed rtl_observation_claims batch"}
+{"ts": "2026-11-04T15:07:03.378+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'rtl_observation_claims' done (43.4s, attempts 1, in 18383/out 5484)"}
+{"ts": "2026-11-04T15:07:03.434+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 4/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:07:03.436+00:00", "event": "substep_done", "step": "testplan", "id": "rtl_observations", "status": "PASS"}
+{"ts": "2026-11-04T15:07:03.438+00:00", "event": "task_progress", "step": "testplan", "message": "[5/13] section strategy: 5. High Level Verification Strategy (strategy)"}
+{"ts": "2026-11-04T15:07:03.440+00:00", "event": "substep_start", "step": "testplan", "id": "strategy", "label": "5. High Level Verification Strategy"}
+{"ts": "2026-11-04T15:07:03.442+00:00", "event": "task_progress", "step": "testplan", "message": "building verification strategy from 7 interface groups with muse-spark-1.3"}
+{"ts": "2026-11-04T15:07:03.444+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_strategy' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:07:03.446+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_strategy': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:07:03.448+00:00", "event": "task_progress", "step": "testplan", "message": "model request 09fd79e97e034828 'testplan_strategy': attempt 1/2, timeout 300s, input 31743 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:09:24.612+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_strategy batch"}
+{"ts": "2026-11-04T15:09:24.615+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_strategy' done (141.2s, attempts 1, in 11575/out 19249)"}
+{"ts": "2026-11-04T15:09:24.619+00:00", "event": "task_progress", "step": "testplan", "message": "strategy done: 7 agents, 0 scoreboards"}
+{"ts": "2026-11-04T15:09:24.661+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 5/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:09:24.664+00:00", "event": "substep_done", "step": "testplan", "id": "strategy", "status": "PASS"}
+{"ts": "2026-11-04T15:09:24.666+00:00", "event": "task_progress", "step": "testplan", "message": "[6/13] section verification_plan: 6. Verification Plan (entries)"}
+{"ts": "2026-11-04T15:09:24.667+00:00", "event": "substep_start", "step": "testplan", "id": "verification_plan", "label": "6. Verification Plan"}
+{"ts": "2026-11-04T15:09:24.670+00:00", "event": "task_progress", "step": "testplan", "message": "section verification_plan: retrieved 0 requirements / 6 chunks; previous context 2 sections"}
+{"ts": "2026-11-04T15:09:24.672+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:09:24.675+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_entries': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:09:24.678+00:00", "event": "task_progress", "step": "testplan", "message": "model request 13ea6a7b00b64217 'testplan_entries': attempt 1/2, timeout 300s, input 120631 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:11:53.493+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_entries batch"}
+{"ts": "2026-11-04T15:11:53.495+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' done (148.8s, attempts 1, in 33844/out 18411)"}
+{"ts": "2026-11-04T15:11:53.542+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 6/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:11:53.544+00:00", "event": "substep_done", "step": "testplan", "id": "verification_plan", "status": "PASS"}
+{"ts": "2026-11-04T15:11:53.546+00:00", "event": "task_progress", "step": "testplan", "message": "[7/13] section configurations: 7. Configurations (configurations)"}
+{"ts": "2026-11-04T15:11:53.548+00:00", "event": "substep_start", "step": "testplan", "id": "configurations", "label": "7. Configurations"}
+{"ts": "2026-11-04T15:11:53.551+00:00", "event": "task_progress", "step": "testplan", "message": "section configurations: retrieved 0 requirements / 6 chunks; previous context 2 sections"}
+{"ts": "2026-11-04T15:11:53.554+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_configurations' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:11:53.558+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_configurations': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:11:53.561+00:00", "event": "task_progress", "step": "testplan", "message": "model request df05decd4d464c20 'testplan_configurations': attempt 1/2, timeout 300s, input 119585 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:13:29.499+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_configurations batch"}
+{"ts": "2026-11-04T15:13:29.501+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_configurations' done (95.9s, attempts 1, in 33453/out 11534)"}
+{"ts": "2026-11-04T15:13:29.559+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 7/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:13:29.562+00:00", "event": "substep_done", "step": "testplan", "id": "configurations", "status": "PASS"}
+{"ts": "2026-11-04T15:13:29.565+00:00", "event": "task_progress", "step": "testplan", "message": "[8/13] section stimulus: 8. Sequences and Stimulus (entries)"}
+{"ts": "2026-11-04T15:13:29.568+00:00", "event": "substep_start", "step": "testplan", "id": "stimulus", "label": "8. Sequences and Stimulus"}
+{"ts": "2026-11-04T15:13:29.571+00:00", "event": "task_progress", "step": "testplan", "message": "section stimulus: retrieved 0 requirements / 6 chunks; previous context 2 sections"}
+{"ts": "2026-11-04T15:13:29.574+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:13:29.578+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_entries': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:13:29.582+00:00", "event": "task_progress", "step": "testplan", "message": "model request 9325e4fc57c64279 'testplan_entries': attempt 1/2, timeout 300s, input 141575 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:16:02.703+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_entries batch"}
+{"ts": "2026-11-04T15:16:02.707+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' done (153.1s, attempts 1, in 39892/out 16807)"}
+{"ts": "2026-11-04T15:16:02.768+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 8/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:16:02.772+00:00", "event": "substep_done", "step": "testplan", "id": "stimulus", "status": "PASS"}
+{"ts": "2026-11-04T15:16:02.775+00:00", "event": "task_progress", "step": "testplan", "message": "[9/13] section checks: 9. Checks and Scoreboards (entries)"}
+{"ts": "2026-11-04T15:16:02.778+00:00", "event": "substep_start", "step": "testplan", "id": "checks", "label": "9. Checks and Scoreboards"}
+{"ts": "2026-11-04T15:16:02.782+00:00", "event": "task_progress", "step": "testplan", "message": "section checks: retrieved 0 requirements / 6 chunks; previous context 2 sections"}
+{"ts": "2026-11-04T15:16:02.786+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:16:02.790+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_entries': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:16:02.795+00:00", "event": "task_progress", "step": "testplan", "message": "model request decab7f6a14a42bd 'testplan_entries': attempt 1/2, timeout 300s, input 145591 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:18:30.402+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_entries batch"}
+{"ts": "2026-11-04T15:18:30.406+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' done (147.6s, attempts 1, in 40655/out 16818)"}
+{"ts": "2026-11-04T15:18:30.469+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 9/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:18:30.474+00:00", "event": "substep_done", "step": "testplan", "id": "checks", "status": "PASS"}
+{"ts": "2026-11-04T15:18:30.478+00:00", "event": "task_progress", "step": "testplan", "message": "[10/13] section coverage: 10. Functional Coverage (entries)"}
+{"ts": "2026-11-04T15:18:30.481+00:00", "event": "substep_start", "step": "testplan", "id": "coverage", "label": "10. Functional Coverage"}
+{"ts": "2026-11-04T15:18:30.486+00:00", "event": "task_progress", "step": "testplan", "message": "section coverage: retrieved 0 requirements / 6 chunks; previous context 2 sections"}
+{"ts": "2026-11-04T15:18:30.490+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:18:30.495+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_entries': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:18:30.500+00:00", "event": "task_progress", "step": "testplan", "message": "model request 9ca9832e3a0f484a 'testplan_entries': attempt 1/2, timeout 300s, input 138985 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:21:22.680+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_entries batch"}
+{"ts": "2026-11-04T15:21:22.685+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' done (172.2s, attempts 1, in 38824/out 21346)"}
+{"ts": "2026-11-04T15:21:22.751+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 10/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:21:22.756+00:00", "event": "substep_done", "step": "testplan", "id": "coverage", "status": "PASS"}
+{"ts": "2026-11-04T15:21:22.760+00:00", "event": "task_progress", "step": "testplan", "message": "[11/13] section callouts: 11. Integration and Reuse (entries)"}
+{"ts": "2026-11-04T15:21:22.764+00:00", "event": "substep_start", "step": "testplan", "id": "callouts", "label": "11. Integration and Reuse"}
+{"ts": "2026-11-04T15:21:22.769+00:00", "event": "task_progress", "step": "testplan", "message": "section callouts: retrieved 0 requirements / 6 chunks; previous context 2 sections"}
+{"ts": "2026-11-04T15:21:22.774+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:21:22.780+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_entries': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:21:22.785+00:00", "event": "task_progress", "step": "testplan", "message": "model request 80e6e456c366487d 'testplan_entries': attempt 1/2, timeout 300s, input 135987 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:23:37.525+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_entries batch"}
+{"ts": "2026-11-04T15:23:37.530+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' done (134.8s, attempts 1, in 38176/out 16363)"}
+{"ts": "2026-11-04T15:23:37.600+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 11/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:23:37.606+00:00", "event": "substep_done", "step": "testplan", "id": "callouts", "status": "PASS"}
+{"ts": "2026-11-04T15:23:37.610+00:00", "event": "task_progress", "step": "testplan", "message": "[12/13] section assumptions: 12. Assumptions (entries)"}
+{"ts": "2026-11-04T15:23:37.615+00:00", "event": "substep_start", "step": "testplan", "id": "assumptions", "label": "12. Assumptions"}
+{"ts": "2026-11-04T15:23:37.620+00:00", "event": "task_progress", "step": "testplan", "message": "section assumptions: retrieved 0 requirements / 6 chunks; previous context 2 sections"}
+{"ts": "2026-11-04T15:23:37.625+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:23:37.630+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_entries': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:23:37.635+00:00", "event": "task_progress", "step": "testplan", "message": "model request b4349462cdca42ba 'testplan_entries': attempt 1/2, timeout 300s, input 41221 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:24:50.098+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_entries batch"}
+{"ts": "2026-11-04T15:24:50.103+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' done (72.5s, attempts 1, in 12222/out 8917)"}
+{"ts": "2026-11-04T15:24:50.177+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 12/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:24:50.183+00:00", "event": "substep_done", "step": "testplan", "id": "assumptions", "status": "PASS"}
+{"ts": "2026-11-04T15:24:50.188+00:00", "event": "task_progress", "step": "testplan", "message": "[13/13] section questions: 13. Questions to Designers (entries)"}
+{"ts": "2026-11-04T15:24:50.252+00:00", "event": "substep_start", "step": "testplan", "id": "questions", "label": "13. Questions to Designers"}
+{"ts": "2026-11-04T15:24:50.258+00:00", "event": "task_progress", "step": "testplan", "message": "section questions: retrieved 0 requirements / 6 chunks; previous context 2 sections"}
+{"ts": "2026-11-04T15:24:50.263+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' start (model muse-spark-1.3)"}
+{"ts": "2026-11-04T15:24:50.269+00:00", "event": "task_progress", "step": "testplan", "message": "model call 'testplan_entries': input-sized output budget 32768"}
+{"ts": "2026-11-04T15:24:50.274+00:00", "event": "task_progress", "step": "testplan", "message": "model request 593d1401d5b441a9 'testplan_entries': attempt 1/2, timeout 300s, input 38040 bytes, output allowance 32768, temperature None"}
+{"ts": "2026-11-04T15:26:27.618+00:00", "event": "task_progress", "step": "testplan", "message": "testplan: checkpoint completed testplan_entries batch"}
+{"ts": "2026-11-04T15:26:27.624+00:00", "event": "task_progress", "step": "testplan", "message": "llm call 'testplan_entries' done (97.4s, attempts 1, in 11485/out 11329)"}
+{"ts": "2026-11-04T15:26:27.705+00:00", "event": "task_progress", "step": "testplan", "message": "testplan checkpoint: 13/13 sections saved to JSON, Markdown and HTML (IN_PROGRESS)"}
+{"ts": "2026-11-04T15:26:27.712+00:00", "event": "substep_done", "step": "testplan", "id": "questions", "status": "PASS"}
+{"ts": "2026-11-04T15:26:27.717+00:00", "event": "task_progress", "step": "testplan", "message": "test-plan document done: 13/13 sections PASS"}
+{"ts": "2026-11-04T15:26:27.744+00:00", "event": "substep_start", "step": "testplan", "id": "render_views", "label": "Render Markdown and HTML reports"}
+{"ts": "2026-11-04T15:26:27.813+00:00", "event": "substep_done", "step": "testplan", "id": "render_views", "status": "PASS"}
+{"ts": "2026-11-04T15:26:27.831+00:00", "event": "tool_done", "step": "testplan", "status": "PASS", "summary": "testplan [title:PASS, feature_description:PASS, register_map:PASS, rtl_observations:PASS, strategy:PASS, verification_plan:PASS, configurations:PASS, stimulus:PASS, checks:PASS, coverage:PASS, callouts:PASS, assumptions:PASS, questions:PASS]", "elapsed_s": 2007.501}
+{"ts": "2026-11-04T15:26:27.839+00:00", "event": "testplan_notification", "status": "SENDING", "file": "testplan_doc.html"}
+{"ts": "2026-11-04T15:26:30.103+00:00", "event": "testplan_notification", "status": "SENT", "reason": "", "file": "testplan_doc.html"}
+{"ts": "2026-11-04T15:26:30.103+00:00", "event": "run_finish", "status": "PASS", "reason": "completed 5 steps"}
