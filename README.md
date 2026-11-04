@@ -15,6 +15,8 @@ requires engineering review.
 
 ![End-to-end architecture](docs/architecture/end_to_end.svg)
 
+> **Diagram legend:** 🟪 **Purple blocks** in the flowcharts indicate steps that use an LLM or make model API calls.
+
 ## Quickstart
 
 Run these commands from the repository root. Python **3.11 or newer**, Git and access to the
