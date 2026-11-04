@@ -240,3 +240,7 @@ repair budget are downgraded to ASSUMED and raised as a designer question. Off f
 failed judge call is reported as BLOCKED and never blocks the section (D-025).
 
 Repository protection policy: [Protected files](docs/PROTECTED_FILES.md).
+
+## License
+
+Apache License 2.0: see [LICENSE](LICENSE). Third-party notes are in [NOTICE](NOTICE).
