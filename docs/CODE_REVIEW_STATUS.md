@@ -15,8 +15,7 @@ Evidence is from saved runs on one design, UART16550, 8-bit build.
 | The model's own tests on that build | FAIL in a preview on a copy; set aside. Routes are global across tests, and expected-error tests need their own classification |
 | Design verification and sign-off | NEEDS_REVIEW; no behavioral verification is claimed |
 
-Offline tests run with mocks; real simulator tests run with `DV_AGENT_TEST_SIMULATION=1`. Open findings are in
-[agent/reviews/2026-11-02-consolidated.md](agent/reviews/2026-11-02-consolidated.md).
+Offline tests run with mocks; real simulator tests run with `DV_AGENT_TEST_SIMULATION=1`. Known limitations are summarized above; detailed agent review notes are kept in the local workarea, outside this repository.
 
 ## Earlier review (historical, at `bad38bd`)
 
