@@ -47,7 +47,7 @@ def recover_decisions(plan,definition,out):
 
 
 def reconcile(plan,definition,out,report):
-    """Review only remediable ambiguity. Never approve a real mismatch or audit defect."""
+    """Review only remediable ambiguity. Never approve a real mismatch or audit defect. Returns why when it cannot ask."""
     previous=report.get('review_decisions') or {}
     if previous and (previous.get('spec_hash')!=sha(plan.get('interfaces')) or previous.get('rtl_hash')!=sha(definition)):
         report=compare(plan,definition)
@@ -63,10 +63,12 @@ def reconcile(plan,definition,out,report):
     suggestions={k:{} for k in FIELDS};candidates={};questions=[];excerpts=[]
     for row in blocked:
         s=by_name[row['spec']];name=s['name'];choices=width_options(s.get('width'));bits=width(s.get('width'))
-        if s.get('direction') not in ('input','output','inout') or s.get('direction_documented') is False or s.get('width_documented') is False: return
+        if s.get('direction') not in ('input','output','inout') or s.get('direction_documented') is False or s.get('width_documented') is False:
+            return f'{name}: its direction or width is not documented in its quote'
         if any(issue not in ('Missing/ambiguous RTL match; provide a reviewed alias mapping',
-                             'Width or configuration-dependent width is unresolved') for issue in row.get('issues',[])): return
-        if bits is None and not choices: return
+                             'Width or configuration-dependent width is unresolved') for issue in row.get('issues',[])):
+            return f"{name}: {'; '.join(row.get('issues',[]))}"
+        if bits is None and not choices: return f"{name}: its width {s.get('width')!r} cannot be read"
         eligible=[p for p in definition['ports'] if p['name'] in report['unmatched_rtl']
                   and p['direction']==s['direction'] and width(p.get('width',p.get('range'))) in (choices or {bits})]
         if row.get('rtl'):
@@ -78,10 +80,12 @@ def reconcile(plan,definition,out,report):
         elif condition_supported(s):
             suggestions['inactive_spec_ports'][name]='Documented conditional output is disabled in the selected RTL configuration.'
             p=None
-        else: return
+        else:
+            return (f"{name}: no RTL port matches, and its condition {s.get('availability','')!r} is not confirmed by its source" if s.get('availability')
+                    else f'{name}: no RTL port matches, and the specification states no condition for it')
         if p and choices:
             actual=width(p.get('width',p.get('range')))
-            if actual not in choices: return
+            if actual not in choices: return f'{name}: RTL width {actual} is not one of the documented widths {sorted(choices)}'
             suggestions['width_choices'][name]=actual
         questions.append(f"{name}: spec width {s.get('width')}, direction {s['direction']}; "+
                          (f"RTL {row['rtl']} width {row.get('rtl_width')}" if row.get('rtl') else

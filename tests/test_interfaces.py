@@ -241,3 +241,14 @@ def test_testbench_supplied_clock_and_reset_raise_plan_time_questions_when_undoc
     assert any(t.startswith("What is the active edge of CLK ") for t in texts)  # a clock the testbench supplies
     assert any(t.startswith("What is the active level of RST ") for t in texts)
     assert not any("TICK" in t or "CLK2" in t for t in texts)  # a derived clock output or a documented edge needs none
+
+
+def test_a_condition_is_found_whatever_its_capitalization_or_line_breaks_unless_negated():
+    from dv_agent.plan.interfaces import condition_stated
+    source = "BAUD_O 1 Output Optional baud rate output signal.\nIt is enabled if UART_HAS_BAUDRATE_OUTPUT\nis defined\n"
+    assert condition_stated(source, "Enabled if UART_HAS_BAUDRATE_OUTPUT is defined")
+    assert condition_stated(source, "enabled if UART_HAS_BAUDRATE_OUTPUT is defined")
+    assert not condition_stated(source, "Enabled if SOMETHING_ELSE is defined")
+    assert not condition_stated(source, "")
+    assert not condition_stated("It is not enabled if FEATURE_X is defined", "Enabled if FEATURE_X is defined")
+

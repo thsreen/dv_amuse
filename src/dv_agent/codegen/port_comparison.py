@@ -151,8 +151,10 @@ def enforce(plan, definition, out, *, resolve=True):
         lines += [f"- Evidence and classification: `{group['plan_pointer']}/property_evidence` (retained in JSON)",'']
     atomic_write_text(out/'interface_port_comparison.md','\n'.join(lines)+'\n')
     if report['status']!='PASS':
+        cause=None
         if resolve:
             from .port_reconciliation import reconcile
-            reconcile(plan,definition,out,report)
-        raise ValueError('Spec/RTL port comparison BLOCKED; review interface_port_comparison.md before generating SV interfaces or DV collateral')
+            cause=reconcile(plan,definition,out,report)
+        raise ValueError('Spec/RTL port comparison BLOCKED; review interface_port_comparison.md before generating SV interfaces or DV collateral'
+                         +(f'. Not sent for review because {cause}.' if cause else ''))
     return report

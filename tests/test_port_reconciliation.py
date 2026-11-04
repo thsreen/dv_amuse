@@ -140,3 +140,13 @@ def test_public_build_restarts_after_alignment_review_and_publishes_correct_stat
     assert result['interface_port_comparison']['independent_validation']['status']=='PASS'
     assert json.loads((out/'code_generation_state.json').read_text())['status']=='BUILT_NEEDS_REVIEW'
     assert result['test_only']
+
+
+def test_a_port_it_cannot_settle_says_why_review_was_not_requested(tmp_path):
+    out,plan,rtl=seed(tmp_path)
+    trace=next(s for s in plan['interfaces']['signals'] if s['name']=='TRACE')
+    trace['quote']='TRACE 1 Output'  # the first line only: the condition is in the source but not in the quote
+    with pytest.raises(ValueError,match="Not sent for review because TRACE: no RTL port matches, and its condition 'Enabled if TRACE_ENABLE is defined' is not confirmed"):
+        enforce(plan,rtl,out)
+    assert not list(out.glob('human_review/*/request.json'))
+
