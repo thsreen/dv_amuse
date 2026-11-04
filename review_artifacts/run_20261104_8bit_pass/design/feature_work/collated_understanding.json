@@ -1,0 +1,1407 @@
+{
+  "dependencies": {
+    "understanding": "Dependency analysis orders fixed-period clock then chip reset then WISHBONE init config then top stimulus and normal-loopback traffic, with WISHBONE UART interrupt-baud monitors before DLAB interrupt LSR reset-state X-Z scoreboard checks and coverage, and top virtual spawning via shared sequencer config.",
+    "tasks": [
+      {
+        "id": "t_wb_init_cfg",
+        "title": "WISHBONE init config sequence",
+        "category": "verification_plan",
+        "goal": "Implement directed init_config_sequence on wishbone agent: set LCR DLAB to 1, program Divisor MSB then LSB, clear DLAB to 0, then program FIFO trigger and IER enables using only documented semantics.",
+        "plan_pointers": [
+          "/sections/5/entries/0"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_chip_reset",
+            "reason": "DLAB divisor FIFO IER programming is valid only after asynchronous reset bring-up"
+          }
+        ],
+        "queries": [
+          "What are documented legal divisor values and reset value for DLL/DLM programming order?",
+          "What are documented FCR trigger and IER enable values for bring-up?"
+        ],
+        "interface_id": "wishbone_slave_interface"
+      },
+      {
+        "id": "t_chip_reset",
+        "title": "Chip reset bring-up sequence",
+        "category": "verification_plan",
+        "goal": "Implement chip_reset_sequence coordinating clock_generate with reset_drive to assert asynchronous reset before configuration with fixed period per test.",
+        "plan_pointers": [
+          "/sections/5/entries/1"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_clk_seq",
+            "reason": "reset_drive coordination needs stable fixed-period clock_generate defined first"
+          }
+        ],
+        "queries": [
+          "What is documented WB_RST_I polarity and minimum assert cycles before configuration?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_traffic_seq",
+        "title": "Normal and loopback traffic sequences",
+        "category": "verification_plan",
+        "goal": "Implement normal_traffic_sequence coordinating wishbone payload with uart TX/RX and modem toggles under interrupt observe plus loopback_traffic_sequence programming modem controls for loopback data compare.",
+        "plan_pointers": [
+          "/sections/5/entries/2",
+          "/sections/5/entries/3"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_wb_init_cfg",
+            "reason": "normal and loopback payload reuse divisor line-format FIFO init base"
+          }
+        ],
+        "queries": [
+          "What documented modem control bits enable loopback routing and what data path must be compared?",
+          "What documented interrupt observes bound normal versus loopback traffic?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_wb_mon",
+        "title": "WISHBONE slave monitor",
+        "category": "verification_plan",
+        "goal": "Build wishbone slave monitor sampling address, data, control and acknowledge on CLK with reset handling to reconstruct completed transactions.",
+        "plan_pointers": [
+          "/sections/5/entries/5"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_clk_seq",
+            "reason": "sampling on CLK needs fixed-period clock defined first"
+          }
+        ],
+        "queries": [
+          "What are documented address width and strobe/ack handshake sampling points for reconstruction?"
+        ],
+        "interface_id": "wishbone_slave_interface"
+      },
+      {
+        "id": "t_uart_mon",
+        "title": "UART serial data monitor",
+        "category": "verification_plan",
+        "goal": "Build uart serial monitor sampling SRX_PAD_I and STX_PAD_O relative to programmed divisor timing to reconstruct TX and RX bytes.",
+        "plan_pointers": [
+          "/sections/5/entries/6"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_wb_init_cfg",
+            "reason": "serial sampling relative to programmed divisor needs init divisor first"
+          }
+        ],
+        "queries": [
+          "What are source-stated data_bits, parity, stop_bits options and divisor-to-bit timing for sampling?"
+        ],
+        "interface_id": "uart_serial_data"
+      },
+      {
+        "id": "t_irq_baud_mon",
+        "title": "Interrupt and baud passive monitors",
+        "category": "verification_plan",
+        "goal": "Build passive interrupt and baud monitors observing INT_O and baud tick for assertion and period stability without driving.",
+        "plan_pointers": [
+          "/sections/5/entries/7"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_clk_seq",
+            "reason": "baud period stability observation needs fixed-period clock first"
+          }
+        ],
+        "queries": [
+          "What is documented INT_O polarity and baud-tick definition for passive observation?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_dlab_gate_chk",
+        "title": "DLAB gating check",
+        "category": "verification_plan",
+        "goal": "Check divisor latches accessible only when LCR bit7 is 1 and normal registers at 0-1 inaccessible at that time.",
+        "plan_pointers": [
+          "/sections/5/entries/9"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_wb_mon",
+            "reason": "DLAB gating check needs reconstructed completed WISHBONE transactions"
+          },
+          {
+            "task_id": "t_wb_init_cfg",
+            "reason": "DLAB set-clear stimulus must be programmed before gating check"
+          }
+        ],
+        "queries": [
+          "What is documented normal versus divisor alias map at addresses 0-1 under DLAB 0/1?"
+        ],
+        "interface_id": "wishbone_slave_interface"
+      },
+      {
+        "id": "t_irq_err_chk",
+        "title": "Interrupt and line-error checks",
+        "category": "verification_plan",
+        "goal": "Check INT_O matches enabled IER sources with IIR highest-priority reporting and correct reset control, and overrun/parity/framing/break set per RX condition with interrupt and clear on LSR read.",
+        "plan_pointers": [
+          "/sections/5/entries/10",
+          "/sections/5/entries/11"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_lsr_status",
+            "reason": "overrun parity framing break interrupt reporting builds on LSR status"
+          },
+          {
+            "task_id": "t_irq_baud_mon",
+            "reason": "enabled-source matching needs INT_O IIR observation"
+          }
+        ],
+        "queries": [
+          "What are documented IER-to-IIR priority encodings and reset-control actions?",
+          "What are documented LSR error set and clear-on-read semantics per bit?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_top_virtual",
+        "title": "Top virtual and normal traffic control",
+        "category": "stimulus",
+        "goal": "Implement top virtual sequence spawning agent tops for WISHBONE, serial, modem, clock and reset plus normal-traffic coordination, spawn-only with no VIFs or delays, stages in order.",
+        "plan_pointers": [
+          "/sections/7/entries/0",
+          "/sections/7/entries/5"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_wb_top_seq",
+            "reason": "top spawn needs shared WISHBONE sequencer configuration"
+          },
+          {
+            "task_id": "t_traffic_seq",
+            "reason": "top normal-traffic coordination needs shared traffic sequencer configuration"
+          },
+          {
+            "task_id": "t_clk_seq",
+            "reason": "top spawn needs shared fixed-period clock sequencer configuration"
+          },
+          {
+            "task_id": "t_chip_reset",
+            "reason": "top spawn needs shared reset sequencer configuration"
+          }
+        ],
+        "queries": [
+          "What is documented bring-up order for reset, divisor, line format and FIFO that virtual stages must enforce?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_wb_top_seq",
+        "title": "WISHBONE top stimulus",
+        "category": "stimulus",
+        "goal": "Implement wishbone top sequence driving controlled register read and write stimulus within documented addresses and DLAB gating.",
+        "plan_pointers": [
+          "/sections/7/entries/1"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_wb_init_cfg",
+            "reason": "controlled register stimulus reuses init DLAB-gating base sequence"
+          }
+        ],
+        "queries": [
+          "What are documented legal masks and access types per WISHBONE address for random constraints?"
+        ],
+        "interface_id": "wishbone_slave_interface"
+      },
+      {
+        "id": "t_clk_seq",
+        "title": "Fixed-period clock stimulus",
+        "category": "stimulus",
+        "goal": "Implement clock sequence driving fixed-period CLK per test for documented WISHBONE points with boundary and seed stratum sampling once bands defined.",
+        "plan_pointers": [
+          "/sections/7/entries/2"
+        ],
+        "depends_on": [],
+        "queries": [
+          "What are documented CLK period bands and baud-related points for fixed-period constraint?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_xz_check",
+        "title": "X/Z protocol check",
+        "category": "checks",
+        "goal": "Check monitors error on sampled X or Z on control/data and DUT outputs reach known non-X/Z values after reset deassertion.",
+        "plan_pointers": [
+          "/sections/8/entries/0"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_chip_reset",
+            "reason": "known non-XZ after deassertion needs reset bring-up first"
+          },
+          {
+            "task_id": "t_wb_mon",
+            "reason": "X-Z check needs sampled control-data monitors"
+          }
+        ],
+        "queries": [
+          "What signals are in documented known-value set after reset for X/Z checking?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_reset_state",
+        "title": "Reset-state scoreboard",
+        "category": "checks",
+        "goal": "Check in top scoreboard after reset FIFOs and shift registers cleared, Divisor 0, LCR 8 bits no parity 1 stop, interrupts disabled.",
+        "plan_pointers": [
+          "/sections/8/entries/1"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_chip_reset",
+            "reason": "reset values observable only after reset bring-up"
+          },
+          {
+            "task_id": "t_wb_mon",
+            "reason": "reset-state scoreboard needs monitor reconstruction of idle bus"
+          }
+        ],
+        "queries": [
+          "What are exact documented reset values for Divisor, LCR, IER and FCR?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_ier_iir_pend",
+        "title": "IER enable and IIR pending",
+        "category": "checks",
+        "goal": "Check IER bits 0-3 enable Received Data, THRE, Receiver Line Status and Modem Status with 0 disabled 1 enabled, and IIR bit0 pending 0 pending 1 none against INT_O.",
+        "plan_pointers": [
+          "/sections/8/entries/2",
+          "/sections/8/entries/3"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_wb_top_seq",
+            "reason": "IER IIR enable-pending check needs controlled register stimulus"
+          },
+          {
+            "task_id": "t_irq_baud_mon",
+            "reason": "pending comparison needs passive INT_O observation"
+          }
+        ],
+        "queries": [
+          "What is documented IER bit-to-source mapping for enable comparison?",
+          "What is documented IIR bit0 versus INT_O polarity for pending comparison?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_iir_prio_fixed",
+        "title": "IIR priority and fixed bits",
+        "category": "checks",
+        "goal": "Check IIR reports highest priority pending with documented priority, source and reset control, plus assertion that IIR read bits 7:6 are 11 and 5:4 are 00.",
+        "plan_pointers": [
+          "/sections/8/entries/4",
+          "/sections/8/entries/5"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_ier_iir_pend",
+            "reason": "priority and fixed-bits reporting builds on enable-pending base"
+          }
+        ],
+        "queries": [
+          "What is documented IIR priority table with source and reset-control actions?"
+        ],
+        "interface_id": "interrupt_output"
+      },
+      {
+        "id": "t_lsr_status",
+        "title": "LSR status and clear",
+        "category": "checks",
+        "goal": "Check LSR Data Ready, Overrun, Parity, Framing and Break reflect FIFO/top-char and generate RLS interrupt, TX empty cleared by FIFO writes and error summary cleared on read.",
+        "plan_pointers": [
+          "/sections/8/entries/6",
+          "/sections/8/entries/7"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_uart_mon",
+            "reason": "LSR Data Ready and error status need TX RX byte reconstruction"
+          },
+          {
+            "task_id": "t_wb_mon",
+            "reason": "LSR read-clear and TX-empty clear need WISHBONE transactions"
+          }
+        ],
+        "queries": [
+          "What are documented LSR bit positions with set and clear-on-read conditions?",
+          "What is documented TX-empty versus THRE semantic for write-clear?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_wb_scoreboard",
+        "title": "WISHBONE agent scoreboard",
+        "category": "checks",
+        "goal": "Check in wishbone agent scoreboard requests eventually answered with correct read data and no lost or duplicated transfers.",
+        "plan_pointers": [
+          "/sections/8/entries/8"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_wb_mon",
+            "reason": "request-answer matching needs completed transactions"
+          }
+        ],
+        "queries": [
+          "What is documented acknowledge behavior defining eventually-answered bound as testbench limit?"
+        ],
+        "interface_id": "wishbone_slave_interface"
+      },
+      {
+        "id": "t_e2e_arch",
+        "title": "End-to-end and architecture scoreboard",
+        "category": "checks",
+        "goal": "Check end-to-end UART integrity from WISHBONE TX to serial to WISHBONE RX preserving bytes and order plus architecture no loss, duplication, misorder, every request answered, no deadlock or livelock.",
+        "plan_pointers": [
+          "/sections/8/entries/9",
+          "/sections/8/entries/11"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_traffic_seq",
+            "reason": "end-to-end integrity needs normal and loopback traffic stimulus"
+          },
+          {
+            "task_id": "t_uart_mon",
+            "reason": "end-to-end compare needs serial byte queues"
+          }
+        ],
+        "queries": [
+          "What documented FIFO depth and ordering guarantees define expected end-to-end queues?",
+          "What testbench drain and request-timeout limits detect deadlock without assuming DUT timing?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_modem_irq",
+        "title": "Modem-status interrupt",
+        "category": "checks",
+        "goal": "Check modem input changes on CTS, DSR, RI or DCD produce Modem Status interrupt subject to IER enable in modem agent and top scoreboard.",
+        "plan_pointers": [
+          "/sections/8/entries/10"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_traffic_seq",
+            "reason": "CTS DSR RI DCD toggle stimulus comes from traffic modem toggles"
+          }
+        ],
+        "queries": [
+          "What are documented modem delta detection and MSR clear versus IIR reset semantics?"
+        ],
+        "interface_id": "modem_control_if"
+      },
+      {
+        "id": "t_wb_reg_cov",
+        "title": "WISHBONE register coverage",
+        "category": "coverage",
+        "goal": "Cover WISHBONE register access addresses 0-6 with read/write direction and byte data classes and documented access types.",
+        "plan_pointers": [
+          "/sections/9/entries/0",
+          "/sections/9/entries/8"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_wb_mon",
+            "reason": "register address direction coverage needs sampled transactions"
+          }
+        ],
+        "queries": [
+          "What are documented access types and legal byte classes per address for bins?"
+        ],
+        "interface_id": "wishbone_slave_interface"
+      },
+      {
+        "id": "t_divisor_cov",
+        "title": "Divisor latch coverage",
+        "category": "coverage",
+        "goal": "Cover divisor latch DLAB gating with LSB and MSB bytes including zero and maximum plus value coverage programmed with DLAB set.",
+        "plan_pointers": [
+          "/sections/9/entries/1",
+          "/sections/9/entries/9"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_wb_init_cfg",
+            "reason": "LSB MSB zero maximum divisor coverage needs DLAB-gated programming"
+          }
+        ],
+        "queries": [
+          "What are documented legal divisor values including zero and maximum handling for bins?"
+        ],
+        "interface_id": "wishbone_slave_interface"
+      },
+      {
+        "id": "t_irq_id_cov",
+        "title": "Interrupt ID coverage",
+        "category": "coverage",
+        "goal": "Cover interrupt identification pending flag and priority encodings for all listed sources.",
+        "plan_pointers": [
+          "/sections/9/entries/2"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_irq_baud_mon",
+            "reason": "pending priority coverage needs INT_O IIR observation"
+          }
+        ],
+        "queries": [
+          "What is documented complete IIR pending plus priority encoding list for coverpoints?"
+        ],
+        "interface_id": "interrupt_output"
+      },
+      {
+        "id": "t_line_err_cov",
+        "title": "Line-status and error cross",
+        "category": "coverage",
+        "goal": "Cover line-status Data Ready, Overrun, Parity, Framing and Break plus cross of TX/RX transfers with errors for concurrent data and error reporting.",
+        "plan_pointers": [
+          "/sections/9/entries/3",
+          "/sections/9/entries/6"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_uart_mon",
+            "reason": "line-status error cross needs serial transfer observation"
+          }
+        ],
+        "queries": [
+          "What documented error conditions define line-status and cross bins with traffic?"
+        ],
+        "interface_id": "uart_serial_data"
+      },
+      {
+        "id": "t_clk_cov",
+        "title": "Clock period coverage",
+        "category": "coverage",
+        "goal": "Cover sampled CLK period band, boundary and seed stratum for documented baud points with fixed period per test.",
+        "plan_pointers": [
+          "/sections/9/entries/4"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_clk_seq",
+            "reason": "period band boundary stratum coverage needs fixed-period clock stimulus"
+          }
+        ],
+        "queries": [
+          "What are documented baud points and CLK period bands for stable sampling?"
+        ],
+        "interface_id": null
+      },
+      {
+        "id": "t_addr_dlab_cov",
+        "title": "Address by DLAB cross",
+        "category": "coverage",
+        "goal": "Cover address crossed with DLAB gating for divisor versus normal aliasing at addresses 0-1.",
+        "plan_pointers": [
+          "/sections/9/entries/5"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_dlab_gate_chk",
+            "reason": "address by DLAB cross builds on divisor versus normal aliasing check"
+          }
+        ],
+        "queries": [
+          "What documented alias map at 0-1 under DLAB 0/1 defines cross bins?"
+        ],
+        "interface_id": "wishbone_slave_interface"
+      },
+      {
+        "id": "t_modem_traffic_cov",
+        "title": "Modem by traffic cross",
+        "category": "coverage",
+        "goal": "Cover Modem Status interrupt crossed with concurrent serial traffic for modem handling during data flow.",
+        "plan_pointers": [
+          "/sections/9/entries/7"
+        ],
+        "depends_on": [
+          {
+            "task_id": "t_modem_irq",
+            "reason": "modem by traffic cross needs Modem Status interrupt base during data flow"
+          }
+        ],
+        "queries": [
+          "What documented modem sources and concurrent traffic combinations define cross bins?"
+        ],
+        "interface_id": null
+      }
+    ],
+    "questions": [
+      "What is documented WB_RST_I polarity, async behavior, and minimum assert/deassert cycles for DATA_BUS_WIDTH_8 FIFO-only use?",
+      "What is documented WISHBONE address map, data width, and access types for addresses 0-6 including DLAB-gated divisor versus normal aliasing at 0-1?",
+      "What are documented reset values for Divisor Latch, LCR, FCR, IER, IIR, and LSR for bring-up and reset-state comparison?",
+      "What are documented IER bit-to-source mapping, IIR pending and priority encodings with fixed bits, and per-source reset control?",
+      "What are documented LSR bit positions with set, clear-on-read, FIFO and error-summary semantics for overrun, parity, framing, and break?",
+      "What are source-stated serial line-format options, divisor-to-bit timing, baud-tick definition, FIFO depth and trigger levels, and loopback routing for TX/RX comparison?",
+      "What are documented modem input delta detection, MSR/IIR modem-status clear semantics, INT_O polarity, and CLK fixed-period bands for coverage?",
+      "No source documents supplied here: which DOCUMENTED spec references anchor divisor DLAB IER IIR LSR modem reset and clock behavior for facts?",
+      "What are the evidenced reset polarity tie-offs bus address representation and inactive levels for handshake and flow-control inputs?",
+      "What is the source-supported divisor programming order DLAB aliasing at addresses 0-1 and baud-tick relation?",
+      "What are the source-supported IER enable bits IIR priority encodings fixed bits pending polarity and reset controls?",
+      "What are the source-supported LSR Data Ready Overrun Parity Framing Break set and read-clear conditions plus modem-status interrupt enable?"
+    ]
+  },
+  "components": {
+    "t_clk_seq": {
+      "understanding": "Fixed-period clock stimulus drives RTL wb_clk_i spec CLK with one symbolic period P_fixed per test started before reset and held through traffic with observed-edge sampling for band boundary stratum once documented WISHBONE points bands defined",
+      "completion": [
+        "Clock started before reset with period P_fixed and held fixed through traffic",
+        "Reset asserted via wb_rst_i and deasserted before configuration with duration scaled to P_fixed",
+        "Observed-edge sampling recorded for this test sampled point where bands defined",
+        "Terminate on traffic done or TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+      ],
+      "questions": [
+        "What are documented CLK period bands and Max Min Resolution meanings for 3.6864 for 115200 bps and 1258Mhz for 1200 bps points?",
+        "What is nominal CLK frequency and period to use as P_fixed?",
+        "What are minimum and maximum operating CLK frequencies periods plus duty-cycle and jitter tolerance?",
+        "Is dynamic period change during operation permitted or must period stay fixed per test changed only between tests before reset and traffic?",
+        "What is active level polarity of wb_rst_i and required reset duration in CLK cycles for scaling to P_fixed?"
+      ],
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": []
+    },
+    "t_chip_reset": {
+      "understanding": "Chip reset bring-up starts stable fixed-period clock on wb_clk_i before asserting asynchronous reset on wb_rst_i as first step before any configuration, tracking duration to symbolic P_fixed; quick-test-only active-high 10-cycle hold is testbench choice not documented DUT requirement.",
+      "completion": [
+        "Reset asserted then deasserted on wb_rst_i before any register configuration with duration tracked to symbolic P_fixed",
+        "Clock on wb_clk_i started before reset with period P_fixed and held fixed through reset",
+        "Terminate on reset done or TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+      ],
+      "questions": [
+        "What is documented active level polarity and inactive level of WB_RST_I on wb_rst_i? Excerpt states only Asynchronous Reset with no polarity.",
+        "What is documented minimum assert duration in clock cycles for WB_RST_I and required deassert to configuration delay before init_config_sequence?",
+        "What is documented nominal CLK period P_fixed and permitted operating range when clocks excerpt lists only labels 3.6864 for 115200 bps and 1258Mhz for 1200 bps with Max Min Resolution unresolved?"
+      ],
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": []
+    },
+    "t_clk_cov": {
+      "understanding": "Clock period coverage samples observed wb_clk_i spec CLK edges with one symbolic fixed period P_fixed per test started before reset and held through traffic; raw period sampling is supported, band boundary stratum classification deferred until documented bands defined with no invented bounds or dynamic switching.",
+      "completion": [
+        "WAIT for traffic done OR TEST_TIMEOUT_CYCLES operational limit; timeout is testbench operational limit not DUT timing",
+        "STOP sampling and retain P_fixed with P_sampled and test seed for this test then CLEANUP to idle without mid-test period change"
+      ],
+      "questions": [
+        "What are documented CLK period bands and Max Min Resolution meanings for 1258Mhz for 1200 bps and 3.6864 for 115200 bps points?",
+        "What is nominal CLK frequency and period to use as P_fixed?",
+        "What are minimum and maximum operating CLK frequencies periods plus duty-cycle and jitter tolerance?",
+        "Is dynamic period change during operation permitted or must period stay fixed per test changed only between tests before reset and traffic?",
+        "What is active level polarity of wb_rst_i and required reset duration in CLK cycles for scaling to P_fixed?"
+      ],
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": [
+        "t_clk_cov_raw_cov"
+      ]
+    },
+    "t_irq_baud_mon": {
+      "understanding": "Build passive INT_O observation via interrupt_output agent timestamped on fixed-period clock without driving; optional 16x baud-tick observation pending physical binding and documented period mapping; reset clears pending state and restarts measurement.",
+      "completion": [
+        "End observation after traffic done plus drain_cycles to flush pending interrupt events",
+        "Abort on request_timeout_cycles operational limit; timeout is testbench limit not DUT timing"
+      ],
+      "questions": [
+        "What is documented INT_O polarity and inactive level for assertion versus deassertion observation?",
+        "Is BAUD_O present on uart_top.v and what is its exact physical port name and UART_HAS_BAUDRATE_OUTPUT enable for binding?",
+        "What is documented divisor to 16x tick period mapping and which divisor value stalls or disables tick for stability checks?",
+        "What is active level polarity of wb_rst_i and required reset duration in CLK cycles for clearing pending events?",
+        "What is nominal P_fixed CLK period to use for INT_O and tick timestamping?"
+      ],
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": [
+        "t_irq_baud_mon_cov_int_o"
+      ]
+    },
+    "t_wb_mon": {
+      "understanding": "Build wishbone_slave_interface monitor sampling RTL pins wb_adr_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_sel_i on observed CLK edges from fixed-period clock, reconstructing completed read and write transactions on WB_ACK_O assertion for analysis port, flushing in-flight on wb_rst_i, with X or Z and known-after-reset checks and ACK-sampled register and DLAB coverage for 8-bit addresses 0-6.",
+      "completion": [
+        "Monitor runs through reset and traffic until test end with in-flight flushed on reset and only completed ACK transactions emitted",
+        "Terminate on traffic done or TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+      ],
+      "questions": [
+        "What is active level polarity of wb_rst_i described as Asynchronous Reset and required reset duration in CLK cycles and must monitor flush in-flight transfer versus flag reset-during-transfer as error?",
+        "What are documented WISHBONE handshake semantics for reconstruction: stability of wb_adr_i wb_we_i wb_sel_i wb_stb_i wb_cyc_i during transfer and wb_ack_o assertion window single versus multi-cycle and wb_dat_o validity window on reads and back-to-back handling?",
+        "What is documented wb_sel_i usage in 8-bit build including legal values and ignored versus checked behavior and address representation as pin values 0-6 versus offsets and illegal addr_7 handling?",
+        "What is documented CLK sampling edge for wishbone_slave_interface monitor and reset sampling relative to CLK given fixed period P_fixed per test?"
+      ],
+      "sequences": [],
+      "checks": [
+        "t_wb_mon_check_xz",
+        "t_wb_mon_check_known"
+      ],
+      "routes": [],
+      "coverage": []
+    },
+    "t_irq_id_cov": {
+      "understanding": "Cover IIR bit0 pending flag, bits3-1 priority codes for five sources, and fixed compatibility bits sampled on IIR reads.",
+      "completion": [
+        "End collection after owning traffic sequences complete plus drain_cycles to flush pending IIR read events",
+        "Abort on request_timeout_cycles operational limit; timeout is testbench limit not DUT timing"
+      ],
+      "questions": [],
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": [
+        "t_irq_id_cov_cg_iir"
+      ]
+    },
+    "t_reset_state": {
+      "understanding": "After global reset top-level scoreboard reconstructs idle WISHBONE reads on observed wb_clk_i edges to check receiver/transmitter FIFOs and shift registers cleared, Divisor Latch 0, LCR 8N1, and IER interrupts disabled, depending on chip-reset bring-up and wishbone monitor.",
+      "completion": [
+        "COMPLETE when all reset-state COMPAREs evaluated after wb_rst_i deassert and reads sampled on observed wb_clk_i edges",
+        "TERMINATE on TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+      ],
+      "questions": [
+        "What is documented active level polarity and inactive level of WB_RST_I on wb_rst_i, minimum assert duration in CLK cycles, and required deassert-to-first-read delay before reset-state reads?",
+        "What are documented bus pin values for IER IIR LSR and Divisor LSB MSB reads in DATA_BUS_WIDTH_8 build, DLAB gating for divisor access, wb_sel_i legal values, and address representation as pin values?",
+        "What are documented reset values for IER including reserved bits and for FCR trigger and clear bits, and how is FCR reset observed when all listed FCR bits are write-only or ignored?",
+        "What documented status proves receiver and transmitter FIFOs and shift registers cleared after reset: expected LSR DR OE PE FE BI and transmitter empty, IIR value and int_o level, and serial idle levels?",
+        "What is documented CLK sampling edge on wb_clk_i for wishbone monitor reconstruction and scoreboard sampling of reset-state reads?"
+      ],
+      "sequences": [
+        "t_reset_state_seq_lcr_reset"
+      ],
+      "checks": [
+        "t_reset_state_check_lcr_reset"
+      ],
+      "routes": [],
+      "coverage": []
+    },
+    "t_wb_init_cfg": {
+      "understanding": "Directed init_config_sequence on wishbone_slave_interface_agent after chip_reset: set LCR DLAB 1, program Divisor MSB first LSB next, clear DLAB 0, then program FIFO trigger and IER enables using only documented addresses order and enable polarity with symbolic bring-up values.",
+      "completion": [
+        "Done when LCR-DLAB1 plus MSB-first plus LSB-next plus LCR-DLAB0 plus FCR-trigger plus IER-enable writes all ACKed and IER read-back COMPARE passes and divisor coverage SAMPLED",
+        "Bound by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing; cleanup leaves DLAB=0 with wishbone bus idle-owned for traffic handoff"
+      ],
+      "questions": [
+        "What symbolic divisor LSB/MSB values form legal nonzero divisor for bring-up and is divisor 0 illegal beyond reset value 0 and MSB-first LSB-next order?",
+        "What specific FCR trigger selection 00-1B 01-4B 10-8B 11-14B is required for bring-up given 14 bytes only recommended if system responds fast enough?",
+        "What specific IER bits 3-0 enables are desired for bring-up versus later traffic?",
+        "What LCR bits 6-0 line parameters must accompany DLAB 1 then DLAB 0 during init?",
+        "How is FCR trigger observed when all listed bits are write-only or ignored and what is post-reset trigger level?",
+        "What documented deassert-to-first-write delay is required after wb_rst_i before init_config_sequence?"
+      ],
+      "sequences": [
+        "t_wb_init_cfg_init_seq"
+      ],
+      "checks": [
+        "t_wb_init_cfg_ier_check"
+      ],
+      "routes": [],
+      "coverage": [
+        "t_wb_init_cfg_cg_dlab_divisor",
+        "t_wb_init_cfg_rc_divisor_bytes"
+      ]
+    },
+    "t_wb_reg_cov": {
+      "understanding": "Cover WISHBONE slave accesses at bus pin values 0-6 with read/write direction and byte data classes and documented per-address access types, sampled from completed transactions with DLAB 0 for normal registers.",
+      "completion": [
+        "Terminate when directed accesses to pin values 0-6 with documented directions and byte classes are attempted and monitor reports traffic done, or on TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing.",
+        "Cleanup by stopping wishbone_slave_interface stimulus, allowing in-flight to flush on reset, and closing dedicated coverage sampling."
+      ],
+      "questions": [
+        "What is CLK sampling edge, wb_rst_i polarity and required reset duration in CLK cycles, and must monitor flush versus flag reset-during-transfer?",
+        "What are documented handshake semantics for wb_adr_i wb_we_i wb_sel_i wb_stb_i wb_cyc_i stability, wb_ack_o single versus multi-cycle window, wb_dat_o validity on reads, and back-to-back handling?",
+        "What is documented wb_sel_i legal values in 8-bit build, address representation as pin values 0-6 versus offsets, and illegal addr_7 handling?",
+        "What is expected handling of mismatched direction per address for rc_wb_regs bins: read from W-only THR FCR MCR and write to R-only RBR IIR LSR MSR ignored versus illegal versus defined return?",
+        "What are legal write masks and read return values for IER reserved bits, FCR ignored bits, and reset values for comparison versus coverage byte classes 0x00 0x01 0x02_0x7F 0x80_0xFE 0xFF?",
+        "How is FCR reset value observed when bits are write-only or ignored, and what LCR bit 7 sequence guarantees DLAB 0 setup for normal 0-1 coverage?"
+      ],
+      "sequences": [
+        "t_wb_reg_cov_directed_seq",
+        "t_wb_reg_cov_directed_seq"
+      ],
+      "checks": [],
+      "routes": [],
+      "coverage": [
+        "t_wb_reg_cov_rc_write"
+      ]
+    },
+    "t_wb_scoreboard": {
+      "understanding": "WISHBONE agent scoreboard inside wishbone_slave_interface agent tracks monitor-reported completed transactions to detect lost duplicated or misordered transfers with read-data comparison only where documented reference exists; eventually-answered uses testbench timeout not documented DUT bound provenance INFERRED quick-test only.",
+      "completion": [
+        "Scoreboard active from reset release through traffic until drain_cycles plus request_timeout_cycles elapse or TEST_TIMEOUT_CYCLES operational limit",
+        "At least one observed versus pending queue comparison attempted when traffic present",
+        "drain_cycles and request_timeout_cycles are TESTBENCH operational limits not DUT acknowledge requirements"
+      ],
+      "questions": [
+        "What is documented acknowledge behavior defining eventually-answered bound as testbench limit?",
+        "What defines correct wb_dat_o on reads for pin addresses 0-6 including DLAB gating reset values and clear-on-read side effects for scoreboard reference?",
+        "What defines WISHBONE request identity for loss or duplication including required wb_stb_i wb_cyc_i wb_we_i wb_sel_i wb_adr_i stability ACK assertion window single versus multi-cycle back-to-back handling and legal wb_sel_i in DATA_BUS_WIDTH_8?",
+        "What are active level polarity of wb_rst_i and required duration in clock cycles and required scoreboard versus monitor behavior on reset-during-transfer flush versus error?"
+      ],
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": []
+    },
+    "t_xz_check": {
+      "understanding": "Monitor-level X/Z protocol check: error on X/Z sampled on WISHBONE serial modem and interrupt signals plus reset-known non-X/Z check after wb_rst_i deassertion; depends on reset bring-up and transaction monitors; uses RTL port names for code and spec references for behavior.",
+      "completion": [
+        "END when reset assertion plus deassertion plus settle window sampled and at least one known-value COMPARE observed",
+        "BOUND by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+      ],
+      "questions": [
+        "What signals are in documented known-value set after reset for X/Z checking beyond FIFOs and shift registers cleared, Divisor 0, LCR 8N1, IER disabled \u2014 specifically expected non-X/Z levels for wb_dat_o wb_ack_o int_o stx_pad_o rts_pad_o dtr_pad_o?",
+        "What is documented active polarity and inactive level of WB_RST_I on wb_rst_i? Source states only Asynchronous Reset.",
+        "What is documented minimum assert duration in clock cycles for WB_RST_I and required deassert-to-configuration delay and post-deassert settle for known check?",
+        "What is documented nominal clock period P_fixed and operating range for wb_clk_i?",
+        "What is documented CLK sampling edge for X/Z monitors and reset sampling relative to CLK?",
+        "Does X/Z error apply during reset assertion or only after deassertion, and must testbench drive all inputs to avoid Z during reset?",
+        "What are documented pad levels after MCR Reset Value 0 given inverted DTR and RTS mapping?"
+      ],
+      "sequences": [
+        "t_xz_check_seq_wb_idle",
+        "t_xz_check_seq_uart_idle",
+        "t_xz_check_seq_modem_idle"
+      ],
+      "checks": [
+        "t_xz_check_check_xz_wb",
+        "t_xz_check_check_known_wb"
+      ],
+      "routes": [],
+      "coverage": []
+    },
+    "t_divisor_cov": {
+      "understanding": "Cover DLAB-gated divisor latch programming with LSB MSB zero max and combined value bins sampled on Wishbone write completions with DLAB 1.",
+      "completion": [
+        "Done when LSB zero 0x00 min 0x01 mid_low mid_high max 0xFF and MSB zero min mid_low mid_high max with DLAB 1 plus combined_zero_disables and combined_nonzero_enables SAMPLED and DLAB restored to 0 with wishbone bus idle-owned [f_lsb_addr f_msb_addr f_div_single f_div_zero]",
+        "Bound by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing; cleanup leaves DLAB 0 [f_dlab_restore]"
+      ],
+      "questions": [
+        "What are documented legal divisor values including zero and maximum handling for bins? Is combined 0x0000 only disabling I/O versus illegal and is 0xFFFF legal maximum for combined_zero_disables versus combined_nonzero_enables?",
+        "What are reset values of LSB at address 0 and MSB at address 1 for mirror comparison masks? Documented reset is empty so unknown reset must be null."
+      ],
+      "sequences": [
+        "t_divisor_cov_seq"
+      ],
+      "checks": [],
+      "routes": [],
+      "coverage": [
+        "t_divisor_cov_cg_dlab_divisor",
+        "t_divisor_cov_rc_divisor_bytes"
+      ]
+    },
+    "t_dlab_gate_chk": {
+      "understanding": "Verify DLAB gating on wishbone_slave_interface with RTL ports wb_adr_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_sel_i using pin values 0 1 3: divisor LSB and MSB at 0 and 1 accessible only when LCR bit7 is 1 and normal at 0 and 1 only when 0 with alias-toggle reads and RW compares at addr1 plus cross coverage; depends on monitor reconstruction and init divisor then clear programming; QUICK_TEST_PLAN_APPROVAL intentions stay INFERRED and spec-to-RTL map is reused with only DOCUMENTED facts constraining behavior.",
+      "completion": [
+        "DONE when LCR DLAB1 plus MSB-first plus LSB-next plus divisor reads plus LCR DLAB0 plus IER write plus IER read plus alias toggle reads all ACKed and COMPAREs pass and cross plus divisor coverage SAMPLED",
+        "BOUND by TEST_TIMEOUT_CYCLES plus drain_cycles and request_timeout_cycles as TESTBENCH operational limits not DUT timing; TIMEOUT is testbench failure",
+        "CLEANUP leaves LCR DLAB 0 with wishbone bus idle-owned for traffic handoff; TERMINATE on traffic done or operational timeout"
+      ],
+      "questions": [
+        "What is documented normal versus divisor alias map at pin addresses 0-1 under DLAB 0 versus 1, confirming normal addr0 RBR_R versus THR_W and addr1 IER_RW versus divisor LSB_RW at 0 MSB_RW at 1, and is mismatched access an alias return versus blocked or ignored with what ACK and read data?",
+        "What is active level polarity of wb_rst_i, required reset duration in clock cycles, and must monitor flush in-flight versus flag reset-during-transfer as error, and what is clock sampling edge for ACK reconstruction given fixed period per test?",
+        "What are documented WISHBONE handshake semantics for reconstruction: stability of wb_adr_i wb_we_i wb_sel_i wb_stb_i wb_cyc_i during transfer, wb_ack_o single versus multi-cycle window, wb_dat_o validity on reads, and back-to-back handling?",
+        "What is documented wb_sel_i legal values in DATA_BUS_WIDTH_8 build, address representation as pin values 0-6 versus offsets, and handling of illegal pin address 7?",
+        "What symbolic divisor LSB and MSB values form legal nonzero divisor for bring-up, is divisor zero illegal beyond reset disabling serial I/O, and is MSB-first LSB-last order mandatory given counter starts on LSB write?",
+        "What LCR bits 6-0 line parameters must accompany DLAB 1 then 0 during gating check, and what comparison masks apply to IER reserved bits 7-4 versus enables 3-0?",
+        "What is expected read data for address 0 FIFO alias during gating given side-effect behavior, and should address 0 be coverage-only without data COMPARE with simple RW mirror limited to address 1 IER versus DLM?"
+      ],
+      "sequences": [
+        "t_dlab_gate_chk_seq"
+      ],
+      "checks": [
+        "t_dlab_gate_chk_alias_class_check"
+      ],
+      "routes": [
+        "t_dlab_gate_chk_route_dlm",
+        "t_dlab_gate_chk_route_ier"
+      ],
+      "coverage": []
+    },
+    "t_traffic_seq": {
+      "understanding": "Coordinate normal_traffic with wishbone payload plus uart TX RX plus modem toggles under IER-gated interrupt observe, and loopback_traffic by programming MCR Loopback 1 for internal TX-shift to RX-shift with documented modem remapping, reusing t_wb_init_cfg divisor line FIFO IER base with DLAB 0.",
+      "completion": [
+        "Done when directed normal burst plus directed loopback burst plus bounded random bursts all ACKed with queues COMPAREd and coverage SAMPLEd",
+        "Bound by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing",
+        "Cleanup: program MCR Loopback to 0 for normal, leave LCR DLAB 0 with wishbone bus idle-owned for handoff"
+      ],
+      "questions": [
+        "What are actual wb_adr_i pin values for THR RBR IER MCR FCR LCR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling and reset release to first write delay?",
+        "What symbolic divisor LSB MSB nonzero values plus LCR line-format values and FIFO trigger level and IER bits 3-0 combination bound normal versus loopback bring-up and traffic?",
+        "What uart_serial_data data_bits parity stop_bits bit_cycles settings must agree with LCR programming and divisor baud for TX observe and RX drive?",
+        "What Out1 Out2 control applies in normal operation outside loopback and what exact loopback data path beyond documented TX-shift to RX-shift plus DTR to DSR RTS to CTS Out1 to RI Out2 to DCD with STX held at 1 must be compared?",
+        "What documented interrupt observe mapping binds Received Data THRE Line Status Modem Status to normal versus loopback traffic and what overrun parity framing Data Ready order preservation without loss duplication applies?"
+      ],
+      "sequences": [
+        "t_traffic_seq_wb_normal_seq",
+        "t_traffic_seq_uart_normal_seq",
+        "t_traffic_seq_modem_normal_seq",
+        "t_traffic_seq_wb_loopback_seq",
+        "t_traffic_seq_modem_random_seq",
+        "t_traffic_seq_normal_virt",
+        "t_traffic_seq_loopback_virt"
+      ],
+      "checks": [
+        "t_traffic_seq_ier_chk"
+      ],
+      "routes": [
+        "t_traffic_seq_loopback_route"
+      ],
+      "coverage": [
+        "t_traffic_seq_cov_modem",
+        "t_traffic_seq_cov_ier",
+        "t_traffic_seq_cov_payload_wb",
+        "t_traffic_seq_cov_payload_uart"
+      ]
+    },
+    "t_uart_mon": {
+      "understanding": "Build uart_serial_data monitor observing stx_pad_o and driving srx_pad_i timing via programmed divisor to reconstruct TX RX bytes with framing break attributes, after wishbone divisor bring-up, using symbolic line format pending source confirmation",
+      "completion": [
+        "Done when divisor bring-up ACKed with DLAB equals 0 and uart_serial_data monitor has emitted TX plus RX byte transactions to analysis port or TEST_TIMEOUT_CYCLES expires",
+        "Bound by TEST_TIMEOUT_CYCLES and drain_cycles as testbench operational limits not DUT timing; on reset WAIT then discard partial frames and realign to next start bit",
+        "Cleanup leaves DLAB equals 0 with wishbone bus idle-owned by wishbone_slave_interface and srx_pad_i idle-owned by uart_serial_data"
+      ],
+      "questions": [
+        "What are source-stated data_bits options for LCR bits 1-0 including 5 6 7 8 and reset 00000011b meaning for monitor reconstruction?",
+        "What are source-stated parity enable even stick rules for LCR bits 3-5 including odd versus even number of 1s for transmit generation versus receive checking?",
+        "What are source-stated stop_bits options for LCR bit 2 including 1 versus 1_5 versus 2 and receiver first-stop-only checking?",
+        "What is exact divisor-to-bit timing for sampling: is BIT_CYCLES divisor times 16 clocks from Input Clock divided by Divisor equals 16 times baud including mid-bit sampling offset?",
+        "What are idle start stop break levels on srx_pad_i and stx_pad_o and break duration start plus data plus parity plus stop versus held 0 for framing versus break attributes?",
+        "What is wb_rst_i polarity and required deassert-to-first-write delay and FCR trigger plus IER plus LCR 6-0 values needed during bring-up to observe bytes without loss?",
+        "What is wb_adr_i 3-bit pin representation for divisor overlap with THR RBR at 0-1 under DLAB and wb_sel_i usage under DATA_BUS_WIDTH_8?"
+      ],
+      "sequences": [
+        "t_uart_mon_bringup_seq",
+        "t_uart_mon_uart_rx_seq",
+        "t_uart_mon_tx_observe_seq",
+        "t_uart_mon_virt_seq"
+      ],
+      "checks": [],
+      "routes": [],
+      "coverage": []
+    },
+    "t_wb_top_seq": {
+      "understanding": "WISHBONE top sequence on wishbone_slave_interface_agent drives controlled register reads and writes within documented addresses 0-6 with DLAB gating, reusing init DLAB base; clock fixed per test, coverage sampled on completion.",
+      "completion": [
+        "Done when directed slots plus N controlled transactions all completed with monitor-sampled coverage and DLAB=0 idle cleanup",
+        "Bound by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+      ],
+      "questions": [
+        "What are documented legal masks and access types per WISHBONE address for random constraints?",
+        "What is wb_rst_i polarity and required deassert-to-first-write delay after reset before init and top traffic?",
+        "What are required wb_sel_i values, owners and tie-offs for 8-bit FIFO-only use, and inactive levels of wb_stb_i and wb_cyc_i that must be driven?",
+        "What are documented legal data values/masks per writable register (IER enables, LCR line bits, FCR trigger, MCR, THR, divisor LSB/MSB including whether divisor 0 is illegal) for constrained random?",
+        "What is explicit bus address representation for wb_adr_i pin values (3-bit vs 5-bit) and required handling of addr 7 which is illegal for 8-bit use?"
+      ],
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": [
+        "t_wb_top_seq_cg_dlab_divisor"
+      ]
+    },
+    "t_addr_dlab_cov": {
+      "understanding": "Cover WISHBONE pin address crossed with LCR DLAB gating for divisor versus normal aliasing at 0-1 plus normal 2-6 and illegal 7 sampled on ACK completion via wishbone_slave_interface monitor.",
+      "completion": [
+        "DONE when cg_cross_addr_dlab cross_addr_X_dlab bins addr0_dlab0_RBR_THR plus addr0_dlab1_DLL_SB plus addr1_dlab0_IER plus addr1_dlab1_DLM_SB plus addr2_to_6_dlab0_normal plus addr2_to_6_dlab1 SAMPLED and illegal addr_7_any_dlab disposition recorded",
+        "BOUND by TEST_TIMEOUT_CYCLES plus drain_cycles and request_timeout_cycles as TESTBENCH operational limits not DUT timing; TIMEOUT is testbench failure",
+        "CLEANUP leaves LCR DLAB 0 with wishbone bus idle-owned for traffic handoff; TERMINATE on coverage done or operational timeout"
+      ],
+      "questions": [
+        "What is active polarity of wb_rst_i required reset duration clock sampling edge for ACK reconstruction and must monitor flush in-flight versus flag reset-during-transfer as error?",
+        "What are documented WISHBONE handshake semantics: stability of wb_adr_i wb_we_i wb_sel_i wb_stb_i wb_cyc_i during transfer wb_ack_o single versus multi-cycle window wb_dat_o validity on reads and back-to-back handling?",
+        "What are wb_sel_i legal values in DATA_BUS_WIDTH_8 build is address representation pin values 0-6 versus offsets and what is handling of illegal pin address 7 and mismatched DLAB access at 0-1 with ACK and read data alias versus blocked?",
+        "What is expected read data for address 0 FIFO alias during gating given side-effect behavior should addr0 be coverage-only without data COMPARE and what masks apply to IER reserved bits and LCR bits 6-0 when programming DLAB?"
+      ],
+      "sequences": [
+        "t_addr_dlab_cov_seq"
+      ],
+      "checks": [],
+      "routes": [],
+      "coverage": []
+    },
+    "t_e2e_arch": {
+      "understanding": "Top-level scoreboard infrastructure traces WISHBONE THR writes to stx_pad_o TX to srx_pad_i RX to RBR reads plus architecture pending-request liveness; documented reset init serial-direction and IIR-pending bound checks; byte order preservation FIFO depth overrun handling and timeout values lack documented source and stay gated by questions so payload equality is collection-only until answered",
+      "completion": [
+        "Done when reset values COMPAREd plus normal and loopback bursts drained with queue tallies REPORTED and IIR pending COMPARE observed or TEST_TIMEOUT_CYCLES expires",
+        "Bound by drain_cycles and request_timeout_cycles as TESTBENCH operational limits not DUT timing",
+        "Cleanup disables scoreboard queues leaves DLAB 0 symbolic wishbone bus idle-owned and srx_pad_i idle-owned by uart_serial_data"
+      ],
+      "questions": [
+        "What documented FIFO depth and ordering guarantees define expected end-to-end queues for loss duplication misorder beyond allowed overrun?",
+        "What testbench drain_cycles and request_timeout_cycles operational limits detect deadlock livelock without assuming DUT timing?",
+        "What are actual wb_adr_i pin values for THR RBR IER FCR LCR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling under DATA_BUS_WIDTH_8?",
+        "What symbolic divisor LSB MSB nonzero values plus LCR line-format values plus FIFO trigger level plus IER bits bound normal versus loopback bring-up?",
+        "What uart_serial_data data_bits parity stop_bits bit_cycles settings must agree with LCR programming and divisor baud for TX observe and RX drive?",
+        "What is wb_rst_i polarity and required deassert to first write delay with clock period fixed per test?",
+        "What documented loopback data path and modem remapping defines expected routing for loopback compare versus normal STX to SRX wiring?"
+      ],
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": []
+    },
+    "t_ier_iir_pend": {
+      "understanding": "Verify IER bits 0-3 enable Received-Data THRE Receiver-Line-Status Modem-Status with 0 disabled 1 enabled via readback, and IIR bit0 0 pending 1 none correlated with passive int_o when enabled.",
+      "completion": [
+        "Done when reset entry plus all 16 IER enable combinations 0000b-1111b written/read via wishbone_slave_interface with at least one IER scoreboard comparison and at least one IIR-bit0 vs int_o scoreboard comparison observed",
+        "Bound by TEST_TIMEOUT_CYCLES plus drain_cycles flush as TESTBENCH operational limits, not DUT timing; stages execute in order, sequences within stage concurrent"
+      ],
+      "questions": [
+        "q_int_o: What is documented INT_O polarity and inactive level for correlating IIR bit0 0 pending versus 1 none with asserted versus negated INT_O?",
+        "q_reset: What is wb_rst_i active polarity, required reset duration in CLK cycles, and deassert-to-first-write delay for IER IIR checks?",
+        "q_addr: What is explicit wb_adr_i pin representation for IER address 1 and IIR reads and required handling of addr 7 illegal for 8-bit use?",
+        "q_bus_drive: What are required wb_sel_i values owners and tie-offs and inactive levels of wb_stb_i wb_cyc_i that must be driven for 8-bit FIFO-only register access?"
+      ],
+      "sequences": [],
+      "checks": [
+        "t_ier_iir_pend_chk_ier",
+        "t_ier_iir_pend_chk_reset",
+        "t_ier_iir_pend_chk_iir_mask"
+      ],
+      "routes": [
+        "t_ier_iir_pend_route_iir_int"
+      ],
+      "coverage": []
+    },
+    "t_line_err_cov": {
+      "understanding": "Deferred (quick testing): code_feature: work package too large; split this package",
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": [],
+      "questions": []
+    },
+    "t_lsr_status": {
+      "understanding": "Deferred (quick testing): code_feature: work package too large; split this package",
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": [],
+      "questions": []
+    },
+    "t_modem_irq": {
+      "understanding": "Verify modem status interrupt where CTS DSR RI DCD toggles set MSR deltas cleared by MSR read and assert INT_O with IIR Modem Status only when IER bit3 enabled checked in modem agent and top scoreboard in normal mode with DLAB 0",
+      "completion": [
+        "Done when IER disabled case shows MSR delta without int_o plus IER enabled cases show MSR delta with int_o and IIR 000 for each of CTS DSR RI DCD each with at least one scoreboard COMPARE",
+        "Bound by TEST_TIMEOUT_CYCLES plus drain_cycles and request_timeout_cycles operational limits where timeout is testbench limit not DUT timing",
+        "Cleanup restores MCR Loopback 0 and LCR DLAB 0 with wishbone bus idle owned for handoff"
+      ],
+      "questions": [
+        "What are confirmed wb_adr_i pin values for IER and IIR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling and reset release to first access delay",
+        "What is wb_rst_i polarity and int_o active polarity for assertion versus negation correlation with IIR bit0",
+        "What are inactive drive levels for cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i and tie off for srx_pad_i and idle ownership of wishbone bus during modem toggles",
+        "What exact IIR bits 3 to 1 and bit0 encoding must be observed for isolated Modem Status 000 versus concurrent higher priority RLS RDA Timeout THRE including bits 7 to 4",
+        "What MCR Loopback 0 versus 1 handling applies for normal external modem observation and are external modem inputs ignored in loopback when STX is held at 1"
+      ],
+      "sequences": [
+        "t_modem_irq_wb_bringup_seq",
+        "t_modem_irq_modem_toggle_seq",
+        "t_modem_irq_wb_clear_seq",
+        "t_modem_irq_virt_seq"
+      ],
+      "checks": [
+        "t_modem_irq_chk_iir",
+        "t_modem_irq_chk_e2e"
+      ],
+      "routes": [],
+      "coverage": [
+        "t_modem_irq_cov_delta",
+        "t_modem_irq_cov_ier",
+        "t_modem_irq_cov_iir"
+      ]
+    },
+    "t_top_virtual": {
+      "understanding": "Deferred (quick testing): code_feature: work package too large; split this package",
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": [],
+      "questions": []
+    },
+    "t_iir_prio_fixed": {
+      "understanding": "Deferred (quick testing): code_feature: work package too large; split this package",
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": [],
+      "questions": []
+    },
+    "t_irq_err_chk": {
+      "understanding": "Deferred (quick testing): code_feature: work package too large; split this package",
+      "sequences": [],
+      "checks": [],
+      "routes": [],
+      "coverage": [],
+      "questions": []
+    },
+    "t_modem_traffic_cov": {
+      "understanding": "Cover single-instance cross of Modem Status IIR 000 from CTS DSR RI DCD with concurrent serial traffic states idle tx_active rx_active tx_rx_active plus no_modem traffic sampled on IIR indication on clock edges during data flow",
+      "completion": [
+        "Done when bins modem_000_X_idle and modem_000_X_tx_active and modem_000_X_rx_active and modem_000_X_tx_rx_active and no_modem_X_traffic each hit at least once",
+        "Bound by TESTBENCH drain_cycles and request_timeout_cycles operational limits which are testbench limits not DUT timing",
+        "Cleanup returns wishbone_slave_interface to idle and srx_pad_i plus cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i to symbolic inactive for handoff"
+      ],
+      "questions": [
+        "What documented window defines tx_active versus rx_active versus idle concurrent with Modem Status IIR indication for sampling, including THR-write versus stx_pad_o versus srx_pad_i versus FIFO occupancy and cycle window?",
+        "What modem granularity defines modem_000 bin when multiple CTS DSR RI DCD deltas overlap or higher-priority RLS RDA Timeout THRE pending concurrently, and what defines no_modem_X_traffic versus no-pending versus other IIR code?",
+        "What serial data_bits parity stop_bits bit_cycles and divisor programming produce documented TX RX traffic for this cross?",
+        "What are wb_adr_i pin values for IER IIR MSR under DLAB 0, wb_sel_i handling, wb_rst_i polarity and release to first access delay, int_o polarity, and inactive drive levels for cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i plus srx_pad_i tie-off and wishbone idle ownership during concurrent traffic?",
+        "What MCR Loopback mode applies for normal external modem observation during data flow and are external modem inputs ignored in loopback?"
+      ],
+      "sequences": [
+        "t_modem_traffic_cov_wb_bringup_seq",
+        "t_modem_traffic_cov_wb_idle_observe_seq",
+        "t_modem_traffic_cov_wb_traffic_observe_seq",
+        "t_modem_traffic_cov_uart_idle_seq",
+        "t_modem_traffic_cov_uart_rx_seq",
+        "t_modem_traffic_cov_modem_toggle_seq",
+        "t_modem_traffic_cov_modem_idle_seq",
+        "t_modem_traffic_cov_virt_seq"
+      ],
+      "checks": [
+        "t_modem_traffic_cov_chk_pending",
+        "t_modem_traffic_cov_chk_fixed"
+      ],
+      "routes": [],
+      "coverage": [
+        "t_modem_traffic_cov_cg"
+      ]
+    }
+  },
+  "integration": {
+    "tests": [
+      {
+        "id": "test_basic",
+        "stages": [
+          [
+            "t_xz_check_seq_wb_idle",
+            "t_xz_check_seq_uart_idle",
+            "t_xz_check_seq_modem_idle"
+          ],
+          [
+            "t_reset_state_seq_lcr_reset"
+          ],
+          [
+            "t_wb_init_cfg_init_seq"
+          ],
+          [
+            "t_dlab_gate_chk_seq"
+          ],
+          [
+            "t_wb_reg_cov_directed_seq"
+          ],
+          [
+            "t_traffic_seq_wb_normal_seq",
+            "t_traffic_seq_uart_normal_seq",
+            "t_traffic_seq_modem_normal_seq"
+          ],
+          [
+            "t_traffic_seq_wb_loopback_seq",
+            "t_traffic_seq_modem_random_seq"
+          ],
+          [
+            "t_traffic_seq_normal_virt"
+          ],
+          [
+            "t_traffic_seq_loopback_virt"
+          ]
+        ],
+        "sequencer_settings": [
+          {
+            "variable": "t_wb_init_cfg_div_msb",
+            "value": 0
+          },
+          {
+            "variable": "t_wb_init_cfg_div_lsb",
+            "value": 1
+          },
+          {
+            "variable": "t_wb_init_cfg_fcr_byte",
+            "value": 192
+          },
+          {
+            "variable": "t_wb_init_cfg_ier_byte",
+            "value": 0
+          },
+          {
+            "variable": "t_wb_init_cfg_lcr_dlab1",
+            "value": 131
+          },
+          {
+            "variable": "t_wb_init_cfg_lcr_dlab0",
+            "value": 3
+          },
+          {
+            "variable": "t_dlab_gate_chk_lcr_dlab1",
+            "value": 131
+          },
+          {
+            "variable": "t_dlab_gate_chk_lcr_dlab0",
+            "value": 3
+          },
+          {
+            "variable": "t_dlab_gate_chk_div_lsb",
+            "value": 52
+          },
+          {
+            "variable": "t_dlab_gate_chk_div_msb",
+            "value": 18
+          },
+          {
+            "variable": "t_dlab_gate_chk_ier_pat",
+            "value": 15
+          },
+          {
+            "variable": "t_traffic_seq_ier_byte",
+            "value": 0
+          },
+          {
+            "variable": "t_traffic_seq_payload",
+            "value": 85
+          },
+          {
+            "variable": "t_traffic_seq_mcr_byte",
+            "value": 16
+          },
+          {
+            "variable": "t_traffic_seq_uart_byte",
+            "value": 85
+          },
+          {
+            "variable": "t_traffic_seq_modem_lvl",
+            "value": 0
+          }
+        ],
+        "seed": 1,
+        "drain_cycles": 2000,
+        "minimum_comparisons": 4,
+        "fact_ids": [
+          "f_wb_addr_1",
+          "f_wb_sel_1",
+          "f_wb_data_1",
+          "f_wb_hs_1",
+          "f_lcr_format",
+          "f_clk_1",
+          "f_mcr_rst_1",
+          "f_lcr_addr",
+          "f_init_dlab1",
+          "f_init_dlab0",
+          "f_init_divorder",
+          "f_init_fifotrig",
+          "f_init_ier",
+          "f_addr_lcr",
+          "f_addr_divlsb",
+          "f_addr_divmsb",
+          "f_addr_ier",
+          "f_addr_fcr",
+          "f_dlab_gate",
+          "f_fcr_trigdef",
+          "f_ier_bit0",
+          "f_ier_en",
+          "f_ier_dis",
+          "f_ier_reserved",
+          "f_dlab_one",
+          "f_dlab_zero",
+          "f_dlab_set",
+          "f_restore",
+          "f_dll_addr",
+          "f_dlm_addr",
+          "f_div_order_2",
+          "f_div_two_bytes",
+          "f_alias_block",
+          "f_ier_enable",
+          "t_wb_reg_cov_f_rbr_1",
+          "t_wb_reg_cov_f_thr_1",
+          "t_wb_reg_cov_f_ier_1",
+          "t_wb_reg_cov_f_iir_1",
+          "t_wb_reg_cov_f_fcr_1",
+          "t_wb_reg_cov_f_lcr_1",
+          "t_wb_reg_cov_f_mcr_1",
+          "t_wb_reg_cov_f_lsr_1",
+          "t_wb_reg_cov_f_msr_1",
+          "t_wb_reg_cov_f_bus8_1",
+          "f_lcr_dlab",
+          "f_ier_rda",
+          "f_mcr_loopback",
+          "f_mcr_map",
+          "f_mcr_dtr_rts"
+        ]
+      },
+      {
+        "id": "test_dlab_divisor",
+        "stages": [
+          [
+            "t_xz_check_seq_wb_idle",
+            "t_xz_check_seq_uart_idle",
+            "t_xz_check_seq_modem_idle"
+          ],
+          [
+            "t_wb_init_cfg_init_seq"
+          ],
+          [
+            "t_divisor_cov_seq"
+          ],
+          [
+            "t_dlab_gate_chk_seq"
+          ],
+          [
+            "t_addr_dlab_cov_seq"
+          ]
+        ],
+        "sequencer_settings": [
+          {
+            "variable": "t_wb_init_cfg_div_msb",
+            "value": 0
+          },
+          {
+            "variable": "t_wb_init_cfg_div_lsb",
+            "value": 1
+          },
+          {
+            "variable": "t_wb_init_cfg_fcr_byte",
+            "value": 192
+          },
+          {
+            "variable": "t_wb_init_cfg_ier_byte",
+            "value": 0
+          },
+          {
+            "variable": "t_wb_init_cfg_lcr_dlab1",
+            "value": 131
+          },
+          {
+            "variable": "t_wb_init_cfg_lcr_dlab0",
+            "value": 3
+          },
+          {
+            "variable": "t_divisor_cov_mid_low",
+            "value": 64
+          },
+          {
+            "variable": "t_divisor_cov_mid_high",
+            "value": 160
+          },
+          {
+            "variable": "t_dlab_gate_chk_lcr_dlab1",
+            "value": 131
+          },
+          {
+            "variable": "t_dlab_gate_chk_lcr_dlab0",
+            "value": 3
+          },
+          {
+            "variable": "t_dlab_gate_chk_div_lsb",
+            "value": 52
+          },
+          {
+            "variable": "t_dlab_gate_chk_div_msb",
+            "value": 18
+          },
+          {
+            "variable": "t_dlab_gate_chk_ier_pat",
+            "value": 15
+          },
+          {
+            "variable": "t_addr_dlab_cov_lcr_dlab1",
+            "value": 128
+          },
+          {
+            "variable": "t_addr_dlab_cov_lcr_dlab0",
+            "value": 0
+          },
+          {
+            "variable": "t_addr_dlab_cov_fcr_byte",
+            "value": 0
+          },
+          {
+            "variable": "t_addr_dlab_cov_mcr_byte",
+            "value": 0
+          },
+          {
+            "variable": "t_addr_dlab_cov_payload",
+            "value": 0
+          }
+        ],
+        "seed": 2,
+        "drain_cycles": 1000,
+        "minimum_comparisons": 2,
+        "fact_ids": [
+          "f_wb_addr_1",
+          "f_wb_sel_1",
+          "f_wb_data_1",
+          "f_wb_hs_1",
+          "f_lcr_format",
+          "f_clk_1",
+          "f_mcr_rst_1",
+          "f_init_dlab1",
+          "f_init_dlab0",
+          "f_init_divorder",
+          "f_addr_lcr",
+          "f_addr_divlsb",
+          "f_addr_divmsb",
+          "f_dlab_gate",
+          "f_lsb_addr",
+          "f_msb_addr",
+          "f_dlab_gating",
+          "f_dlab_bit",
+          "f_div_single",
+          "f_div_both",
+          "f_div_order",
+          "f_div_zero",
+          "f_dlab_restore",
+          "f_dlab_one",
+          "f_dlab_zero",
+          "f_div_two_bytes",
+          "f_div_order_2",
+          "f_alias_block",
+          "f_dlab_set",
+          "f_restore",
+          "f_ier_enable",
+          "f_ier_reserved",
+          "f_cross_alias",
+          "t_addr_dlab_cov_f_alias_blocked",
+          "t_addr_dlab_cov_f_addr7",
+          "t_wb_reg_cov_f_rbr_1",
+          "t_wb_reg_cov_f_thr_1",
+          "t_wb_reg_cov_f_ier_1",
+          "t_wb_reg_cov_f_lcr_1"
+        ]
+      }
+    ],
+    "questions": [
+      "What is fixed wb_clk_i period P_fixed value tolerance and hold requirement through reset configuration and traffic?",
+      "What is wb_rst_i active polarity async behavior hold duration scaled to P_fixed deassert to access delay and pending clear?",
+      "What are evidenced inactive idle tie_off levels and owners for wb_adr_i wb_dat_i wb_sel_i wb_we_i wb_stb_i wb_cyc_i srx_pad_i cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i and observed levels for wb_dat_o wb_ack_o stx_pad_o rts_pad_o dtr_pad_o int_o?",
+      "What is WISHBONE address representation as bus pin values for 0_to_6 normal versus 7 illegal with we sel cyc stb ack roles and DLAB alias at 0_1?",
+      "What is UART line format data_bits parity stop_bits from LCR programming and BIT_CYCLES derivation from programmed divisor for driver monitor agreement including MSB_first LSB_next order?",
+      "What is divisor to 16x baud mapping with zero combined disables versus nonzero enables and DLAB1 access versus DLAB0 normal alias behavior?",
+      "What is int_o active level and IIR bit0 pending plus bits3_1 codes for RLS RDA Timeout THRE Modem correlation under IER 0_to_3 enables with reserved zero and fixed bits?",
+      "What is MSR delta DCTS DDSR TERI DDCD set on CTS DSR RI DCD toggle and clear on MSR read plus Loopback1 internal remap versus normal complement behavior?",
+      "Deferred (quick testing): test test_uart_serial was left out: Test test_uart_serial starts t_modem_traffic_cov before dependency t_traffic_seq",
+      "Deferred (quick testing): test test_modem_irq was left out: Test test_modem_irq starts t_modem_irq before dependency t_traffic_seq"
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "level": "full_agent",
+  "reason": "DUT input srx_pad_i requires active driving and DUT output stx_pad_o requires observation with RS232 byte framing to external_device peer, so scaffold_only/utility tie-off and passive-only observe are insufficient. Full_agent provides driver plus monitor for bidirectional uart_frame_traffic coordinated with WISHBONE payload path. This architecture choice is inferred from documented ports/protocol and needs review.",
+  "responsibilities": [
+    "Own and drive srx_pad_i as active RS232 serial input stimulus",
+    "Observe stx_pad_o as DUT-driven RS232 serial output",
+    "Provide uart_serial_data_agent driver/monitor/sequencer for TX/RX byte framing transactions",
+    "Model bidirectional external_device peer connectivity for serial link",
+    "Coordinate with wishbone_slave_interface payload movement without implementing scoreboard or tests"
+  ],
+  "coverage": false,
+  "facts": [
+    {
+      "id": "f_stx_port",
+      "statement": "STX_PAD_O is a 1-bit DUT output defined as The serial output signal",
+      "source_id": "CH-98be4510fb",
+      "quote": "STX_PAD_O 1 Output The serial output signal",
+      "plan_pointer": "/interfaces/groups/4/signals/0"
+    },
+    {
+      "id": "f_srx_port",
+      "statement": "SRX_PAD_I is a 1-bit DUT input defined as The serial input signal",
+      "source_id": "CH-98be4510fb",
+      "quote": "SRX_PAD_I 1 Input The serial input signal",
+      "plan_pointer": "/interfaces/groups/4/signals/1"
+    },
+    {
+      "id": "f_function",
+      "statement": "uart_serial_data function is UART serial transmit and receive data lines using STX_PAD_O and SRX_PAD_I",
+      "source_id": "CH-98be4510fb",
+      "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/function"
+    },
+    {
+      "id": "f_protocol",
+      "statement": "uart_serial_data protocol is RS232 over serial cable",
+      "source_id": "CH-2baa4497c0",
+      "quote": "like another computer using a serial cable and RS232 protocol.",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/protocol"
+    },
+    {
+      "id": "f_peer",
+      "statement": "uart_serial_data connects to modem or other external devices for serial communication",
+      "source_id": "CH-2baa4497c0",
+      "quote": "which allow communication with modem or other external\ndevices, like another computer using a serial cable and RS232 protocol.",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/connected_to"
+    },
+    {
+      "id": "f_category",
+      "statement": "UART core provides serial communication capabilities for this interface",
+      "source_id": "CH-2baa4497c0",
+      "quote": "The UART (Universal Asynchronous Receiver/Transmitter) core provides serial\ncommunication capabilities",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/category"
+    }
+  ],
+  "questions": [
+    "For uart_serial_data srx_pad_i/stx_pad_o: documented sources confirm RS232 external-device link and input/output directions but do not specify frame parameters and divisor-to-baud sampling reference; what baud/frame configuration should the full_agent use to drive SRX and reconstruct STX bytes and coordinate with WISHBONE payload in later phases?"
+  ],
+  "review_status": "NEEDS_REVIEW",
+  "provenance": "INFERRED_IMPLEMENTATION_CHOICE"
+}

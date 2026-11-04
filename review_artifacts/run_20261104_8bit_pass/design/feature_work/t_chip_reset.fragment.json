@@ -1,0 +1,92 @@
+{
+  "sequencer_variables": [],
+  "registers": [],
+  "facts": [
+    {
+      "id": "t_chip_reset_f_reset_async",
+      "statement": "WB_RST_I is asynchronous reset input for UART core",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_RST_I 1 Input Asynchronous Reset",
+      "plan_pointer": "/interfaces/groups/2/property_evidence/function"
+    },
+    {
+      "id": "t_chip_reset_f_shift_clear",
+      "statement": "After reset receiver and transmitter shift registers are cleared",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter shift registers are cleared",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "t_chip_reset_f_div_zero",
+      "statement": "After reset Divisor Latch register is set to 0",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Divisor Latch register is set to 0.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "t_chip_reset_f_lcr_default",
+      "statement": "After reset Line Control Register is 8 bits no parity 1 stop bit",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Line Control Register is set to communication of 8 bits of data, no parity, 1",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "t_chip_reset_f_ier_disable",
+      "statement": "After reset all interrupts are disabled in Interrupt Enable Register",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "All interrupts are disabled in the Interrupt Enable Register.",
+      "plan_pointer": "/sections/8/entries/1"
+    }
+  ],
+  "sequences": [],
+  "routes": [],
+  "checks": [],
+  "hooks": [],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "Which common clock UVC starts stable fixed-period clock on wb_clk_i with symbolic period P_fixed held fixed through reset with no dynamic switching? No clock agent in shared_agents, base clock_generate from t_clk_seq not yet defined, and nominal P_fixed undocumented with only labels 3.6864 for 115200 bps and 1258Mhz for 1200 bps and Max Min Resolution unresolved."
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [],
+      "question": "What testbench stabilization limit in observed wb_clk_i edges defines stable clock before reset, and which common clock monitor samples edges? Stabilization count is testbench choice not documented DUT timing."
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [],
+      "question": "Which common reset UVC asserts reset on wb_rst_i with period-scaled duration, and what is documented active level polarity and minimum assert cycles? Excerpt states only Asynchronous Reset with no polarity and no cycles; quick-test-only active-high 10-cycle hold is testbench choice not documented requirement."
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [],
+      "question": "Which common monitors sample wb_rst_i assertion and wb_clk_i edges to track reset duration to symbolic P_fixed with no DUT timing requirement? Requires observation only before any configuration."
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [],
+      "question": "Which common reset UVC deasserts reset on wb_rst_i to complementary inactive level, and what is documented inactive level? Excerpt states only Asynchronous Reset with no polarity."
+    },
+    {
+      "step": "stimulus_steps/5",
+      "component_ids": [],
+      "question": "What documented deassert-to-configuration delay defines post-reset stabilization on wb_clk_i edges before init_config_sequence, and which common coordination orders cleanup to configuration stage after t_clk_seq clock_generate and reset_drive? Delay undocumented."
+    },
+    {
+      "step": "stimulus_steps/6",
+      "component_ids": [],
+      "question": "What testbench operational value for TEST_TIMEOUT_CYCLES aborts bring-up if reset not completed, with ordering after t_clk_seq? Timeout is testbench limit not DUT timing."
+    }
+  ],
+  "questions": [
+    "Which common clock UVC starts stable fixed-period clock on wb_clk_i with symbolic period P_fixed held fixed through reset with no dynamic switching? No clock agent in shared_agents, base clock_generate from t_clk_seq not yet defined, and nominal P_fixed undocumented with only labels 3.6864 for 115200 bps and 1258Mhz for 1200 bps and Max Min Resolution unresolved.",
+    "What testbench stabilization limit in observed wb_clk_i edges defines stable clock before reset, and which common clock monitor samples edges? Stabilization count is testbench choice not documented DUT timing.",
+    "Which common reset UVC asserts reset on wb_rst_i with period-scaled duration, and what is documented active level polarity and minimum assert cycles? Excerpt states only Asynchronous Reset with no polarity and no cycles; quick-test-only active-high 10-cycle hold is testbench choice not documented requirement.",
+    "Which common monitors sample wb_rst_i assertion and wb_clk_i edges to track reset duration to symbolic P_fixed with no DUT timing requirement? Requires observation only before any configuration.",
+    "Which common reset UVC deasserts reset on wb_rst_i to complementary inactive level, and what is documented inactive level? Excerpt states only Asynchronous Reset with no polarity.",
+    "What documented deassert-to-configuration delay defines post-reset stabilization on wb_clk_i edges before init_config_sequence, and which common coordination orders cleanup to configuration stage after t_clk_seq clock_generate and reset_drive? Delay undocumented.",
+    "What testbench operational value for TEST_TIMEOUT_CYCLES aborts bring-up if reset not completed, with ordering after t_clk_seq? Timeout is testbench limit not DUT timing."
+  ]
+}

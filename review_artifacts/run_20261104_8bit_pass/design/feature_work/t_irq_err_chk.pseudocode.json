@@ -1,0 +1,183 @@
+{
+  "understanding": "Feature t_irq_err_chk checks int_o matches enabled IER sources with IIR highest-priority reporting and reset control plus LSR OE PE FE BI set per RX condition generating RLS interrupt cleared on LSR read. Entries 10-11 are QUICK_TEST inferred only not engineer approval. Depends on deferred t_lsr_status and passive t_irq_baud_mon int_o observation. Uses wishbone_slave_interface for register access uart_serial_data for RX error injection interrupt_output passive for int_o modem_control_if owned or tied off. Clock and reset are common UVCs.",
+  "preconditions": [
+    "Clock runs at symbolic P_fixed; reset driven via reset with symbolic polarity and duration; expect IIR reset C1h no-pending [f_iir_reset f_iir_pend1]",
+    "DUT in DATA_BUS_WIDTH_8 FIFO-only mode; divisor and LCR line format programmed via wishbone_slave_interface to symbolic SYM_DIVISOR SYM_LCR matching uart_serial_data data_bits parity stop_bits bit_cycles",
+    "Input ownership on physical ports: wishbone_slave_interface owns wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i; uart_serial_data owns srx_pad_i; modem_control_if owns or ties off cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i; clock owns wb_clk_i; reset owns wb_rst_i; observe wb_dat_o wb_ack_o int_o stx_pad_o rts_pad_o dtr_pad_o; addresses are actual wb_adr_i pin values",
+    "interrupt_output passively observes int_o; wishbone reads observe IIR LSR; no driver forces int_o; entries 10 and 11 remain quick-test inferred only",
+    "Symbolic addresses SYM_ADDR_IER SYM_ADDR_IIR SYM_ADDR_LSR SYM_ADDR_RBR SYM_ADDR_THR SYM_ADDR_MSR and symbolic enables; LSR IER resets unknown null"
+  ],
+  "stimulus_steps": [
+    "STAGE bringup: WAIT reset release; program SYM_DIVISOR SYM_LCR via wishbone_slave_interface; configure uart_serial_data to same data_bits parity stop_bits bit_cycles; READ IIR at SYM_ADDR_IIR to confirm C1h no-pending [f_iir_reset f_iir_pend1 f_int_single]",
+    "STAGE rls_inject: FOR err IN [overrun parity framing break]: IF err==overrun THEN fill RX FIFO via uart_serial_data then send extra char into shift register [f_oe_set]; IF err==parity THEN send char with inverted parity [f_pe_set]; IF err==framing THEN send char without valid stop [f_fe_set]; IF err==break THEN hold srx_pad_i at 0 for one char time [f_bi_set]",
+    "After each injection: WAIT RX complete; SAMPLE int_o via interrupt_output; READ LSR at SYM_ADDR_LSR via wishbone_slave_interface; READ IIR at SYM_ADDR_IIR [f_iir_highest f_iir_pend0 f_iir_rls f_lsr_clr_rls f_bi_clr]",
+    "STAGE priority_overlap: WRITE symbolic IER to enable RLS plus lower sources; create concurrent pending with RLS error plus THRE RDA timeout modem where reachable; READ IIR to observe highest priority 011 over 010_110 over 001 over 000 [f_iir_rls f_iir_rda f_iir_timeout f_iir_thre_src f_iir_thre_rst f_iir_modem]",
+    "STAGE reset_actions: apply documented resets: READ LSR for RLS [f_iir_rls f_lsr_clr_rls f_bi_clr]; WAIT FIFO drop below trigger for RDA [f_iir_rda]; READ RBR for timeout [f_iir_timeout]; WRITE THR or READ IIR for THRE [f_iir_thre_rst]; READ MSR for modem [f_iir_modem]; re-READ IIR to confirm next priority or no-pending",
+    "Cleanup: program symbolic FIFO reset; return srx_pad_i to idle; leave modem inputs tied off"
+  ],
+  "check_steps": [
+    "COMPARE int_o asserted exactly when pending source enabled by symbolic IER and IIR bit0==0; int_o negated when IIR bit0==1; FAIL on spurious or missing [f_int_single f_iir_pend0 f_iir_pend1 f_iir_highest]",
+    "COMPARE IIR bits 3-1 highest priority 011 RLS first over 010/110 second over 001 third over 000 fourth; FAIL on mis-prioritized; COMPARE fixed bits 7-6==11 and 5-4==00 [f_iir_rls f_iir_rda f_iir_timeout f_iir_thre_src f_iir_modem f_iir_fixed67 f_iir_fixed45]",
+    "COMPARE LSR OE set iff FIFO full plus extra char in shift register; PE set iff top char parity error; FE set iff top char no valid stop; BI set iff break hold 0 for one char time [f_oe_set f_pe_set f_fe_set f_bi_set]",
+    "COMPARE OE PE FE BI generate Receiver Line Status interrupt with IIR 011; FAIL on lost or aliased indication [f_iir_rls f_lsr_clr_rls f_bi_clr]",
+    "COMPARE OE PE FE BI cleared upon LSR read; RLS reset by LSR read advances IIR to next pending or to 1 no-pending; FAIL on sticky [f_lsr_clr_rls f_bi_clr f_iir_rls f_iir_pend1]",
+    "COMPARE THRE RDA timeout modem resets only as documented; use operational timeouts as testbench limits not DUT timing [f_iir_rda f_iir_timeout f_iir_thre_rst f_iir_modem]"
+  ],
+  "coverage_steps": [
+    "SAMPLE cg_iir_interrupt cp_iir_pending pending_0 no_pending_1 on every IIR read completion via wishbone monitor tap [f_iir_pend0 f_iir_pend1]",
+    "SAMPLE cp_iir_code 011_rls 010_rda 110_timeout 001_thre 000_modem and illegal 100_101_111 on same tap; SAMPLE cp_iir_fixed 76_11 and 54_00 [f_iir_rls f_iir_rda f_iir_timeout f_iir_thre_src f_iir_modem f_iir_fixed67 f_iir_fixed45]",
+    "SAMPLE each LSR error assertion OE PE FE BI on LSR read via wishbone monitor tap; SAMPLE RLS assertion and clearing via interrupt_output monitor tap [f_oe_set f_pe_set f_fe_set f_bi_set f_lsr_clr_rls f_bi_clr]",
+    "Dedicated subscribers tap monitor analysis ports; drivers never supply coverage; virtual spawn only with no VIFs or delays"
+  ],
+  "completion": [
+    "End after each RLS kind observed set plus RLS interrupt plus clear-on-read and priority overlap with reset sequence done plus drain_cycles flush",
+    "Abort on request_timeout_cycles operational limit; timeout is testbench limit not DUT timing",
+    "Require at least one scoreboard comparison per test; basic single-error functional test first then overlap tests"
+  ],
+  "facts": [
+    {
+      "id": "f_iir_highest",
+      "statement": "IIR returns current highest priority pending interrupt",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "The IIR enables the programmer to retrieve what is the current highest priority pending",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_iir_pend0",
+      "statement": "IIR bit0 0 means interrupt pending",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_iir_pend1",
+      "statement": "IIR bit0 1 means no interrupt pending",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "When it\u2019s \u20181\u2019 \u2013 no interrupt\nis pending.",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_iir_rls",
+      "statement": "IIR 011 is 1st priority Receiver Line Status for parity overrun framing break reset by reading LSR",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Parity, Overrun or Framing\nerrors or Break Interrupt\nReading the Line\nStatus Register",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_iir_rda",
+      "statement": "IIR 010 Receiver Data Available source FIFO trigger reached reset when FIFO drops below trigger",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "FIFO trigger level reached FIFO drops below\ntrigger level",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_iir_timeout",
+      "statement": "IIR 110 Timeout source at least 1 char in FIFO with no input or read for 4 char times reset by reading Receiver Buffer Register",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "There\u2019s at least 1 character\nin the FIFO but no character\nhas been input to the FIFO\nor read from it for the last 4\nChar times.\nReading from the\nFIFO (Receiver\nBuffer Register)",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_iir_thre_src",
+      "statement": "IIR 001 source is Transmitter Holding Register Empty",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Transmitter Holding\nRegister Empty",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_iir_thre_rst",
+      "statement": "IIR 001 THRE reset is writing Transmitter Holding Register or reading IIR",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Writing to the\nTransmitter Holding\nRegister or reading\nIIR.",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_iir_modem",
+      "statement": "IIR 000 Modem Status source CTS DSR RI DCD reset by reading modem status register",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "CTS, DSR, RI or DCD. Reading the Modem\nstatus register.",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_iir_fixed67",
+      "statement": "IIR bits 7-6 are 1 for compatibility",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 6 and 7: Logic \u20181\u2019 for compatibility reason.",
+      "plan_pointer": "/sections/9/entries/2"
+    },
+    {
+      "id": "f_iir_fixed45",
+      "statement": "IIR bits 5-4 are 0",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 4 and 5: Logic \u20180\u2019.",
+      "plan_pointer": "/sections/9/entries/2"
+    },
+    {
+      "id": "f_iir_reset",
+      "statement": "IIR reset value is C1h no pending",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Reset Value: C1h",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_int_single",
+      "statement": "UART core provides single int_o interrupt output observed passively",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "The core requires one interrupt.",
+      "plan_pointer": "/sections/4/strategy/agents/3"
+    },
+    {
+      "id": "f_oe_set",
+      "statement": "LSR OE set when FIFO full and another char received in shift register",
+      "source_id": "CH-a2dd758e55",
+      "quote": "If the FIFO is full and another character has been\nreceived in the receiver shift register.",
+      "plan_pointer": "/registers/registers/9/fields/1"
+    },
+    {
+      "id": "f_pe_set",
+      "statement": "LSR PE set when top FIFO char received with parity error",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The character that is currently at the top of the FIFO\nhas been received with parity error.",
+      "plan_pointer": "/registers/registers/9/fields/2"
+    },
+    {
+      "id": "f_fe_set",
+      "statement": "LSR FE set when top FIFO char did not have valid stop bit",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The received character at the top of the FIFO did not\nhave a valid stop bit.",
+      "plan_pointer": "/registers/registers/9/fields/3"
+    },
+    {
+      "id": "f_bi_set",
+      "statement": "LSR BI break when line held 0 for one char time start plus data plus parity plus stop",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The break occurs when the line is held in logic 0 for a\ntime of one character (start bit + data + parity + stop bit).",
+      "plan_pointer": "/registers/registers/9/fields/4"
+    },
+    {
+      "id": "f_bi_clr",
+      "statement": "LSR BI cleared on read generates Receiver Line Status interrupt",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The bit is cleared upon\nreading from the register. Generates Receiver Line Status interrupt.",
+      "plan_pointer": "/registers/registers/9/fields/4"
+    },
+    {
+      "id": "f_lsr_clr_rls",
+      "statement": "LSR OE cleared on read generates Receiver Line Status interrupt with PE FE same clear on read",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The bit is cleared upon reading from the register.\nGenerates Receiver Line Status interrupt.",
+      "plan_pointer": "/sections/8/entries/6"
+    }
+  ],
+  "questions": [
+    "What are documented IER bit assignments mapping RLS RDA Timeout THRE Modem enables to INT_O gating?",
+    "What are actual wb_adr_i pin values for IER IIR LSR RBR THR FCR LCR DLL DLM MSR accesses?",
+    "What is documented INT_O polarity and inactive level for assertion versus deassertion?",
+    "What is active level polarity of wb_rst_i and required reset duration in clock cycles to clear IIR LSR pending?",
+    "What is nominal fixed clock period P_fixed for timestamping INT_O IIR LSR events?",
+    "What are documented divisor LCR and FIFO trigger programming values and matching uart_serial_data data_bits parity stop_bits bit_cycles for each error injection?",
+    "What are FIFO depth and fill counts for overrun and hold duration in char times for break injection?",
+    "What are documented reset values for LSR and IER; is unknown reset null?"
+  ],
+  "blockers": []
+}

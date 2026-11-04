@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "reason": "",
+  "binary": "/proj/work/silicon_copilot/dv_agent/.e2e-bin/xezim",
+  "version": "xezim version 0.11.3\ngit 058f2bb (2026-10-23T17:05:55-07:00)\ntag 0.11.3",
+  "uvm": "/proj/work/silicon_copilot/dv_agent/.deps/uvm-core-2020.3.1/src/uvm_pkg.sv",
+  "error_exit": true,
+  "code_coverage": true,
+  "waveform": true,
+  "log": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code/a7836a4101734528/compile.log",
+  "fingerprint": "a7836a4101734528f402bdca7759be27fd2e950eea5a5279031503e8c36b0a3axezim version 0.11.3\ngit 058f2bb (2026-10-23T17:05:55-07:00)\ntag 0.11.3/proj/work/silicon_copilot/dv_agent/.deps/uvm-core-2020.3.1/src/uvm_pkg.sv"
+}

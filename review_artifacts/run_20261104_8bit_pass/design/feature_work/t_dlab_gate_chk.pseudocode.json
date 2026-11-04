@@ -1,0 +1,182 @@
+{
+  "understanding": "Verify DLAB gating on wishbone_slave_interface with RTL ports wb_adr_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_sel_i using pin values 0 1 3: divisor LSB and MSB at 0 and 1 accessible only when LCR bit7 is 1 and normal at 0 and 1 only when 0 with alias-toggle reads and RW compares at addr1 plus cross coverage; depends on monitor reconstruction and init divisor then clear programming; QUICK_TEST_PLAN_APPROVAL intentions stay INFERRED and spec-to-RTL map is reused with only DOCUMENTED facts constraining behavior.",
+  "preconditions": [
+    "PRE_RESET_CLOCK: After reset driven via reset with clock running at fixed period per test; monitor flushes in-flight on reset and emits only completed ACK transactions; reset polarity and duration per questions with no invented level [f_post_reset f_div_reset_zero]",
+    "PRE_BIND: Canonical wishbone roles map to RTL ports wb_adr_i_2_0 wb_dat_i_7_0 wb_dat_o_7_0 wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_sel_i with UART_DATA_WIDTH 8 UART_ADDR_WIDTH 3 DATA_BUS_WIDTH_8; write and read addresses are bus pin values 0 1 3 not offsets [f_lcr_addr f_rbr_addr f_dll_addr f_dlm_addr]",
+    "PRE_OWNERSHIP: wishbone_slave_interface agent drives wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i and observes wb_dat_o wb_ack_o; interrupt_output observes int_o; uart_serial_data holds srx_pad_i and stx_pad_o idle; modem_control_if holds cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i rts_pad_o dtr_pad_o idle; no handshake or flow-control inactive levels invented",
+    "PRE_BASELINE: Post-reset LCR 00000011b divisor 0 IER 00h with FIFOs cleared; init programming completed MSB-first LSB-next with DLAB 1 then cleared to 0 leaving DLAB 0 and bus idle-owned for gating handoff [f_lcr_reset f_div_reset_zero f_ier_reset f_div_order f_restore]",
+    "PRE_MONITOR: Wishbone monitor samples on clock edges and reconstructs completed reads and writes on ACK assertion for analysis port to checker scoreboard and coverage"
+  ],
+  "stimulus_steps": [
+    "STIM_WAIT_START: WAIT reset deassert via reset; WAIT bus idle-owned; START wishbone monitor to reconstruct ACK completions",
+    "STIM_BASIC_DLAB1: WRITE LCR pin 3 data SYM_LCR_DLAB1 with bit7 1 from documented baseline via wishbone_slave_interface; WAIT ACK [f_lcr_addr f_dlab_one f_dlab_set]",
+    "STIM_BASIC_DIV_PROG: WRITE pin 1 data SYM_DIV_MSB then WRITE pin 0 data SYM_DIV_LSB MSB-first LSB-next via same agent; WAIT ACK each [f_dll_addr f_dlm_addr f_div_order f_div_two_bytes]",
+    "STIM_BASIC_DIV_READ: READ pin 1 and pin 0 with DLAB 1 via same agent; HOLD data for CHECK_DIV_DLAB1; WAIT ACK",
+    "STIM_BASIC_DLAB0: WRITE LCR pin 3 data SYM_LCR_DLAB0 with bit7 0 via same agent; WAIT ACK [f_dlab_zero f_restore]",
+    "STIM_BASIC_IER: WRITE pin 1 data SYM_IER_PATTERN with bits 3-0 documented enables and bits 7-4 zero via same agent; WAIT ACK; READ pin 1 with DLAB 0 via same agent; HOLD for CHECK_IER_DLAB0 [f_ier_enable f_ier_reserved]",
+    "STIM_TOGGLE: WRITE LCR DLAB 1; READ pin 1 for divisor alias; WRITE LCR DLAB 0; READ pin 1 for normal alias; FOR documented IER enable sweep repeat IER write and read with DLAB 0; WAIT ACK each",
+    "STIM_CLEANUP: LEAVE LCR DLAB 0; WAIT bus idle-owned; FLUSH in-flight; END stimulus"
+  ],
+  "check_steps": [
+    "CHECK_DIV_DLAB1: COMPARE divisor reads at pin 0 and 1 with written SYM_DIV_LSB and SYM_DIV_MSB mask 0xFF when DLAB equals 1; FAIL on data mismatch [f_dlab_one f_dll_addr f_dlm_addr f_div_order]",
+    "CHECK_IER_DLAB0: COMPARE IER read at pin 1 with SYM_IER_PATTERN mask 0x0F for bits 3-0 plus reserved check 0xF0 equals 0 when DLAB equals 0; FAIL on mismatch [f_dlab_zero f_ier_enable f_ier_reserved]",
+    "CHECK_ALIAS_TOGGLE: COMPARE toggle proof that pin 1 read with DLAB 1 equals divisor and not normal and pin 1 read with DLAB 0 equals normal and not divisor; FAIL on unexpected acceptance or alias leakage [f_alias_block f_dlab_set f_restore]",
+    "CHECK_PROTOCOL_CLASS: ASSERT on each completed ACK transaction at pin 0 and 1 that alias class matches DLAB context, pin 0 DLAB1 is DLL and DLAB0 is RBR_THR, pin 1 DLAB1 is DLM and DLAB0 is IER; FAIL on class mismatch [f_alias_block f_rbr_addr f_dll_addr f_dlm_addr]",
+    "CHECK_PLUMBING: CHECK sampled wishbone pins never X or Z in ACK window and known after reset as infrastructure, not DUT oracle"
+  ],
+  "coverage_steps": [
+    "COV_CROSS_DLAB: SAMPLE cg_cross_addr_dlab cross_addr_X_dlab bins addr0_dlab0_RBR_THR addr0_dlab1_DLL addr1_dlab0_IER addr1_dlab1_DLM addr2_to_6 normal illegal addr_7 on each WB_ACK_O completion via dedicated subscriber tapping wishbone monitor analysis port; drivers never supply coverage [f_cross_alias f_rbr_addr f_dll_addr f_dlm_addr]",
+    "COV_DIV_BYTES: SAMPLE rc_divisor_bytes cp_divisor_value for LSB and MSB values on divisor-byte write completion with DLAB 1, ignore DLAB 0, via same subscriber [f_div_two_bytes f_div_msb_desc]",
+    "COV_ASSERT: PROVIDE property and activation covers for DLAB gating assertion"
+  ],
+  "completion": [
+    "DONE when LCR DLAB1 plus MSB-first plus LSB-next plus divisor reads plus LCR DLAB0 plus IER write plus IER read plus alias toggle reads all ACKed and COMPAREs pass and cross plus divisor coverage SAMPLED",
+    "BOUND by TEST_TIMEOUT_CYCLES plus drain_cycles and request_timeout_cycles as TESTBENCH operational limits not DUT timing; TIMEOUT is testbench failure",
+    "CLEANUP leaves LCR DLAB 0 with wishbone bus idle-owned for traffic handoff; TERMINATE on traffic done or operational timeout"
+  ],
+  "facts": [
+    {
+      "id": "f_dlab_one",
+      "statement": "LCR bit 7 equals 1 means divisor latches can be accessed",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "\u20181\u2019 \u2013 The divisor latches can be accessed",
+      "plan_pointer": "/registers/registers/7/fields/6"
+    },
+    {
+      "id": "f_dlab_zero",
+      "statement": "LCR bit 7 equals 0 means normal registers are accessed",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "\u20180\u2019 \u2013 The normal registers are accessed",
+      "plan_pointer": "/registers/registers/7/fields/6"
+    },
+    {
+      "id": "f_lcr_addr",
+      "statement": "Line Control Register is at pin address 3 width 8 RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Line Control Register 3 8 RW Control connection",
+      "plan_pointer": "/registers/registers/7"
+    },
+    {
+      "id": "f_lcr_reset",
+      "statement": "LCR reset is 00000011b",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "Reset Value: 00000011b",
+      "plan_pointer": "/registers/registers/7"
+    },
+    {
+      "id": "f_div_two_bytes",
+      "statement": "Divisor is two bytes forming one 16-bit register",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The 2 bytes form one 16-bit register, which is",
+      "plan_pointer": "/registers/registers/13"
+    },
+    {
+      "id": "f_div_reset_zero",
+      "statement": "Divisor reset is 0 which disables serial I/O",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The register is set to the default value of 0 on reset, which",
+      "plan_pointer": "/registers/registers/13"
+    },
+    {
+      "id": "f_div_order",
+      "statement": "Divisor order is MSB first LSB last with counter starting on LSB write",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "write the MSB first and the LSB last.",
+      "plan_pointer": "/sections/1/entries/9"
+    },
+    {
+      "id": "f_alias_block",
+      "statement": "When DLAB is 1 the registers at addresses 0-1 cannot be accessed as normal",
+      "source_id": "CH-f88915355b",
+      "quote": "At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/registers/registers/1"
+    },
+    {
+      "id": "f_dlab_set",
+      "statement": "Divisor latches are accessed by setting LCR bit 7 to 1",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The divisor latches can be accessed by setting the 7th bit of LCR to \u20181\u2019.",
+      "plan_pointer": "/sections/1/entries/9"
+    },
+    {
+      "id": "f_restore",
+      "statement": "Restoring bit to 0 restores access to other registers at same addresses",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "restore this bit to \u20180\u2019 after setting the divisor latches in order to restore access to the other",
+      "plan_pointer": "/sections/1/entries/9"
+    },
+    {
+      "id": "f_rbr_addr",
+      "statement": "Receiver Buffer normal register is at pin address 0 width 8 read-only",
+      "source_id": "CH-f88915355b",
+      "quote": "Receiver Buffer 0 8 R Receiver FIFO output",
+      "plan_pointer": "/registers/registers/1"
+    },
+    {
+      "id": "f_dll_addr",
+      "statement": "Divisor LSB byte is at pin address 0 RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 1 (LSB) 0 8 RW The LSB of the divisor",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "f_dlm_addr",
+      "statement": "Divisor MSB byte is at pin address 1 RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 2 1 8 RW The MSB of the divisor",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "f_ier_enable",
+      "statement": "IER allows enabling and disabling interrupt generation",
+      "source_id": "CH-de51b2eafc",
+      "quote": "This register allows enabling and disabling interrupt generation by the UART.",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_reserved",
+      "statement": "IER bits 7-4 reserved should be logic 0",
+      "source_id": "CH-de51b2eafc",
+      "quote": "7-4 RW Reserved. Should be logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_reset",
+      "statement": "IER reset is 00h",
+      "source_id": "CH-de51b2eafc",
+      "quote": "Reset Value: 00h",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_post_reset",
+      "statement": "After reset all interrupts are disabled",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "All interrupts are disabled in the Interrupt Enable Register.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_cross_alias",
+      "statement": "Divisor versus normal aliasing at 0-1 is gated by DLAB",
+      "source_id": "CH-f88915355b",
+      "quote": "The registers can be accessed when the 7th (DLAB) bit of the Line Control Register is set",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "f_div_msb_desc",
+      "statement": "Divisor MSB byte coverage is from programmed value with DLAB set",
+      "source_id": "CH-f88915355b",
+      "quote": "The MSB of the divisor",
+      "plan_pointer": "/sections/9/entries/9"
+    }
+  ],
+  "questions": [
+    "What is documented normal versus divisor alias map at pin addresses 0-1 under DLAB 0 versus 1, confirming normal addr0 RBR_R versus THR_W and addr1 IER_RW versus divisor LSB_RW at 0 MSB_RW at 1, and is mismatched access an alias return versus blocked or ignored with what ACK and read data?",
+    "What is active level polarity of wb_rst_i, required reset duration in clock cycles, and must monitor flush in-flight versus flag reset-during-transfer as error, and what is clock sampling edge for ACK reconstruction given fixed period per test?",
+    "What are documented WISHBONE handshake semantics for reconstruction: stability of wb_adr_i wb_we_i wb_sel_i wb_stb_i wb_cyc_i during transfer, wb_ack_o single versus multi-cycle window, wb_dat_o validity on reads, and back-to-back handling?",
+    "What is documented wb_sel_i legal values in DATA_BUS_WIDTH_8 build, address representation as pin values 0-6 versus offsets, and handling of illegal pin address 7?",
+    "What symbolic divisor LSB and MSB values form legal nonzero divisor for bring-up, is divisor zero illegal beyond reset disabling serial I/O, and is MSB-first LSB-last order mandatory given counter starts on LSB write?",
+    "What LCR bits 6-0 line parameters must accompany DLAB 1 then 0 during gating check, and what comparison masks apply to IER reserved bits 7-4 versus enables 3-0?",
+    "What is expected read data for address 0 FIFO alias during gating given side-effect behavior, and should address 0 be coverage-only without data COMPARE with simple RW mirror limited to address 1 IER versus DLM?"
+  ],
+  "blockers": []
+}

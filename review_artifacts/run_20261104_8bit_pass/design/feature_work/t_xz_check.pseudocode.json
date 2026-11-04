@@ -1,0 +1,135 @@
+{
+  "understanding": "Monitor-level X/Z protocol check: error on X/Z sampled on WISHBONE serial modem and interrupt signals plus reset-known non-X/Z check after wb_rst_i deassertion; depends on reset bring-up and transaction monitors; uses RTL port names for code and spec references for behavior.",
+  "preconditions": [
+    "Clock on wb_clk_i stable at symbolic P_fixed before any reset or sampling",
+    "Reset on wb_rst_i asserted to symbolic RST_ACTIVE then deasserted before configuration as first test step",
+    "Monitors for wishbone_slave_interface uart_serial_data modem_control_if and interrupt_output active through reset until test end",
+    "All DUT inputs owned to avoid testbench Z: wishbone_slave_interface drives wb_adr_i wb_dat_i wb_sel_i wb_we_i wb_stb_i wb_cyc_i and uart_serial_data drives srx_pad_i and modem_control_if drives cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i; clock and reset driven by testbench"
+  ],
+  "stimulus_steps": [
+    "START clock on wb_clk_i with period P_fixed; HOLD fixed for test",
+    "ASSERT reset on wb_rst_i to RST_ACTIVE",
+    "WAIT symbolic reset duration scaled to P_fixed",
+    "DEASSERT reset on wb_rst_i to inactive level",
+    "WAIT symbolic settle cycles for DUT outputs to reach known values",
+    "DRIVE idle known values on wb_adr_i wb_dat_i wb_sel_i wb_we_i wb_stb_i wb_cyc_i via wishbone_slave_interface and on srx_pad_i via uart_serial_data and on cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i via modem_control_if; HOLD through checks"
+  ],
+  "check_steps": [
+    "SAMPLE on each observed clock edge wb_adr_i wb_sel_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_clk_i wb_rst_i int_o stx_pad_o srx_pad_i rts_pad_o dtr_pad_o cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i [f_wb_addr_1 f_wb_sel_1 f_wb_data_1 f_wb_hs_1 f_int_o_1]; IF any sampled value is X or Z THEN REPORT uvm_error",
+    "WAIT for reset deassertion on wb_rst_i [f_wb_rst_1]; SAMPLE wb_dat_o wb_ack_o int_o stx_pad_o rts_pad_o dtr_pad_o; IF any is X or Z THEN REPORT error ELSE RECORD known-check pass",
+    "COMPARE reset-known state [f_init_fifo_1 f_init_shift_1 f_init_div_1 f_init_lcr_1 f_init_ier_1 f_mcr_rst_1]: IF Divisor Latch != 0 THEN REPORT error; IF LCR != 8-bits no-parity 1-stop THEN REPORT error; IF any IER interrupt enabled THEN REPORT error; IF FIFOs or shift registers not cleared THEN REPORT error"
+  ],
+  "coverage_steps": [
+    "SAMPLE cover_xz_activation on each monitor sample of control and data",
+    "SAMPLE cover_xz_error on each X-or-Z error report",
+    "SAMPLE cover_known_after_reset when DUT outputs sampled known non-X/Z after reset deassertion",
+    "TAP monitor analysis ports with dedicated subscribers; drivers never supply coverage"
+  ],
+  "completion": [
+    "END when reset assertion plus deassertion plus settle window sampled and at least one known-value COMPARE observed",
+    "BOUND by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+  ],
+  "facts": [
+    {
+      "id": "f_clk_1",
+      "statement": "CLK is block clock input driven by testbench.",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input",
+      "plan_pointer": "/sections/4/strategy/agents/2"
+    },
+    {
+      "id": "f_wb_rst_1",
+      "statement": "WB_RST_I is asynchronous reset input.",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_RST_I 1 Input Asynchronous Reset",
+      "plan_pointer": "/sections/4/strategy/agents/2"
+    },
+    {
+      "id": "f_wb_addr_1",
+      "statement": "WB_ADDR_I is input used for register selection.",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+      "plan_pointer": "/sections/4/strategy/agents/2"
+    },
+    {
+      "id": "f_wb_sel_1",
+      "statement": "WB_SEL_I is select signal input.",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_SEL_I 4 Input Select signal",
+      "plan_pointer": "/sections/4/strategy/agents/2"
+    },
+    {
+      "id": "f_wb_data_1",
+      "statement": "WB_DAT_I is data input and WB_DAT_O is data output.",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_DAT_I 32 or 8 Input Data input\nWB_DAT_O 32 or 8 Output Data output",
+      "plan_pointer": "/sections/4/strategy/agents/2"
+    },
+    {
+      "id": "f_wb_hs_1",
+      "statement": "WB_WE_I WB_STB_I WB_CYC_I are control inputs and WB_ACK_O is acknowledge output.",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_WE_I 1 Input Write or read cycle selection\nWB_STB_I 1 Input Specifies transfer cycle\nWB_CYC_I 1 Input A bus cycle is in progress\nWB_ACK_O 1 Output Acknowledge of a transfer",
+      "plan_pointer": "/sections/4/strategy/agents/2"
+    },
+    {
+      "id": "f_init_fifo_1",
+      "statement": "Upon reset receiver and transmitter FIFOs are cleared.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter FIFOs are cleared.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_init_shift_1",
+      "statement": "Upon reset receiver and transmitter shift registers are cleared.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter shift registers are cleared",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_init_div_1",
+      "statement": "Upon reset Divisor Latch register is set to 0.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Divisor Latch register is set to 0.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_init_lcr_1",
+      "statement": "Upon reset Line Control Register is 8 bits data no parity 1 stop bit.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Line Control Register is set to communication of 8 bits of data, no parity, 1\nstop bit.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_init_ier_1",
+      "statement": "Upon reset all interrupts are disabled in Interrupt Enable Register.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "All interrupts are disabled in the Interrupt Enable Register.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_mcr_rst_1",
+      "statement": "MCR reset value is 0.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "Reset Value: 0",
+      "plan_pointer": "/registers/registers/8/fields/0"
+    },
+    {
+      "id": "f_int_o_1",
+      "statement": "INT_O is 1-bit output interrupt output.",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/6/property_evidence/function"
+    }
+  ],
+  "questions": [
+    "What signals are in documented known-value set after reset for X/Z checking beyond FIFOs and shift registers cleared, Divisor 0, LCR 8N1, IER disabled \u2014 specifically expected non-X/Z levels for wb_dat_o wb_ack_o int_o stx_pad_o rts_pad_o dtr_pad_o?",
+    "What is documented active polarity and inactive level of WB_RST_I on wb_rst_i? Source states only Asynchronous Reset.",
+    "What is documented minimum assert duration in clock cycles for WB_RST_I and required deassert-to-configuration delay and post-deassert settle for known check?",
+    "What is documented nominal clock period P_fixed and operating range for wb_clk_i?",
+    "What is documented CLK sampling edge for X/Z monitors and reset sampling relative to CLK?",
+    "Does X/Z error apply during reset assertion or only after deassertion, and must testbench drive all inputs to avoid Z during reset?",
+    "What are documented pad levels after MCR Reset Value 0 given inverted DTR and RTS mapping?"
+  ],
+  "blockers": []
+}

@@ -1,0 +1,45 @@
+{
+  "understanding": "wishbone_slave_interface is the DUT-responder WISHBONE SoC bus for UART register access to the WISHBONE bus interconnect; testbench drives 6 inputs for register selection and transfer control and observes 2 outputs for read data and transfer acknowledge using spec_rtl_relation wb_* aliases with 3b address and 8b data; clock and reset are separate dependencies, and this collateral provides ownership plus protocol context to enable later register-model use without scoreboard tests or coverage.",
+  "actions": [
+    "Instantiate single collateral_wishbone_slave_interface agent owning wb_adr_i wb_sel_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i as drives and wb_dat_o wb_ack_o as observes",
+    "Configure agent protocol context as WISHBONE responder register-access to WISHBONE bus using documented function protocol category without transactions checks or coverage",
+    "Reuse spec_rtl_relation reviewed aliases and widths WB_ADDR_I to wb_adr_i 3b WB_DAT to 8b with UART_ADDR_WIDTH 3 UART_DATA_WIDTH 8 selection",
+    "Apply driver-template drive_reset_values defaults for all owned inputs and defer sampling-edge and acknowledge-timing to later phase"
+  ],
+  "completion": [
+    "Ownership declared for 8 ports with drive versus observe matching documented directions",
+    "Protocol configuration records WISHBONE responder register-access context for WISHBONE bus",
+    "Reviewed aliases and widths reused with no invented tie-offs sequences or monitors",
+    "No scoreboard functional tests coverage or full register map required for completion"
+  ],
+  "facts": [
+    {
+      "id": "f_wb_stb_i",
+      "statement": "The specification defines WB_STB_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_STB_I 1 Input Specifies transfer cycle",
+      "plan_pointer": "/interfaces/groups/0/signals/5"
+    },
+    {
+      "id": "f_wb_cyc_i",
+      "statement": "The specification defines WB_CYC_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_CYC_I 1 Input A bus cycle is in progress",
+      "plan_pointer": "/interfaces/groups/0/signals/6"
+    },
+    {
+      "id": "f_wb_ack_o",
+      "statement": "The specification defines WB_ACK_O as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ACK_O 1 Output Acknowledge of a transfer",
+      "plan_pointer": "/interfaces/groups/0/signals/7"
+    }
+  ],
+  "questions": [
+    "For wishbone_slave_interface: which clock edge samples wb_adr_i/wb_dat_i/wb_dat_o/wb_we_i/wb_stb_i/wb_cyc_i/wb_ack_o, since spec defines ports and transfer descriptions but no sampling edge; needed to finalize monitor sampling in a later phase, not to block scaffold.",
+    "For wishbone_slave_interface handshake wb_stb_i/wb_cyc_i/wb_ack_o with wb_dat_o: what acknowledge latency and stability rule applies, since spec states Specifies transfer cycle and Acknowledge of a transfer but no timing bound; needed for later protocol checks, not for infrastructure ownership.",
+    "Evidence substituted: f_category, f_connected_to, f_function, f_protocol, f_wb_adr_i, f_wb_dat_i, f_wb_dat_o, f_wb_sel_i, f_wb_we_i could not be proven from the retrieved sources (Fact must reference a retrieved documented item; Fact quote must occur in a retrieved source excerpt); the documented facts of this interface are cited instead. Review the choice that cited them."
+  ],
+  "blockers": [],
+  "ambiguities": []
+}

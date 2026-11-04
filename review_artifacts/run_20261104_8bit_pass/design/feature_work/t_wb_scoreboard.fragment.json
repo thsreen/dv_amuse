@@ -1,0 +1,51 @@
+{
+  "sequencer_variables": [],
+  "registers": [],
+  "facts": [],
+  "sequences": [],
+  "routes": [],
+  "checks": [],
+  "hooks": [],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "check_steps/0",
+      "component_ids": [],
+      "question": "Deferred: scoreboard hook t_wb_scoreboard_h_sample_append targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_order_record targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_timeout_flush targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)"
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [],
+      "question": "Deferred: scoreboard hook t_wb_scoreboard_h_sample_append targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_order_record targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_timeout_flush targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)"
+    },
+    {
+      "step": "check_steps/2",
+      "component_ids": [],
+      "question": "Deferred: scoreboard hook t_wb_scoreboard_h_sample_append targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_order_record targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_timeout_flush targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)"
+    },
+    {
+      "step": "check_steps/3",
+      "component_ids": [],
+      "question": "Deferred: scoreboard hook t_wb_scoreboard_h_sample_append targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_order_record targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_timeout_flush targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)"
+    },
+    {
+      "step": "check_steps/4",
+      "component_ids": [],
+      "question": "Deferred: scoreboard hook t_wb_scoreboard_h_sample_append targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_order_record targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_timeout_flush targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)"
+    },
+    {
+      "step": "check_steps/5",
+      "component_ids": [],
+      "question": "Deferred: scoreboard hook t_wb_scoreboard_h_sample_append targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_order_record targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here); scoreboard hook t_wb_scoreboard_h_timeout_flush targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)"
+    }
+  ],
+  "questions": [
+    "What is documented acknowledge behavior defining eventually-answered bound as testbench limit?",
+    "What defines correct wb_dat_o on reads for pin addresses 0-6 including DLAB gating reset values and clear-on-read side effects for scoreboard reference?",
+    "What defines WISHBONE request identity for loss or duplication including required wb_stb_i wb_cyc_i wb_we_i wb_sel_i wb_adr_i stability ACK assertion window single versus multi-cycle back-to-back handling and legal wb_sel_i in DATA_BUS_WIDTH_8?",
+    "What are active level polarity of wb_rst_i and required duration in clock cycles and required scoreboard versus monitor behavior on reset-during-transfer flush versus error?",
+    "Deferred (quick testing): scoreboard hook t_wb_scoreboard_h_sample_append targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)",
+    "Deferred (quick testing): scoreboard hook t_wb_scoreboard_h_order_record targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)",
+    "Deferred (quick testing): scoreboard hook t_wb_scoreboard_h_timeout_flush targets wishbone_slave_interface, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)"
+  ]
+}

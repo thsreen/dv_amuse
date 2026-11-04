@@ -1,0 +1,96 @@
+{
+  "understanding": "Top-level scoreboard infrastructure traces WISHBONE THR writes to stx_pad_o TX to srx_pad_i RX to RBR reads plus architecture pending-request liveness; documented reset init serial-direction and IIR-pending bound checks; byte order preservation FIFO depth overrun handling and timeout values lack documented source and stay gated by questions so payload equality is collection-only until answered",
+  "preconditions": [
+    "Reset driven on reset with clock fixed per test; FIFOs and shift registers cleared Divisor 0 LCR 8N1 interrupts disabled [f_reset_1 f_reset_2]",
+    "Init programming done with symbolic divisor LCR FIFO trigger IER using DLAB gating MSB first and baud formula with serial settings agreeing [f_init_1 f_init_2]",
+    "Agents own inputs: wishbone_slave_interface owns wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i, uart_serial_data owns srx_pad_i and observes stx_pad_o srx_pad_i, modem_control_if owns cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i, interrupt_output observes int_o [f_serial_1 f_arch_1 f_modem_1]",
+    "Traffic stimulus available from t_traffic_seq normal and loopback bursts and byte monitors from t_uart_mon with symbolic bus pin addresses and symbolic line format"
+  ],
+  "stimulus_steps": [
+    "WAIT reset deassertion THEN WAIT init_config completion with symbolic divisor LCR FIFO trigger IER before enabling scoreboard queues",
+    "WAIT normal_traffic burst with wishbone payload writes plus uart TX observe plus uart RX drive plus modem toggles under IER observe",
+    "WAIT loopback_traffic burst with internal TX to RX routing using symbolic loopback control"
+  ],
+  "check_steps": [
+    "WAIT reset deassertion THEN SAMPLE symbolic divisor LCR IER reads AND COMPARE to f_reset_1 f_reset_2 for cleared FIFOs Divisor 0 LCR 8N1 interrupts disabled",
+    "SAMPLE wishbone_slave_interface monitor completed STB CYC to ACK transactions into wb_req_queue and wb_ack_queue; FOR each request TRACK pending UNTIL ACK OR request_timeout_cycles operational limit THEN REPORT unanswered as liveness event [f_arch_1]",
+    "SAMPLE THR payload writes filtered by origin address excluding configuration writes into exp_queue AND SAMPLE stx_pad_o TX bytes as DUT output into tx_queue AND SAMPLE srx_pad_i RX bytes as DUT input into rx_queue AND SAMPLE RBR payload reads into act_queue [f_serial_1 f_arch_1]",
+    "COMPARE queue counts for loss duplication as infrastructure tally; IF overrun-free documented condition THEN COMPARE exp_queue vs tx_queue vs rx_queue vs act_queue in order ELSE REPORT overrun-pending without oracle; never COMPARE an event with itself",
+    "SAMPLE interrupt_output monitor INT_O AND SAMPLE IIR bit0 via symbolic reads AND COMPARE pending rule 0 equals pending asserted 1 equals idle negated subject to IER enables [f_iir_1 f_modem_1]",
+    "WAIT drain_cycles operational limit for pipeline flush THEN REPORT all queues and pending counts; CLEANUP disable queues and leave wishbone bus and srx_pad_i idle-owned for handoff"
+  ],
+  "coverage_steps": [],
+  "completion": [
+    "Done when reset values COMPAREd plus normal and loopback bursts drained with queue tallies REPORTED and IIR pending COMPARE observed or TEST_TIMEOUT_CYCLES expires",
+    "Bound by drain_cycles and request_timeout_cycles as TESTBENCH operational limits not DUT timing",
+    "Cleanup disables scoreboard queues leaves DLAB 0 symbolic wishbone bus idle-owned and srx_pad_i idle-owned by uart_serial_data"
+  ],
+  "facts": [
+    {
+      "id": "f_reset_1",
+      "statement": "After reset receiver and transmitter FIFOs and shift registers are cleared and Divisor Latch is 0",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter FIFOs are cleared.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_reset_2",
+      "statement": "After reset LCR is 8 bits no parity 1 stop bit and all interrupts disabled",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Line Control Register is set to communication of 8 bits of data, no parity, 1\nstop bit.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_init_1",
+      "statement": "Initialization programs Divisor Latches MSB first LSB next with LCR bit7 DLAB gating",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set the Divisor Latches, MSB first, LSB next.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_init_2",
+      "statement": "Baud rate equals Input Clock divided by Divisor divided by 16",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Remember that (Input Clock Speed)/(Divisor Latch value) = 16 x the communication\nbaud rate.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_serial_1",
+      "statement": "STX_PAD_O is DUT serial output and SRX_PAD_I is DUT serial input",
+      "source_id": "CH-98be4510fb",
+      "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/function"
+    },
+    {
+      "id": "f_arch_1",
+      "statement": "Core uses WISHBONE SoC bus with 8-bit data bus",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "It has an 8-bit data bus for compatibility reason.",
+      "plan_pointer": "/sections/4/strategy/agents/4"
+    },
+    {
+      "id": "f_iir_1",
+      "statement": "IIR bit0 0 means interrupt pending asserted with INT_O and 1 means no interrupt pending",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019. When it\u2019s \u20181\u2019 \u2013 no interrupt\nis pending.",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_modem_1",
+      "statement": "Modem Status interrupt source is CTS DSR RI or DCD change subject to IER enable",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 0 4 th Modem Status CTS, DSR, RI or DCD.",
+      "plan_pointer": "/sections/8/entries/10"
+    }
+  ],
+  "questions": [
+    "What documented FIFO depth and ordering guarantees define expected end-to-end queues for loss duplication misorder beyond allowed overrun?",
+    "What testbench drain_cycles and request_timeout_cycles operational limits detect deadlock livelock without assuming DUT timing?",
+    "What are actual wb_adr_i pin values for THR RBR IER FCR LCR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling under DATA_BUS_WIDTH_8?",
+    "What symbolic divisor LSB MSB nonzero values plus LCR line-format values plus FIFO trigger level plus IER bits bound normal versus loopback bring-up?",
+    "What uart_serial_data data_bits parity stop_bits bit_cycles settings must agree with LCR programming and divisor baud for TX observe and RX drive?",
+    "What is wb_rst_i polarity and required deassert to first write delay with clock period fixed per test?",
+    "What documented loopback data path and modem remapping defines expected routing for loopback compare versus normal STX to SRX wiring?"
+  ],
+  "blockers": []
+}

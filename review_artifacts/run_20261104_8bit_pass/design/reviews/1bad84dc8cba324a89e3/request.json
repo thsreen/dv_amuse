@@ -1,0 +1,2317 @@
+{
+  "id": "1bad84dc8cba324a89e3",
+  "plan_hash": "f4771fee8bff6b55259f02446beaa3efe34af70e93b91fa79aa70a205c686a2d",
+  "interface_hash": "2ab01c62b63ade871a3147d4e3c660c500f2b7f1e50b2515c2866d1ee5ced2bd",
+  "unit": "interface_port_alignment",
+  "blockers": [
+    "CLK: spec width 1, direction input; RTL candidates wb_clk_i",
+    "WB_ADDR_I: spec width 5 or 3, direction input; RTL candidates wb_adr_i",
+    "WB_DAT_I: spec width 32 or 8, direction input; RTL wb_dat_i width 8",
+    "WB_DAT_O: spec width 32 or 8, direction output; RTL wb_dat_o width 8",
+    "BAUD_O: spec width 1, direction output; optional under if UART_HAS_BAUDRATE_OUTPUT is defined; absent from RTL"
+  ],
+  "review_contract_hash": "8d54597ddca28ccf7be2ca0cf74a99579b54f30b56198120590862adebc04444",
+  "alignment_contract_hash": "431667fca18279f7e3d0b963ef8aa528d38e423d8d24288aea85aeb745525d34",
+  "status": "WAITING_HUMAN",
+  "created_at": "2026-11-04T15:39:58.237250+00:00",
+  "nonce": "7ca6da19f1c74e20d7d07e50c1392dc6",
+  "ports": [
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "wb_clk_i"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "wb_rst_i"
+    },
+    {
+      "direction": "input",
+      "width": 3,
+      "name": "wb_adr_i"
+    },
+    {
+      "direction": "input",
+      "width": 8,
+      "name": "wb_dat_i"
+    },
+    {
+      "direction": "output",
+      "width": 8,
+      "name": "wb_dat_o"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "wb_we_i"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "wb_stb_i"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "wb_cyc_i"
+    },
+    {
+      "direction": "output",
+      "width": 1,
+      "name": "wb_ack_o"
+    },
+    {
+      "direction": "input",
+      "width": 4,
+      "name": "wb_sel_i"
+    },
+    {
+      "direction": "output",
+      "width": 1,
+      "name": "int_o"
+    },
+    {
+      "direction": "output",
+      "width": 1,
+      "name": "stx_pad_o"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "srx_pad_i"
+    },
+    {
+      "direction": "output",
+      "width": 1,
+      "name": "rts_pad_o"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "cts_pad_i"
+    },
+    {
+      "direction": "output",
+      "width": 1,
+      "name": "dtr_pad_o"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "dsr_pad_i"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "ri_pad_i"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "dcd_pad_i"
+    }
+  ],
+  "evidence": {
+    "source_excerpts": [
+      {
+        "source_id": "CH-63ad4d61a5",
+        "start": null,
+        "end": null,
+        "text": "CLK 1 Input Block\u2019s clock input",
+        "doc_path": "uart16550/doc/UART_spec.pdf",
+        "pages": [
+          6,
+          6
+        ]
+      },
+      {
+        "source_id": "CH-63ad4d61a5",
+        "start": null,
+        "end": null,
+        "text": "WB_ADDR_I 5 or 3 Input Used for register selection",
+        "doc_path": "uart16550/doc/UART_spec.pdf",
+        "pages": [
+          6,
+          6
+        ]
+      },
+      {
+        "source_id": "CH-63ad4d61a5",
+        "start": null,
+        "end": null,
+        "text": "WB_DAT_I 32 or 8 Input Data input",
+        "doc_path": "uart16550/doc/UART_spec.pdf",
+        "pages": [
+          6,
+          6
+        ]
+      },
+      {
+        "source_id": "CH-63ad4d61a5",
+        "start": null,
+        "end": null,
+        "text": "WB_DAT_O 32 or 8 Output Data output",
+        "doc_path": "uart16550/doc/UART_spec.pdf",
+        "pages": [
+          6,
+          6
+        ]
+      },
+      {
+        "source_id": "CH-8c2c8e9408",
+        "start": null,
+        "end": null,
+        "text": "BAUD_O 1 Output Optional baud rate output signal.\nThe signal here is the 16 x actual baud rate.\nIt is enabled if UART_HAS_BAUDRATE_OUTPUT\nis defined",
+        "doc_path": "uart16550/doc/UART_spec.pdf",
+        "pages": [
+          6,
+          6
+        ]
+      }
+    ],
+    "documented_items": []
+  },
+  "bindings_scope": "infrastructure_only",
+  "question": "Resolve infrastructure ambiguity: CLK: spec width 1, direction input; RTL candidates wb_clk_i; WB_ADDR_I: spec width 5 or 3, direction input; RTL candidates wb_adr_i; WB_DAT_I: spec width 32 or 8, direction input; RTL wb_dat_i width 8; WB_DAT_O: spec width 32 or 8, direction output; RTL wb_dat_o width 8; BAUD_O: spec width 1, direction output; optional under if UART_HAS_BAUDRATE_OUTPUT is defined; absent from RTL",
+  "allowed_fields": [
+    "mappings",
+    "width_choices",
+    "inactive_spec_ports"
+  ],
+  "alignment_context": {
+    "interfaces": {
+      "status": "PASS",
+      "chunk_ids": [
+        "CH-32b051cdb1",
+        "CH-2baa4497c0",
+        "CH-63ad4d61a5",
+        "CH-8c2c8e9408",
+        "CH-98be4510fb",
+        "CH-8e56094e71",
+        "CH-f88915355b",
+        "CH-de51b2eafc",
+        "CH-6abe65aeff",
+        "CH-06bad6ffcd",
+        "CH-1e2324cfc3",
+        "CH-d62a4ba2db"
+      ],
+      "signals": [
+        {
+          "name": "CLK",
+          "width": "1",
+          "direction": "input",
+          "availability": "",
+          "description": "Block\u2019s clock input",
+          "quote": "CLK 1 Input Block\u2019s clock input",
+          "chunk_id": "CH-63ad4d61a5",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "WB_RST_I",
+          "width": "1",
+          "direction": "input",
+          "availability": "",
+          "description": "Asynchronous Reset",
+          "quote": "WB_RST_I 1 Input Asynchronous Reset",
+          "chunk_id": "CH-63ad4d61a5",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "WB_ADDR_I",
+          "width": "5 or 3",
+          "direction": "input",
+          "availability": "",
+          "description": "Used for register selection",
+          "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+          "chunk_id": "CH-63ad4d61a5",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "not_applicable",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": [],
+          "configured_width": 3
+        },
+        {
+          "name": "WB_SEL_I",
+          "width": "4",
+          "direction": "input",
+          "availability": "",
+          "description": "Select signal",
+          "quote": "WB_SEL_I 4 Input Select signal",
+          "chunk_id": "CH-63ad4d61a5",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "WB_DAT_I",
+          "width": "32 or 8",
+          "direction": "input",
+          "availability": "",
+          "description": "Data input",
+          "quote": "WB_DAT_I 32 or 8 Input Data input",
+          "chunk_id": "CH-63ad4d61a5",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "not_applicable",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": [],
+          "configured_width": 8
+        },
+        {
+          "name": "WB_DAT_O",
+          "width": "32 or 8",
+          "direction": "output",
+          "availability": "",
+          "description": "Data output",
+          "quote": "WB_DAT_O 32 or 8 Output Data output",
+          "chunk_id": "CH-63ad4d61a5",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "not_applicable",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": [],
+          "configured_width": 8
+        },
+        {
+          "name": "WB_WE_I",
+          "width": "1",
+          "direction": "input",
+          "availability": "",
+          "description": "Write or read cycle selection",
+          "quote": "WB_WE_I 1 Input Write or read cycle selection",
+          "chunk_id": "CH-63ad4d61a5",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "WB_STB_I",
+          "width": "1",
+          "direction": "input",
+          "availability": "",
+          "description": "Specifies transfer cycle",
+          "quote": "WB_STB_I 1 Input Specifies transfer cycle",
+          "chunk_id": "CH-63ad4d61a5",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "WB_CYC_I",
+          "width": "1",
+          "direction": "input",
+          "availability": "",
+          "description": "A bus cycle is in progress",
+          "quote": "WB_CYC_I 1 Input A bus cycle is in progress",
+          "chunk_id": "CH-63ad4d61a5",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "WB_ACK_O",
+          "width": "1",
+          "direction": "output",
+          "availability": "",
+          "description": "Acknowledge of a transfer",
+          "quote": "WB_ACK_O 1 Output Acknowledge of a transfer",
+          "chunk_id": "CH-63ad4d61a5",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "INT_O",
+          "width": "1",
+          "direction": "output",
+          "availability": "",
+          "description": "Interrupt output",
+          "quote": "INT_O 1 Output Interrupt output",
+          "chunk_id": "CH-8c2c8e9408",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "BAUD_O",
+          "width": "1",
+          "direction": "output",
+          "availability": "if UART_HAS_BAUDRATE_OUTPUT is defined",
+          "description": "Optional baud rate output signal. The signal here is the 16 x actual baud rate.",
+          "quote": "BAUD_O 1 Output Optional baud rate output signal.\nThe signal here is the 16 x actual baud rate.\nIt is enabled if UART_HAS_BAUDRATE_OUTPUT\nis defined",
+          "chunk_id": "CH-8c2c8e9408",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": true,
+            "description": true
+          },
+          "validation": [],
+          "inactive_in_configuration": "Not in this build: if UART_HAS_BAUDRATE_OUTPUT is defined"
+        },
+        {
+          "name": "STX_PAD_O",
+          "width": "1",
+          "direction": "output",
+          "availability": "",
+          "description": "The serial output signal",
+          "quote": "STX_PAD_O 1 Output The serial output signal",
+          "chunk_id": "CH-98be4510fb",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "not_applicable",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "SRX_PAD_I",
+          "width": "1",
+          "direction": "input",
+          "availability": "",
+          "description": "The serial input signal",
+          "quote": "SRX_PAD_I 1 Input The serial input signal",
+          "chunk_id": "CH-98be4510fb",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "not_applicable",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "RTS_PAD_O",
+          "width": "1",
+          "direction": "output",
+          "availability": "",
+          "description": "Request To Send",
+          "quote": "RTS_PAD_O 1 Output Request To Send",
+          "chunk_id": "CH-98be4510fb",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "DTR_PAD_O",
+          "width": "1",
+          "direction": "output",
+          "availability": "",
+          "description": "Data Terminal Ready",
+          "quote": "DTR_PAD_O 1 Output Data Terminal Ready",
+          "chunk_id": "CH-98be4510fb",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "CTS_PAD_I",
+          "width": "1",
+          "direction": "input",
+          "availability": "",
+          "description": "Clear To Send",
+          "quote": "CTS_PAD_I 1 Input Clear To Send",
+          "chunk_id": "CH-98be4510fb",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "DSR_PAD_I",
+          "width": "1",
+          "direction": "input",
+          "availability": "",
+          "description": "Data Set Ready",
+          "quote": "DSR_PAD_I 1 Input Data Set Ready",
+          "chunk_id": "CH-98be4510fb",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "RI_PAD_I",
+          "width": "1",
+          "direction": "input",
+          "availability": "",
+          "description": "Ring Indicator",
+          "quote": "RI_PAD_I 1 Input Ring Indicator",
+          "chunk_id": "CH-98be4510fb",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        },
+        {
+          "name": "DCD_PAD_I",
+          "width": "1",
+          "direction": "input",
+          "availability": "",
+          "description": "Data Carrier Detect",
+          "quote": "DCD_PAD_I 1 Input Data Carrier Detect",
+          "chunk_id": "CH-98be4510fb",
+          "doc_path": "uart16550/doc/UART_spec.pdf",
+          "pages": [
+            6,
+            6
+          ],
+          "provenance": "DOCUMENTED",
+          "direction_documented": true,
+          "active_level": "unknown",
+          "active_level_documented": false,
+          "width_documented": true,
+          "documented": {
+            "name": true,
+            "width": true,
+            "direction": true,
+            "active_level": false,
+            "availability": false,
+            "description": true
+          },
+          "validation": []
+        }
+      ],
+      "groups": [
+        {
+          "name": "wishbone_slave_interface",
+          "function": "WISHBONE SoC bus slave interface for register access to UART",
+          "category": "bus",
+          "protocol": "WISHBONE",
+          "connected_to": "WISHBONE bus",
+          "peer_type": "interconnect",
+          "grouping_key": "bus|interconnect",
+          "dut_role": "responder",
+          "is_sideband": false,
+          "rationale": "All WISHBONE transfer signals share same register-access functionality and same peer (WISHBONE bus); clocks/resets split per rules.",
+          "provenance": "INFERRED",
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "2.1 WISHBONE interface signals",
+              "inference_reason": "Group label chosen to reflect WISHBONE bus interface functionality",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "86085d646bd36b0e848f"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core implements the WISNBONE SoC bus interface for communication with the\nsystem.",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core implements the WISNBONE SoC bus interface for communication with the\nsystem.",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "2.1 WISHBONE interface signals",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core implements the WISNBONE SoC bus interface for communication with the\nsystem.",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core implements the WISNBONE SoC bus interface for communication with the\nsystem.",
+              "inference_reason": "On-chip SoC bus implies interconnect fabric; no explicit peer type stated",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "6537ee58e9128f9910c0"
+            },
+            "dut_role": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_STB_I 1 Input Specifies transfer cycle\nWB_CYC_I 1 Input A bus cycle is in progress\nWB_ACK_O 1 Output Acknowledge of a transfer",
+              "inference_reason": "Master-driven STB/CYC inputs with slave-driven ACK output indicates responder/slave role per WISHBONE convention",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "e3aba34653036e304a3a"
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "2.1 WISHBONE interface signals",
+              "inference_reason": "Main functional bus, not a sideband interrupt/status/tick/enable per grouping rules",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "b5f266ce838115c3d379"
+            }
+          },
+          "direction_summary": "both directions",
+          "signals": [
+            {
+              "name": "WB_ADDR_I",
+              "width": "5 or 3",
+              "direction": "input",
+              "availability": "",
+              "description": "Used for register selection",
+              "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+              "chunk_id": "CH-63ad4d61a5",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "not_applicable",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": [],
+              "configured_width": 3
+            },
+            {
+              "name": "WB_SEL_I",
+              "width": "4",
+              "direction": "input",
+              "availability": "",
+              "description": "Select signal",
+              "quote": "WB_SEL_I 4 Input Select signal",
+              "chunk_id": "CH-63ad4d61a5",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            },
+            {
+              "name": "WB_DAT_I",
+              "width": "32 or 8",
+              "direction": "input",
+              "availability": "",
+              "description": "Data input",
+              "quote": "WB_DAT_I 32 or 8 Input Data input",
+              "chunk_id": "CH-63ad4d61a5",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "not_applicable",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": [],
+              "configured_width": 8
+            },
+            {
+              "name": "WB_DAT_O",
+              "width": "32 or 8",
+              "direction": "output",
+              "availability": "",
+              "description": "Data output",
+              "quote": "WB_DAT_O 32 or 8 Output Data output",
+              "chunk_id": "CH-63ad4d61a5",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "not_applicable",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": [],
+              "configured_width": 8
+            },
+            {
+              "name": "WB_WE_I",
+              "width": "1",
+              "direction": "input",
+              "availability": "",
+              "description": "Write or read cycle selection",
+              "quote": "WB_WE_I 1 Input Write or read cycle selection",
+              "chunk_id": "CH-63ad4d61a5",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            },
+            {
+              "name": "WB_STB_I",
+              "width": "1",
+              "direction": "input",
+              "availability": "",
+              "description": "Specifies transfer cycle",
+              "quote": "WB_STB_I 1 Input Specifies transfer cycle",
+              "chunk_id": "CH-63ad4d61a5",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            },
+            {
+              "name": "WB_CYC_I",
+              "width": "1",
+              "direction": "input",
+              "availability": "",
+              "description": "A bus cycle is in progress",
+              "quote": "WB_CYC_I 1 Input A bus cycle is in progress",
+              "chunk_id": "CH-63ad4d61a5",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            },
+            {
+              "name": "WB_ACK_O",
+              "width": "1",
+              "direction": "output",
+              "availability": "",
+              "description": "Acknowledge of a transfer",
+              "quote": "WB_ACK_O 1 Output Acknowledge of a transfer",
+              "chunk_id": "CH-63ad4d61a5",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            }
+          ],
+          "cited_chunk_ids": [
+            "CH-63ad4d61a5"
+          ],
+          "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+          "review_status": "TEST_AUTO_APPROVED",
+          "test_only": true,
+          "quick_testing_approval_id": "3e9d664301c4f9db83d1"
+        },
+        {
+          "name": "system_clock",
+          "function": "Block clock input for UART core logic",
+          "category": "clock",
+          "protocol": "",
+          "connected_to": "WISHBONE bus",
+          "peer_type": "clock_generator",
+          "grouping_key": "clock|clock_generator",
+          "dut_role": "sink",
+          "is_sideband": false,
+          "rationale": "Clock isolated in own group per requirement that clocks are their own groups.",
+          "provenance": "INFERRED",
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": "Label chosen for clock input signal",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "19c4c8ef179b2786ca7c"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8e56094e71"
+              ],
+              "quote": "clk WISHBONE\nbus",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8e56094e71"
+              ],
+              "quote": "clk WISHBONE\nbus",
+              "inference_reason": "Clock source on WISHBONE bus assumed driven by clock generator; type not explicitly stated",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "d48d73a4229797b32a3d"
+            },
+            "dut_role": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": ""
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": "Main clock in own group, not a sideband per grouping rules",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "115f062383983b7c2994"
+            }
+          },
+          "direction_summary": "into DUT",
+          "signals": [
+            {
+              "name": "CLK",
+              "width": "1",
+              "direction": "input",
+              "availability": "",
+              "description": "Block\u2019s clock input",
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "chunk_id": "CH-63ad4d61a5",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            }
+          ],
+          "cited_chunk_ids": [
+            "CH-63ad4d61a5"
+          ],
+          "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+          "review_status": "TEST_AUTO_APPROVED",
+          "test_only": true,
+          "quick_testing_approval_id": "3526fce47e567599abd9"
+        },
+        {
+          "name": "wishbone_reset",
+          "function": "Asynchronous reset input for UART core",
+          "category": "reset",
+          "protocol": "",
+          "connected_to": "",
+          "peer_type": "reset_controller",
+          "grouping_key": "reset|reset_controller",
+          "dut_role": "sink",
+          "is_sideband": false,
+          "rationale": "Reset isolated in own group per requirement that resets are their own groups.",
+          "provenance": "INFERRED",
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": "Label chosen for reset signal",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "27fe08b10667279152d8"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": "Reset input presumed driven by reset controller; type not explicitly stated",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "2e6e3b9488a67ad8c833"
+            },
+            "dut_role": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": ""
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": "Reset in own group, not a sideband per grouping rules",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "51643885639814abcdf8"
+            }
+          },
+          "direction_summary": "into DUT",
+          "signals": [
+            {
+              "name": "WB_RST_I",
+              "width": "1",
+              "direction": "input",
+              "availability": "",
+              "description": "Asynchronous Reset",
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "chunk_id": "CH-63ad4d61a5",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            }
+          ],
+          "cited_chunk_ids": [
+            "CH-63ad4d61a5"
+          ],
+          "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+          "review_status": "TEST_AUTO_APPROVED",
+          "test_only": true,
+          "quick_testing_approval_id": "287b4655d4030704cfc2"
+        },
+        {
+          "name": "interrupt_output",
+          "function": "Interrupt output to signal UART events to system",
+          "category": "interrupt",
+          "protocol": "",
+          "connected_to": "",
+          "peer_type": "interrupt_controller",
+          "grouping_key": "interrupt|interrupt_controller",
+          "dut_role": "source",
+          "is_sideband": true,
+          "rationale": "Single-wire interrupt sideband isolated for its own functionality and peer type.",
+          "provenance": "INFERRED",
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": "Label chosen for interrupt signal",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "1f94c6fb46bff2a329d8"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core requires one interrupt.",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core requires one interrupt.",
+              "inference_reason": "Interrupt output presumed to connect to interrupt controller; type not explicitly stated",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "c115f640912121d9a558"
+            },
+            "dut_role": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": ""
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": "Interrupt line is sideband bundle per grouping rules requiring own sideband group",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "1a14b7016f6e279fa6b2"
+            }
+          },
+          "direction_summary": "out of DUT",
+          "signals": [
+            {
+              "name": "INT_O",
+              "width": "1",
+              "direction": "output",
+              "availability": "",
+              "description": "Interrupt output",
+              "quote": "INT_O 1 Output Interrupt output",
+              "chunk_id": "CH-8c2c8e9408",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            }
+          ],
+          "cited_chunk_ids": [
+            "CH-8c2c8e9408"
+          ],
+          "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+          "review_status": "TEST_AUTO_APPROVED",
+          "test_only": true,
+          "quick_testing_approval_id": "c2931b941e21ffc83c4f"
+        },
+        {
+          "name": "uart_serial_data",
+          "function": "UART serial transmit and receive data lines",
+          "category": "serial_data",
+          "protocol": "RS232",
+          "connected_to": "modem or other external devices",
+          "peer_type": "external_device",
+          "grouping_key": "serial_data|external_device",
+          "dut_role": "bidirectional",
+          "is_sideband": false,
+          "rationale": "TX and RX form one serial data interface to same external peer; kept together.",
+          "provenance": "INFERRED",
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+              "inference_reason": "Label chosen to reflect serial data functionality",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "13b4d7f0aa4de89ad4d8"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-2baa4497c0"
+              ],
+              "quote": "The UART (Universal Asynchronous Receiver/Transmitter) core provides serial\ncommunication capabilities",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-2baa4497c0"
+              ],
+              "quote": "like another computer using a serial cable and RS232 protocol.",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-2baa4497c0"
+              ],
+              "quote": "which allow communication with modem or other external\ndevices, like another computer using a serial cable and RS232 protocol.",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-2baa4497c0"
+              ],
+              "quote": "which allow communication with modem or other external\ndevices, like another computer using a serial cable and RS232 protocol.",
+              "inference_reason": ""
+            },
+            "dut_role": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+              "inference_reason": ""
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+              "inference_reason": "Main serial data path, not sideband handshake/status per grouping rules",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "50a7bb11f7d6995fa92a"
+            }
+          },
+          "direction_summary": "both directions",
+          "signals": [
+            {
+              "name": "STX_PAD_O",
+              "width": "1",
+              "direction": "output",
+              "availability": "",
+              "description": "The serial output signal",
+              "quote": "STX_PAD_O 1 Output The serial output signal",
+              "chunk_id": "CH-98be4510fb",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "not_applicable",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            },
+            {
+              "name": "SRX_PAD_I",
+              "width": "1",
+              "direction": "input",
+              "availability": "",
+              "description": "The serial input signal",
+              "quote": "SRX_PAD_I 1 Input The serial input signal",
+              "chunk_id": "CH-98be4510fb",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "not_applicable",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            }
+          ],
+          "cited_chunk_ids": [
+            "CH-98be4510fb"
+          ],
+          "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+          "review_status": "TEST_AUTO_APPROVED",
+          "test_only": true,
+          "quick_testing_approval_id": "eea1867c0465da50d817"
+        },
+        {
+          "name": "modem_control",
+          "function": "Modem control and status handshake signals (RTS/CTS/DTR/DSR/RI/DCD)",
+          "category": "flow_control",
+          "protocol": "",
+          "connected_to": "modem",
+          "peer_type": "external_device",
+          "grouping_key": "flow_control|external_device",
+          "dut_role": "bidirectional",
+          "is_sideband": true,
+          "rationale": "All six modem handshake/status signals share modem control functionality to same modem peer; sideband separate from serial data.",
+          "provenance": "INFERRED",
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "2.3 External (off-chip) connections",
+              "inference_reason": "Label chosen to reflect modem handshake functionality",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "b331d663651876a01fd7"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-6abe65aeff"
+              ],
+              "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "RTS_PAD_O 1 Output Request To Send",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "RTS_PAD_O 1 Output Request To Send",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-6abe65aeff"
+              ],
+              "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "2.3 External (off-chip) connections",
+              "inference_reason": ""
+            },
+            "dut_role": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb",
+                "CH-98be4510fb",
+                "CH-98be4510fb",
+                "CH-98be4510fb",
+                "CH-98be4510fb",
+                "CH-98be4510fb"
+              ],
+              "quote": "",
+              "inference_reason": "Presence of output handshake (RTS) and input handshake (CTS) indicates bidirectional",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "8bb0c7ded8c493dceaa8"
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "RTS_PAD_O 1 Output Request To Send",
+              "inference_reason": "Handshake/status lines are sidebands requiring own sideband group per rules",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "d4decfea8fc906164010"
+            }
+          },
+          "direction_summary": "both directions",
+          "signals": [
+            {
+              "name": "RTS_PAD_O",
+              "width": "1",
+              "direction": "output",
+              "availability": "",
+              "description": "Request To Send",
+              "quote": "RTS_PAD_O 1 Output Request To Send",
+              "chunk_id": "CH-98be4510fb",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            },
+            {
+              "name": "DTR_PAD_O",
+              "width": "1",
+              "direction": "output",
+              "availability": "",
+              "description": "Data Terminal Ready",
+              "quote": "DTR_PAD_O 1 Output Data Terminal Ready",
+              "chunk_id": "CH-98be4510fb",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            },
+            {
+              "name": "CTS_PAD_I",
+              "width": "1",
+              "direction": "input",
+              "availability": "",
+              "description": "Clear To Send",
+              "quote": "CTS_PAD_I 1 Input Clear To Send",
+              "chunk_id": "CH-98be4510fb",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            },
+            {
+              "name": "DSR_PAD_I",
+              "width": "1",
+              "direction": "input",
+              "availability": "",
+              "description": "Data Set Ready",
+              "quote": "DSR_PAD_I 1 Input Data Set Ready",
+              "chunk_id": "CH-98be4510fb",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            },
+            {
+              "name": "RI_PAD_I",
+              "width": "1",
+              "direction": "input",
+              "availability": "",
+              "description": "Ring Indicator",
+              "quote": "RI_PAD_I 1 Input Ring Indicator",
+              "chunk_id": "CH-98be4510fb",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            },
+            {
+              "name": "DCD_PAD_I",
+              "width": "1",
+              "direction": "input",
+              "availability": "",
+              "description": "Data Carrier Detect",
+              "quote": "DCD_PAD_I 1 Input Data Carrier Detect",
+              "chunk_id": "CH-98be4510fb",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": false,
+                "description": true
+              },
+              "validation": []
+            }
+          ],
+          "cited_chunk_ids": [
+            "CH-98be4510fb"
+          ],
+          "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+          "review_status": "TEST_AUTO_APPROVED",
+          "test_only": true,
+          "quick_testing_approval_id": "e23098728abade033320"
+        },
+        {
+          "name": "baud_rate_output",
+          "function": "Optional 16x baud rate tick output",
+          "category": "clock",
+          "protocol": "",
+          "connected_to": "",
+          "peer_type": "unknown",
+          "grouping_key": "clock|unknown",
+          "dut_role": "source",
+          "is_sideband": true,
+          "rationale": "Optional baud tick output isolated as its own clock sideband with conditional availability.",
+          "provenance": "INFERRED",
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": "Label chosen for baud output functionality",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "498a39541d357a95dd8e"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.\nThe signal here is the 16 x actual baud rate.",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "The signal here is the 16 x actual baud rate.",
+              "inference_reason": "16x baud toggling output interpreted as clock-related tick; source does not label it clock",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "e3a830b8e91516f639c3"
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": ""
+            },
+            "dut_role": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": ""
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": "Tick/status output is sideband per grouping rules requiring own sideband group",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "4a43b998fb5b1c8abe31"
+            }
+          },
+          "direction_summary": "out of DUT",
+          "signals": [
+            {
+              "name": "BAUD_O",
+              "width": "1",
+              "direction": "output",
+              "availability": "if UART_HAS_BAUDRATE_OUTPUT is defined",
+              "description": "Optional baud rate output signal. The signal here is the 16 x actual baud rate.",
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.\nThe signal here is the 16 x actual baud rate.\nIt is enabled if UART_HAS_BAUDRATE_OUTPUT\nis defined",
+              "chunk_id": "CH-8c2c8e9408",
+              "doc_path": "uart16550/doc/UART_spec.pdf",
+              "pages": [
+                6,
+                6
+              ],
+              "provenance": "DOCUMENTED",
+              "direction_documented": true,
+              "active_level": "unknown",
+              "active_level_documented": false,
+              "width_documented": true,
+              "documented": {
+                "name": true,
+                "width": true,
+                "direction": true,
+                "active_level": false,
+                "availability": true,
+                "description": true
+              },
+              "validation": [],
+              "inactive_in_configuration": "Not in this build: if UART_HAS_BAUDRATE_OUTPUT is defined"
+            }
+          ],
+          "cited_chunk_ids": [
+            "CH-8c2c8e9408"
+          ],
+          "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+          "review_status": "TEST_AUTO_APPROVED",
+          "test_only": true,
+          "quick_testing_approval_id": "9d4deaa587ab3f2714af"
+        }
+      ],
+      "validation": [],
+      "repair": {
+        "attempts": 1,
+        "refusals": [],
+        "unresolved": [],
+        "repair_error": null
+      },
+      "heading": "1.1 Interface Definitions",
+      "artifact_id": "TPS-5f89ec2e49",
+      "subsections": [
+        {
+          "id": "interface_0",
+          "heading": "wishbone_slave_interface",
+          "content_path": "/interfaces/groups/0",
+          "layout": "table"
+        },
+        {
+          "id": "interface_1",
+          "heading": "system_clock",
+          "content_path": "/interfaces/groups/1",
+          "layout": "table"
+        },
+        {
+          "id": "interface_2",
+          "heading": "wishbone_reset",
+          "content_path": "/interfaces/groups/2",
+          "layout": "table"
+        },
+        {
+          "id": "interface_3",
+          "heading": "interrupt_output",
+          "content_path": "/interfaces/groups/3",
+          "layout": "table"
+        },
+        {
+          "id": "interface_4",
+          "heading": "uart_serial_data",
+          "content_path": "/interfaces/groups/4",
+          "layout": "table"
+        },
+        {
+          "id": "interface_5",
+          "heading": "modem_control",
+          "content_path": "/interfaces/groups/5",
+          "layout": "table"
+        },
+        {
+          "id": "interface_6",
+          "heading": "baud_rate_output",
+          "content_path": "/interfaces/groups/6",
+          "layout": "table"
+        }
+      ]
+    },
+    "definition": {
+      "sources": [
+        "uart_top.v"
+      ],
+      "direction_reference": "DUT",
+      "parameters": [
+        {
+          "name": "UART_DATA_WIDTH",
+          "width": 8
+        },
+        {
+          "name": "UART_ADDR_WIDTH",
+          "width": 3
+        }
+      ],
+      "ports": [
+        {
+          "direction": "input",
+          "width": 1,
+          "name": "wb_clk_i"
+        },
+        {
+          "direction": "input",
+          "width": 1,
+          "name": "wb_rst_i"
+        },
+        {
+          "direction": "input",
+          "width": 3,
+          "name": "wb_adr_i"
+        },
+        {
+          "direction": "input",
+          "width": 8,
+          "name": "wb_dat_i"
+        },
+        {
+          "direction": "output",
+          "width": 8,
+          "name": "wb_dat_o"
+        },
+        {
+          "direction": "input",
+          "width": 1,
+          "name": "wb_we_i"
+        },
+        {
+          "direction": "input",
+          "width": 1,
+          "name": "wb_stb_i"
+        },
+        {
+          "direction": "input",
+          "width": 1,
+          "name": "wb_cyc_i"
+        },
+        {
+          "direction": "output",
+          "width": 1,
+          "name": "wb_ack_o"
+        },
+        {
+          "direction": "input",
+          "width": 4,
+          "name": "wb_sel_i"
+        },
+        {
+          "direction": "output",
+          "width": 1,
+          "name": "int_o"
+        },
+        {
+          "direction": "output",
+          "width": 1,
+          "name": "stx_pad_o"
+        },
+        {
+          "direction": "input",
+          "width": 1,
+          "name": "srx_pad_i"
+        },
+        {
+          "direction": "output",
+          "width": 1,
+          "name": "rts_pad_o"
+        },
+        {
+          "direction": "input",
+          "width": 1,
+          "name": "cts_pad_i"
+        },
+        {
+          "direction": "output",
+          "width": 1,
+          "name": "dtr_pad_o"
+        },
+        {
+          "direction": "input",
+          "width": 1,
+          "name": "dsr_pad_i"
+        },
+        {
+          "direction": "input",
+          "width": 1,
+          "name": "ri_pad_i"
+        },
+        {
+          "direction": "input",
+          "width": 1,
+          "name": "dcd_pad_i"
+        }
+      ],
+      "defines": [
+        "DATA_BUS_WIDTH_8"
+      ]
+    },
+    "candidates": {
+      "CLK": [
+        "wb_clk_i"
+      ],
+      "WB_ADDR_I": [
+        "wb_adr_i"
+      ]
+    },
+    "proposed_bindings": {
+      "mappings": {
+        "CLK": "wb_clk_i",
+        "WB_ADDR_I": "wb_adr_i"
+      },
+      "width_choices": {
+        "WB_ADDR_I": 3,
+        "WB_DAT_I": 8,
+        "WB_DAT_O": 8
+      },
+      "inactive_spec_ports": {
+        "BAUD_O": "Documented conditional output is disabled in the selected RTL configuration."
+      }
+    }
+  },
+  "review_brief": {
+    "question": "Confirm the selected interface wiring and configuration:\n- CLK: spec width 1, direction input; RTL candidates wb_clk_i\n- WB_ADDR_I: spec width 5 or 3, direction input; RTL candidates wb_adr_i\n- WB_DAT_I: spec width 32 or 8, direction input; RTL wb_dat_i width 8\n- WB_DAT_O: spec width 32 or 8, direction output; RTL wb_dat_o width 8\n- BAUD_O: spec width 1, direction output; optional under if UART_HAS_BAUDRATE_OUTPUT is defined; absent from RTL",
+    "why": "The current evidence does not resolve this required binding: CLK: spec width 1, direction input; RTL candidates wb_clk_i; WB_ADDR_I: spec width 5 or 3, direction input; RTL candidates wb_adr_i",
+    "architecture": "The specification describes the logical interface and permitted variants. The configured RTL inventory defines physical port names and selected widths. Confirm aliases and the selected variant together before any interface or driver is built. Optional-port absence needs an explicit configuration decision.",
+    "impact": "These decisions connect specification signals to physical RTL ports. They must pass independent validation before SV interfaces or verification code can be generated.",
+    "ports": [
+      {
+        "direction": "input",
+        "width": 1,
+        "name": "wb_clk_i"
+      },
+      {
+        "direction": "input",
+        "width": 3,
+        "name": "wb_adr_i"
+      },
+      {
+        "direction": "input",
+        "width": 8,
+        "name": "wb_dat_i"
+      },
+      {
+        "direction": "output",
+        "width": 8,
+        "name": "wb_dat_o"
+      }
+    ],
+    "sources": [
+      {
+        "id": "CH-63ad4d61a5",
+        "path": "uart16550/doc/UART_spec.pdf",
+        "location": "page 6",
+        "report_link": "../../dv/testplan_doc.html#reference-CH-63ad4d61a5",
+        "start": null,
+        "end": null,
+        "quote": "CLK 1 Input Block\u2019s clock input",
+        "authority": "Specification reference"
+      },
+      {
+        "id": "CH-63ad4d61a5",
+        "path": "uart16550/doc/UART_spec.pdf",
+        "location": "page 6",
+        "report_link": "../../dv/testplan_doc.html#reference-CH-63ad4d61a5",
+        "start": null,
+        "end": null,
+        "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+        "authority": "Specification reference"
+      },
+      {
+        "id": "CH-63ad4d61a5",
+        "path": "uart16550/doc/UART_spec.pdf",
+        "location": "page 6",
+        "report_link": "../../dv/testplan_doc.html#reference-CH-63ad4d61a5",
+        "start": null,
+        "end": null,
+        "quote": "WB_DAT_I 32 or 8 Input Data input",
+        "authority": "Specification reference"
+      },
+      {
+        "id": "CH-63ad4d61a5",
+        "path": "uart16550/doc/UART_spec.pdf",
+        "location": "page 6",
+        "report_link": "../../dv/testplan_doc.html#reference-CH-63ad4d61a5",
+        "start": null,
+        "end": null,
+        "quote": "WB_DAT_O 32 or 8 Output Data output",
+        "authority": "Specification reference"
+      },
+      {
+        "id": "CH-8c2c8e9408",
+        "path": "uart16550/doc/UART_spec.pdf",
+        "location": "page 6",
+        "report_link": "../../dv/testplan_doc.html#reference-CH-8c2c8e9408",
+        "start": null,
+        "end": null,
+        "quote": "BAUD_O 1 Output Optional baud rate output signal.\nThe signal here is the 16 x actual baud rate.\nIt is enabled if UART_HAS_BAUDRATE_OUTPUT\nis defined",
+        "authority": "Specification reference"
+      }
+    ],
+    "scope": "Only this infrastructure clarification is approved; other behavior remains unchanged."
+  }
+}

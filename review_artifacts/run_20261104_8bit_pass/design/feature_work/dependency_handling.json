@@ -1,0 +1,331 @@
+{
+  "understanding": "Dependency analysis orders fixed-period clock then chip reset then WISHBONE init config then top stimulus and normal-loopback traffic, with WISHBONE UART interrupt-baud monitors before DLAB interrupt LSR reset-state X-Z scoreboard checks and coverage, and top virtual spawning via shared sequencer config.",
+  "dependencies": [
+    {
+      "task_id": "t_chip_reset",
+      "requires": "t_clk_seq",
+      "reason": "reset_drive coordination needs stable fixed-period clock_generate defined first",
+      "mechanism": "ordering",
+      "controls": [
+        "clock_generate",
+        "reset_drive"
+      ]
+    },
+    {
+      "task_id": "t_wb_init_cfg",
+      "requires": "t_chip_reset",
+      "reason": "DLAB divisor FIFO IER programming is valid only after asynchronous reset bring-up",
+      "mechanism": "ordering",
+      "controls": [
+        "reset_drive",
+        "init_config_sequence"
+      ]
+    },
+    {
+      "task_id": "t_wb_top_seq",
+      "requires": "t_wb_init_cfg",
+      "reason": "controlled register stimulus reuses init DLAB-gating base sequence",
+      "mechanism": "sequence_extension",
+      "controls": [
+        "init_config_sequence"
+      ]
+    },
+    {
+      "task_id": "t_traffic_seq",
+      "requires": "t_wb_init_cfg",
+      "reason": "normal and loopback payload reuse divisor line-format FIFO init base",
+      "mechanism": "sequence_extension",
+      "controls": [
+        "init_config_sequence"
+      ]
+    },
+    {
+      "task_id": "t_wb_mon",
+      "requires": "t_clk_seq",
+      "reason": "sampling on CLK needs fixed-period clock defined first",
+      "mechanism": "ordering",
+      "controls": [
+        "clock_generate"
+      ]
+    },
+    {
+      "task_id": "t_uart_mon",
+      "requires": "t_wb_init_cfg",
+      "reason": "serial sampling relative to programmed divisor needs init divisor first",
+      "mechanism": "ordering",
+      "controls": [
+        "init_config_sequence"
+      ]
+    },
+    {
+      "task_id": "t_irq_baud_mon",
+      "requires": "t_clk_seq",
+      "reason": "baud period stability observation needs fixed-period clock first",
+      "mechanism": "ordering",
+      "controls": [
+        "clock_generate"
+      ]
+    },
+    {
+      "task_id": "t_dlab_gate_chk",
+      "requires": "t_wb_mon",
+      "reason": "DLAB gating check needs reconstructed completed WISHBONE transactions",
+      "mechanism": "ordering",
+      "controls": [
+        "wishbone_monitor"
+      ]
+    },
+    {
+      "task_id": "t_dlab_gate_chk",
+      "requires": "t_wb_init_cfg",
+      "reason": "DLAB set-clear stimulus must be programmed before gating check",
+      "mechanism": "ordering",
+      "controls": [
+        "init_config_sequence"
+      ]
+    },
+    {
+      "task_id": "t_ier_iir_pend",
+      "requires": "t_wb_top_seq",
+      "reason": "IER IIR enable-pending check needs controlled register stimulus",
+      "mechanism": "ordering",
+      "controls": [
+        "wishbone_top_sequence"
+      ]
+    },
+    {
+      "task_id": "t_ier_iir_pend",
+      "requires": "t_irq_baud_mon",
+      "reason": "pending comparison needs passive INT_O observation",
+      "mechanism": "ordering",
+      "controls": [
+        "interrupt_monitor"
+      ]
+    },
+    {
+      "task_id": "t_iir_prio_fixed",
+      "requires": "t_ier_iir_pend",
+      "reason": "priority and fixed-bits reporting builds on enable-pending base",
+      "mechanism": "ordering",
+      "controls": [
+        "interrupt_monitor"
+      ]
+    },
+    {
+      "task_id": "t_lsr_status",
+      "requires": "t_uart_mon",
+      "reason": "LSR Data Ready and error status need TX RX byte reconstruction",
+      "mechanism": "ordering",
+      "controls": [
+        "uart_monitor"
+      ]
+    },
+    {
+      "task_id": "t_lsr_status",
+      "requires": "t_wb_mon",
+      "reason": "LSR read-clear and TX-empty clear need WISHBONE transactions",
+      "mechanism": "ordering",
+      "controls": [
+        "wishbone_monitor"
+      ]
+    },
+    {
+      "task_id": "t_irq_err_chk",
+      "requires": "t_lsr_status",
+      "reason": "overrun parity framing break interrupt reporting builds on LSR status",
+      "mechanism": "ordering",
+      "controls": [
+        "lsr_check"
+      ]
+    },
+    {
+      "task_id": "t_irq_err_chk",
+      "requires": "t_irq_baud_mon",
+      "reason": "enabled-source matching needs INT_O IIR observation",
+      "mechanism": "ordering",
+      "controls": [
+        "interrupt_monitor"
+      ]
+    },
+    {
+      "task_id": "t_reset_state",
+      "requires": "t_chip_reset",
+      "reason": "reset values observable only after reset bring-up",
+      "mechanism": "ordering",
+      "controls": [
+        "reset_drive"
+      ]
+    },
+    {
+      "task_id": "t_reset_state",
+      "requires": "t_wb_mon",
+      "reason": "reset-state scoreboard needs monitor reconstruction of idle bus",
+      "mechanism": "ordering",
+      "controls": [
+        "wishbone_monitor"
+      ]
+    },
+    {
+      "task_id": "t_wb_scoreboard",
+      "requires": "t_wb_mon",
+      "reason": "request-answer matching needs completed transactions",
+      "mechanism": "ordering",
+      "controls": [
+        "wishbone_monitor"
+      ]
+    },
+    {
+      "task_id": "t_e2e_arch",
+      "requires": "t_traffic_seq",
+      "reason": "end-to-end integrity needs normal and loopback traffic stimulus",
+      "mechanism": "ordering",
+      "controls": [
+        "normal_traffic_sequence",
+        "loopback_traffic_sequence"
+      ]
+    },
+    {
+      "task_id": "t_e2e_arch",
+      "requires": "t_uart_mon",
+      "reason": "end-to-end compare needs serial byte queues",
+      "mechanism": "ordering",
+      "controls": [
+        "uart_monitor"
+      ]
+    },
+    {
+      "task_id": "t_modem_irq",
+      "requires": "t_traffic_seq",
+      "reason": "CTS DSR RI DCD toggle stimulus comes from traffic modem toggles",
+      "mechanism": "ordering",
+      "controls": [
+        "normal_traffic_sequence"
+      ]
+    },
+    {
+      "task_id": "t_xz_check",
+      "requires": "t_chip_reset",
+      "reason": "known non-XZ after deassertion needs reset bring-up first",
+      "mechanism": "ordering",
+      "controls": [
+        "reset_drive"
+      ]
+    },
+    {
+      "task_id": "t_xz_check",
+      "requires": "t_wb_mon",
+      "reason": "X-Z check needs sampled control-data monitors",
+      "mechanism": "ordering",
+      "controls": [
+        "wishbone_monitor",
+        "uart_monitor"
+      ]
+    },
+    {
+      "task_id": "t_top_virtual",
+      "requires": "t_wb_top_seq",
+      "reason": "top spawn needs shared WISHBONE sequencer configuration",
+      "mechanism": "p_sequencer_config",
+      "controls": [
+        "wishbone_sequencer"
+      ]
+    },
+    {
+      "task_id": "t_top_virtual",
+      "requires": "t_traffic_seq",
+      "reason": "top normal-traffic coordination needs shared traffic sequencer configuration",
+      "mechanism": "p_sequencer_config",
+      "controls": [
+        "traffic_sequencer"
+      ]
+    },
+    {
+      "task_id": "t_top_virtual",
+      "requires": "t_clk_seq",
+      "reason": "top spawn needs shared fixed-period clock sequencer configuration",
+      "mechanism": "p_sequencer_config",
+      "controls": [
+        "clock_sequencer"
+      ]
+    },
+    {
+      "task_id": "t_top_virtual",
+      "requires": "t_chip_reset",
+      "reason": "top spawn needs shared reset sequencer configuration",
+      "mechanism": "p_sequencer_config",
+      "controls": [
+        "reset_sequencer"
+      ]
+    },
+    {
+      "task_id": "t_wb_reg_cov",
+      "requires": "t_wb_mon",
+      "reason": "register address direction coverage needs sampled transactions",
+      "mechanism": "ordering",
+      "controls": [
+        "wishbone_monitor"
+      ]
+    },
+    {
+      "task_id": "t_divisor_cov",
+      "requires": "t_wb_init_cfg",
+      "reason": "LSB MSB zero maximum divisor coverage needs DLAB-gated programming",
+      "mechanism": "ordering",
+      "controls": [
+        "init_config_sequence"
+      ]
+    },
+    {
+      "task_id": "t_irq_id_cov",
+      "requires": "t_irq_baud_mon",
+      "reason": "pending priority coverage needs INT_O IIR observation",
+      "mechanism": "ordering",
+      "controls": [
+        "interrupt_monitor"
+      ]
+    },
+    {
+      "task_id": "t_line_err_cov",
+      "requires": "t_uart_mon",
+      "reason": "line-status error cross needs serial transfer observation",
+      "mechanism": "ordering",
+      "controls": [
+        "uart_monitor"
+      ]
+    },
+    {
+      "task_id": "t_clk_cov",
+      "requires": "t_clk_seq",
+      "reason": "period band boundary stratum coverage needs fixed-period clock stimulus",
+      "mechanism": "ordering",
+      "controls": [
+        "clock_generate"
+      ]
+    },
+    {
+      "task_id": "t_addr_dlab_cov",
+      "requires": "t_dlab_gate_chk",
+      "reason": "address by DLAB cross builds on divisor versus normal aliasing check",
+      "mechanism": "ordering",
+      "controls": [
+        "dlab_check"
+      ]
+    },
+    {
+      "task_id": "t_modem_traffic_cov",
+      "requires": "t_modem_irq",
+      "reason": "modem by traffic cross needs Modem Status interrupt base during data flow",
+      "mechanism": "ordering",
+      "controls": [
+        "modem_check"
+      ]
+    }
+  ],
+  "questions": [
+    "No source documents supplied here: which DOCUMENTED spec references anchor divisor DLAB IER IIR LSR modem reset and clock behavior for facts?",
+    "What are the evidenced reset polarity tie-offs bus address representation and inactive levels for handshake and flow-control inputs?",
+    "What is the source-supported divisor programming order DLAB aliasing at addresses 0-1 and baud-tick relation?",
+    "What are the source-supported IER enable bits IIR priority encodings fixed bits pending polarity and reset controls?",
+    "What are the source-supported LSR Data Ready Overrun Parity Framing Break set and read-clear conditions plus modem-status interrupt enable?"
+  ]
+}

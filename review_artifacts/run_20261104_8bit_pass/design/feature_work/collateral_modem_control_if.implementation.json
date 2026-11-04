@@ -1,0 +1,81 @@
+{
+  "agents": [
+    {
+      "id": "modem_control_if",
+      "protocol": "custom",
+      "bindings": {
+        "RTS_PAD_O": "rts_pad_o",
+        "DTR_PAD_O": "dtr_pad_o",
+        "CTS_PAD_I": "cts_pad_i",
+        "DSR_PAD_I": "dsr_pad_i",
+        "RI_PAD_I": "ri_pad_i",
+        "DCD_PAD_I": "dcd_pad_i"
+      },
+      "fact_ids": [
+        "f_cts_pad_i",
+        "f_dsr_pad_i",
+        "f_ri_pad_i",
+        "f_function_1",
+        "f_connected_1"
+      ],
+      "bit_cycles": 2,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "active": true,
+      "coverage_enabled": false,
+      "idle_values": {
+        "cts_pad_i": 0,
+        "dsr_pad_i": 0,
+        "ri_pad_i": 0,
+        "dcd_pad_i": 0
+      }
+    }
+  ],
+  "tie_offs": [],
+  "registers": [],
+  "hooks": [],
+  "defines": [],
+  "facts": [
+    {
+      "id": "f_cts_pad_i",
+      "statement": "CTS_PAD_I is a 1-bit DUT input Clear To Send in modem_control interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "CTS_PAD_I 1 Input Clear To Send",
+      "plan_pointer": "/interfaces/groups/5/signals/2"
+    },
+    {
+      "id": "f_dsr_pad_i",
+      "statement": "DSR_PAD_I is a 1-bit DUT input Data Set Ready in modem_control interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DSR_PAD_I 1 Input Data Set Ready",
+      "plan_pointer": "/interfaces/groups/5/signals/3"
+    },
+    {
+      "id": "f_ri_pad_i",
+      "statement": "RI_PAD_I is a 1-bit DUT input Ring Indicator in modem_control interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "RI_PAD_I 1 Input Ring Indicator",
+      "plan_pointer": "/interfaces/groups/5/signals/4"
+    },
+    {
+      "id": "f_function_1",
+      "statement": "Modem control register transfers control signals to modem connected to UART",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/function"
+    },
+    {
+      "id": "f_connected_1",
+      "statement": "Modem control interface connects to modem",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/connected_to"
+    }
+  ],
+  "questions": [
+    "What DUT sampling edge, if any, applies to cts_pad_i, dsr_pad_i, ri_pad_i, dcd_pad_i and rts_pad_o, dtr_pad_o for later monitor phases?",
+    "Is any modem status-change or interrupt mapping needed for later scoreboard and functional phases?",
+    "Evidence substituted: f_dcd_pad_i, f_dtr_pad_o, f_rts_pad_o could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them."
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "understanding": "Cover DLAB-gated divisor latch programming with LSB MSB zero max and combined value bins sampled on Wishbone write completions with DLAB 1.",
+  "preconditions": [
+    "Common clock running and chip reset completed via common reset leaving divisor 0 disabling I/O [f_div_zero]",
+    "wishbone_slave_interface agent owns wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i and observes wb_dat_o wb_ack_o using 3-bit pin values 0 and 1 for LSB MSB [f_lsb_addr f_msb_addr]",
+    "LCR DLAB mechanism available: DLAB 1 selects divisor latches DLAB 0 selects normal registers; start with DLAB 0 idle [f_dlab_gating f_dlab_bit f_dlab_restore]",
+    "Other DUT inputs owned by their agents per existing_agent_ids with clock and reset as common UVCs; no reset polarity or inactive levels assumed"
+  ],
+  "stimulus_steps": [
+    "STAGE bring_up via wishbone_slave_interface only: WRITE LCR with DLAB 1 using symbolic LCR address; WAIT wb_ack_o completion on clock [f_dlab_gating f_dlab_bit f_dlab_restore]",
+    "STAGE divisor_program with DLAB 1: FOR each pair in zero 0x00_0x00 min 0x01_0x01 symbolic_mid_low symbolic_mid_high max 0xFF_0xFF plus cross 0x00_0xFF and 0xFF_0x00: WRITE wb_adr_i 1 with MSB value THEN WRITE wb_adr_i 0 with LSB value; WAIT each wb_ack_o completion [f_msb_addr f_lsb_addr f_div_order f_div_single f_div_both]",
+    "STAGE dlab_return: WRITE LCR with DLAB 0 using symbolic LCR address; WAIT completion; IF normal alias needed THEN WRITE normal register at adr 0_1 with DLAB 0 to sample dlab_0_normal; WAIT completion [f_dlab_bit f_dlab_restore]",
+    "Cleanup: LEAVE DLAB 0 with wishbone bus idle-owned for handoff; no VIF delays in virtual control [f_dlab_restore]"
+  ],
+  "check_steps": [],
+  "coverage_steps": [
+    "SAMPLE cg_dlab_divisor on each wishbone write completion on clock edges via wishbone_slave_interface monitor analysis port: cp_dlab from LCR DLAB, cp_div_lsb from data at adr 0 when DLAB 1, cp_div_msb from data at adr 1 when DLAB 1; single UART instance per-instance false [f_dlab_gating f_dlab_bit f_lsb_addr f_msb_addr]",
+    "SAMPLE rc_divisor_bytes cp_divisor_value on DLAB 1 completions combining LSB plus MSB as single 16-bit value; IGNORE access_with_DLAB_0; cover lsb_zero mid max msb_zero mid max combined_zero_disables versus combined_nonzero_enables [f_div_single f_div_both f_div_zero]"
+  ],
+  "completion": [
+    "Done when LSB zero 0x00 min 0x01 mid_low mid_high max 0xFF and MSB zero min mid_low mid_high max with DLAB 1 plus combined_zero_disables and combined_nonzero_enables SAMPLED and DLAB restored to 0 with wishbone bus idle-owned [f_lsb_addr f_msb_addr f_div_single f_div_zero]",
+    "Bound by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing; cleanup leaves DLAB 0 [f_dlab_restore]"
+  ],
+  "facts": [
+    {
+      "id": "f_lsb_addr",
+      "statement": "Divisor Latch LSB is 8-bit RW at bus address 0.",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 1 (LSB) 0 8 RW The LSB of the divisor",
+      "plan_pointer": "/registers/registers/0"
+    },
+    {
+      "id": "f_msb_addr",
+      "statement": "Divisor Latch MSB is 8-bit RW at bus address 1.",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 2 1 8 RW The MSB of the divisor",
+      "plan_pointer": "/registers/registers/3"
+    },
+    {
+      "id": "f_dlab_gating",
+      "statement": "Divisor registers accessible when LCR DLAB bit 7 is 1; normal registers at addresses 0-1 not accessible then.",
+      "source_id": "CH-f88915355b",
+      "quote": "The registers can be accessed when the 7th (DLAB) bit of the Line Control Register is set\nto \u20181\u2019. At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/registers/registers/0"
+    },
+    {
+      "id": "f_dlab_bit",
+      "statement": "LCR bit 7 value 1 selects divisor latches, value 0 selects normal registers.",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "\u20181\u2019 \u2013 The divisor latches can be accessed\n \u20180\u2019 \u2013 The normal registers are accessed",
+      "plan_pointer": "/registers/registers/7/fields/6"
+    },
+    {
+      "id": "f_div_single",
+      "statement": "LSB and MSB form one 16-bit divisor accessed internally as single number.",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The 2 bytes form one 16-bit register, which is\ninternally accessed as a single number.",
+      "plan_pointer": "/sections/1/entries/8"
+    },
+    {
+      "id": "f_div_both",
+      "statement": "Both divisor bytes must be set to ensure normal operation.",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "You should therefore set all 2 bytes of the register\nto ensure normal operation.",
+      "plan_pointer": "/sections/1/entries/8"
+    },
+    {
+      "id": "f_div_order",
+      "statement": "Program divisor MSB first LSB last; counter starts when LSB written.",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The internal counter starts to work when the LSB of DL is written, so when setting the\ndivisor, write the MSB first and the LSB last.",
+      "plan_pointer": "/sections/1/entries/8"
+    },
+    {
+      "id": "f_div_zero",
+      "statement": "Divisor default 0 on reset disables serial I/O requiring explicit setup.",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The register is set to the default value of 0 on reset, which\ndisables all serial I/O operations in order to ensure explicit setup of the register in the\nsoftware.",
+      "plan_pointer": "/sections/1/entries/8"
+    },
+    {
+      "id": "f_dlab_restore",
+      "statement": "Access divisor by setting LCR bit 7 to 1 and restore to 0 after to restore other registers.",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The divisor latches can be accessed by setting the 7th bit of LCR to \u20181\u2019. You should\nrestore this bit to \u20180\u2019 after setting the divisor latches in order to restore access to the other\nregisters that occupy the same addresses.",
+      "plan_pointer": "/sections/1/entries/8"
+    }
+  ],
+  "questions": [
+    "What are documented legal divisor values including zero and maximum handling for bins? Is combined 0x0000 only disabling I/O versus illegal and is 0xFFFF legal maximum for combined_zero_disables versus combined_nonzero_enables?",
+    "What are reset values of LSB at address 0 and MSB at address 1 for mirror comparison masks? Documented reset is empty so unknown reset must be null."
+  ],
+  "blockers": []
+}

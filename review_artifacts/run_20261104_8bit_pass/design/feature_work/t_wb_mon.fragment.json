@@ -1,0 +1,103 @@
+{
+  "sequencer_variables": [],
+  "registers": [],
+  "facts": [
+    {
+      "id": "t_wb_mon_f_bus_8",
+      "statement": "Integration targets 8-bit data bus build for compatibility reason.",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "It has an 8-bit data bus for compatibility reason.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "t_wb_mon_f_wb_sel",
+      "statement": "WISHBONE interface includes wb_sel_i select signal.",
+      "source_id": "CH-32b051cdb1",
+      "quote": "wb_sel_i signal is added to the list.",
+      "plan_pointer": "/sections/8/entries/0"
+    }
+  ],
+  "sequences": [],
+  "routes": [],
+  "checks": [
+    {
+      "id": "t_wb_mon_check_xz",
+      "agent": "wishbone_slave_interface",
+      "kind": "known_controls",
+      "fact_ids": [
+        "t_wb_mon_f_wb_sel",
+        "t_wb_mon_f_bus_8"
+      ]
+    },
+    {
+      "id": "t_wb_mon_check_known",
+      "agent": "wishbone_slave_interface",
+      "kind": "known_controls",
+      "fact_ids": [
+        "t_wb_mon_f_wb_sel",
+        "t_wb_mon_f_bus_8"
+      ]
+    }
+  ],
+  "hooks": [],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "Deferred: coverage t_wb_mon_cov_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_mon_cov_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_mon_hook_sample does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_flush does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_emit does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_cov_reg does not fit the testbench: Coverage hook requires selected coverage infrastructure; hook t_wb_mon_hook_cov_dlab does not fit the testbench: Coverage hook requires selected coverage infrastructure"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [],
+      "question": "Deferred: coverage t_wb_mon_cov_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_mon_cov_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_mon_hook_sample does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_flush does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_emit does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_cov_reg does not fit the testbench: Coverage hook requires selected coverage infrastructure; hook t_wb_mon_hook_cov_dlab does not fit the testbench: Coverage hook requires selected coverage infrastructure"
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [],
+      "question": "Deferred: coverage t_wb_mon_cov_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_mon_cov_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_mon_hook_sample does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_flush does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_emit does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_cov_reg does not fit the testbench: Coverage hook requires selected coverage infrastructure; hook t_wb_mon_hook_cov_dlab does not fit the testbench: Coverage hook requires selected coverage infrastructure"
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [],
+      "question": "Deferred: coverage t_wb_mon_cov_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_mon_cov_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_mon_hook_sample does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_flush does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_emit does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_cov_reg does not fit the testbench: Coverage hook requires selected coverage infrastructure; hook t_wb_mon_hook_cov_dlab does not fit the testbench: Coverage hook requires selected coverage infrastructure"
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [
+        "t_wb_mon_check_xz"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [
+        "t_wb_mon_check_known"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [],
+      "question": "Deferred: coverage t_wb_mon_cov_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_mon_cov_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_mon_hook_sample does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_flush does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_emit does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_cov_reg does not fit the testbench: Coverage hook requires selected coverage infrastructure; hook t_wb_mon_hook_cov_dlab does not fit the testbench: Coverage hook requires selected coverage infrastructure"
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [],
+      "question": "Deferred: coverage t_wb_mon_cov_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_mon_cov_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_mon_hook_sample does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_flush does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_emit does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_wb_mon_hook_cov_reg does not fit the testbench: Coverage hook requires selected coverage infrastructure; hook t_wb_mon_hook_cov_dlab does not fit the testbench: Coverage hook requires selected coverage infrastructure"
+    }
+  ],
+  "questions": [
+    "What is active level polarity of wb_rst_i described as Asynchronous Reset and required reset duration in CLK cycles and must monitor flush in-flight transfer versus flag reset-during-transfer as error?",
+    "What are documented WISHBONE handshake semantics for reconstruction: stability of wb_adr_i wb_we_i wb_sel_i wb_stb_i wb_cyc_i during transfer and wb_ack_o assertion window single versus multi-cycle and wb_dat_o validity window on reads and back-to-back handling?",
+    "What is documented wb_sel_i usage in 8-bit build including legal values and ignored versus checked behavior and address representation as pin values 0-6 versus offsets and illegal addr_7 handling?",
+    "What is documented CLK sampling edge for wishbone_slave_interface monitor and reset sampling relative to CLK given fixed period P_fixed per test?",
+    "Deferred (quick testing): coverage t_wb_mon_cov_reg_access does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): coverage t_wb_mon_cov_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): hook t_wb_mon_hook_sample does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned",
+    "Deferred (quick testing): hook t_wb_mon_hook_flush does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned",
+    "Deferred (quick testing): hook t_wb_mon_hook_emit does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned",
+    "Deferred (quick testing): hook t_wb_mon_hook_cov_reg does not fit the testbench: Coverage hook requires selected coverage infrastructure",
+    "Deferred (quick testing): hook t_wb_mon_hook_cov_dlab does not fit the testbench: Coverage hook requires selected coverage infrastructure"
+  ]
+}

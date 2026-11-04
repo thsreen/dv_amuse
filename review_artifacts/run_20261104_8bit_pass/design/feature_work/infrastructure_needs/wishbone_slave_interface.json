@@ -1,0 +1,76 @@
+{
+  "level": "full_agent",
+  "reason": "Full active master agent is minimum: documented WISHBONE bus defines 6 DUT inputs requiring driven register-selection and read/write stimulus and 2 DUT outputs requiring observation for acknowledge and read data. Passive or scaffold_only cannot program registers nor move TX/RX payload via this SoC register-access bus. This architecture choice is inferred from documented bus grouping and drive/observe map and needs review.",
+  "responsibilities": [
+    "Drive wb_adr_i for register selection",
+    "Drive wb_sel_i, wb_we_i, wb_stb_i, wb_cyc_i for transfer control and read versus write selection",
+    "Drive wb_dat_i for write data payload",
+    "Observe wb_dat_o for read data and wb_ack_o for transfer acknowledge",
+    "Provide driver plus sequencer for controlled register reads and writes and monitor for transaction reconstruction to support later register-model use"
+  ],
+  "coverage": false,
+  "facts": [
+    {
+      "id": "f_wb_adr_i",
+      "statement": "The specification defines WB_ADDR_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+      "plan_pointer": "/interfaces/groups/0/signals/0"
+    },
+    {
+      "id": "f_wb_sel_i",
+      "statement": "The specification defines WB_SEL_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_SEL_I 4 Input Select signal",
+      "plan_pointer": "/interfaces/groups/0/signals/1"
+    },
+    {
+      "id": "f_wb_dat_i",
+      "statement": "The specification defines WB_DAT_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_DAT_I 32 or 8 Input Data input",
+      "plan_pointer": "/interfaces/groups/0/signals/2"
+    },
+    {
+      "id": "f_wb_dat_o",
+      "statement": "The specification defines WB_DAT_O as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_DAT_O 32 or 8 Output Data output",
+      "plan_pointer": "/interfaces/groups/0/signals/3"
+    },
+    {
+      "id": "f_wb_we_i",
+      "statement": "The specification defines WB_WE_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_WE_I 1 Input Write or read cycle selection",
+      "plan_pointer": "/interfaces/groups/0/signals/4"
+    },
+    {
+      "id": "f_wb_stb_i",
+      "statement": "The specification defines WB_STB_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_STB_I 1 Input Specifies transfer cycle",
+      "plan_pointer": "/interfaces/groups/0/signals/5"
+    },
+    {
+      "id": "f_wb_cyc_i",
+      "statement": "The specification defines WB_CYC_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_CYC_I 1 Input A bus cycle is in progress",
+      "plan_pointer": "/interfaces/groups/0/signals/6"
+    },
+    {
+      "id": "f_wb_ack_o",
+      "statement": "The specification defines WB_ACK_O as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ACK_O 1 Output Acknowledge of a transfer",
+      "plan_pointer": "/interfaces/groups/0/signals/7"
+    }
+  ],
+  "questions": [
+    "For wishbone_slave_interface on CLK: which clock edge samples wb_adr_i/wb_dat_i/wb_dat_o/wb_we_i/wb_stb_i/wb_cyc_i/wb_ack_o, since spec defines ports and transfer descriptions but no sampling edge; needed to finalize monitor sampling in a later phase, not to block scaffold.",
+    "For wishbone_slave_interface handshake wb_stb_i/wb_cyc_i/wb_ack_o with wb_dat_o: what acknowledge latency and stability rule applies, since spec states Specifies transfer cycle and Acknowledge of a transfer but no timing bound; needed for later protocol checks, not for infrastructure ownership."
+  ],
+  "review_status": "NEEDS_REVIEW",
+  "provenance": "INFERRED_IMPLEMENTATION_CHOICE"
+}

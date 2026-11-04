@@ -1,0 +1,479 @@
+{
+  "contract": "verification_codegen_v1",
+  "top": "uart_top",
+  "clock": "wb_clk_i",
+  "reset": "wb_rst_i",
+  "reset_active": "high",
+  "clock_period_ns": 10.0,
+  "clock_period_ranges": [],
+  "reset_cycles": 10,
+  "defines": [],
+  "request_timeout_cycles": 10000,
+  "facts": [
+    {
+      "id": "clock_binding",
+      "statement": "The specification defines CLK as the testbench-supplied clock",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input Block\u2019s clock input",
+      "plan_pointer": "/interfaces/groups/1/property_evidence/category"
+    },
+    {
+      "id": "test_e23b96fccb734832e468",
+      "statement": "Quick-testing inferred binding",
+      "source_id": "QUICK-TEST-e23b96fccb734832e468",
+      "quote": "QUICK TESTING ONLY inferred binding for foundation_reset: {\"reset\": \"wb_rst_i\", \"reset_active\": \"high\", \"reset_cycles\": 10} \u2014 Automatically approved for quick testing on 2026-11-04T15:40:45.212225+00:00; NOT human approval or sign-off. Reason: Port list shows single reset wb_rst_i and excerpt only says Asynchronous Reset with no polarity. Wishbone/OpenCores uart16550 convention and plain _rst_i naming both indicate active-high, so bind wb_rst_i high.. Assumptions: Guessed for quick test only: reset_active is high based on general Wishbone/OpenCores convention that RST_I is active-high; rejected alternative active-low.; Outside knowledge: naming convention that active-low would normally be wb_rst_n_i / rst_n / reset_n, while plain wb_rst_i implies active-high; rejected treating bare rst as active-low.; Guessed for quick test only: reset is wb_rst_i as the sole 1-bit reset in the supplied port list with no competing reset; rejected no-reset or other port.; Guessed for quick test only: reset_cycles 10 as plausible testbench hold length since spec gives no value; rejected very short 0-2 cycle hold as risky for async reset.",
+      "plan_pointer": "/sections/14/entries/1"
+    },
+    {
+      "id": "port_int_o",
+      "statement": "The specification defines INT_O as a port of this interface",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/signals/0"
+    },
+    {
+      "id": "port_stx_pad_o",
+      "statement": "The specification defines STX_PAD_O as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "STX_PAD_O 1 Output The serial output signal",
+      "plan_pointer": "/interfaces/groups/4/signals/0"
+    },
+    {
+      "id": "port_srx_pad_i",
+      "statement": "The specification defines SRX_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "SRX_PAD_I 1 Input The serial input signal",
+      "plan_pointer": "/interfaces/groups/4/signals/1"
+    },
+    {
+      "id": "port_rts_pad_o",
+      "statement": "The specification defines RTS_PAD_O as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "RTS_PAD_O 1 Output Request To Send",
+      "plan_pointer": "/interfaces/groups/5/signals/0"
+    },
+    {
+      "id": "port_dtr_pad_o",
+      "statement": "The specification defines DTR_PAD_O as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DTR_PAD_O 1 Output Data Terminal Ready",
+      "plan_pointer": "/interfaces/groups/5/signals/1"
+    },
+    {
+      "id": "port_cts_pad_i",
+      "statement": "The specification defines CTS_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "CTS_PAD_I 1 Input Clear To Send",
+      "plan_pointer": "/interfaces/groups/5/signals/2"
+    },
+    {
+      "id": "port_dsr_pad_i",
+      "statement": "The specification defines DSR_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DSR_PAD_I 1 Input Data Set Ready",
+      "plan_pointer": "/interfaces/groups/5/signals/3"
+    },
+    {
+      "id": "port_ri_pad_i",
+      "statement": "The specification defines RI_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "RI_PAD_I 1 Input Ring Indicator",
+      "plan_pointer": "/interfaces/groups/5/signals/4"
+    },
+    {
+      "id": "port_dcd_pad_i",
+      "statement": "The specification defines DCD_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DCD_PAD_I 1 Input Data Carrier Detect",
+      "plan_pointer": "/interfaces/groups/5/signals/5"
+    },
+    {
+      "id": "port_wb_adr_i",
+      "statement": "The specification defines WB_ADDR_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+      "plan_pointer": "/interfaces/groups/0/signals/0"
+    },
+    {
+      "id": "port_wb_sel_i",
+      "statement": "The specification defines WB_SEL_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_SEL_I 4 Input Select signal",
+      "plan_pointer": "/interfaces/groups/0/signals/1"
+    },
+    {
+      "id": "port_wb_dat_i",
+      "statement": "The specification defines WB_DAT_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_DAT_I 32 or 8 Input Data input",
+      "plan_pointer": "/interfaces/groups/0/signals/2"
+    },
+    {
+      "id": "port_wb_dat_o",
+      "statement": "The specification defines WB_DAT_O as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_DAT_O 32 or 8 Output Data output",
+      "plan_pointer": "/interfaces/groups/0/signals/3"
+    },
+    {
+      "id": "port_wb_we_i",
+      "statement": "The specification defines WB_WE_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_WE_I 1 Input Write or read cycle selection",
+      "plan_pointer": "/interfaces/groups/0/signals/4"
+    },
+    {
+      "id": "port_wb_stb_i",
+      "statement": "The specification defines WB_STB_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_STB_I 1 Input Specifies transfer cycle",
+      "plan_pointer": "/interfaces/groups/0/signals/5"
+    },
+    {
+      "id": "port_wb_cyc_i",
+      "statement": "The specification defines WB_CYC_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_CYC_I 1 Input A bus cycle is in progress",
+      "plan_pointer": "/interfaces/groups/0/signals/6"
+    },
+    {
+      "id": "port_wb_ack_o",
+      "statement": "The specification defines WB_ACK_O as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ACK_O 1 Output Acknowledge of a transfer",
+      "plan_pointer": "/interfaces/groups/0/signals/7"
+    },
+    {
+      "id": "f_port_int_o",
+      "statement": "The specification defines INT_O as 1-bit Output Interrupt output",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/signals/0"
+    },
+    {
+      "id": "f_dut_source",
+      "statement": "DUT role for interrupt_output is source with direction out of DUT",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/dut_role"
+    },
+    {
+      "id": "f_core_interrupt",
+      "statement": "The core requires one interrupt",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "The core requires one interrupt.",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/connected_to"
+    },
+    {
+      "id": "f_port_int_o_2",
+      "statement": "Specification defines INT_O as 1-bit Output Interrupt output",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/signals/0"
+    },
+    {
+      "id": "f_function_interrupt",
+      "statement": "Function of interrupt_output is Interrupt output to signal UART events to system",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/function"
+    },
+    {
+      "id": "f_category_interrupt",
+      "statement": "Category of interrupt_output is interrupt",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/category"
+    },
+    {
+      "id": "f_stx_port",
+      "statement": "STX_PAD_O is a 1-bit DUT output defined as The serial output signal",
+      "source_id": "CH-98be4510fb",
+      "quote": "STX_PAD_O 1 Output The serial output signal",
+      "plan_pointer": "/interfaces/groups/4/signals/0"
+    },
+    {
+      "id": "f_srx_port",
+      "statement": "SRX_PAD_I is a 1-bit DUT input defined as The serial input signal",
+      "source_id": "CH-98be4510fb",
+      "quote": "SRX_PAD_I 1 Input The serial input signal",
+      "plan_pointer": "/interfaces/groups/4/signals/1"
+    },
+    {
+      "id": "f_function",
+      "statement": "uart_serial_data function is UART serial transmit and receive data lines using STX_PAD_O and SRX_PAD_I",
+      "source_id": "CH-98be4510fb",
+      "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/function"
+    },
+    {
+      "id": "f_protocol",
+      "statement": "uart_serial_data protocol is RS232 over serial cable",
+      "source_id": "CH-2baa4497c0",
+      "quote": "like another computer using a serial cable and RS232 protocol.",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/protocol"
+    },
+    {
+      "id": "f_peer",
+      "statement": "uart_serial_data connects to modem or other external devices for serial communication",
+      "source_id": "CH-2baa4497c0",
+      "quote": "which allow communication with modem or other external\ndevices, like another computer using a serial cable and RS232 protocol.",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/connected_to"
+    },
+    {
+      "id": "f_category",
+      "statement": "UART core provides serial communication capabilities for this interface",
+      "source_id": "CH-2baa4497c0",
+      "quote": "The UART (Universal Asynchronous Receiver/Transmitter) core provides serial\ncommunication capabilities",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/category"
+    },
+    {
+      "id": "f_function_1",
+      "statement": "Modem control register transfers control signals to modem connected to UART",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/function"
+    },
+    {
+      "id": "f_connected_1",
+      "statement": "Modem control interface connects to modem",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/connected_to"
+    },
+    {
+      "id": "f_peer_1",
+      "statement": "Modem control peer is external off-chip device",
+      "source_id": "CH-98be4510fb",
+      "quote": "2.3 External (off-chip) connections",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/peer_type"
+    },
+    {
+      "id": "f_cts_pad_i",
+      "statement": "CTS_PAD_I is a 1-bit DUT input Clear To Send in modem_control interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "CTS_PAD_I 1 Input Clear To Send",
+      "plan_pointer": "/interfaces/groups/5/signals/2"
+    },
+    {
+      "id": "f_dsr_pad_i",
+      "statement": "DSR_PAD_I is a 1-bit DUT input Data Set Ready in modem_control interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DSR_PAD_I 1 Input Data Set Ready",
+      "plan_pointer": "/interfaces/groups/5/signals/3"
+    },
+    {
+      "id": "f_ri_pad_i",
+      "statement": "RI_PAD_I is a 1-bit DUT input Ring Indicator in modem_control interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "RI_PAD_I 1 Input Ring Indicator",
+      "plan_pointer": "/interfaces/groups/5/signals/4"
+    },
+    {
+      "id": "f_wb_adr_i",
+      "statement": "The specification defines WB_ADDR_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+      "plan_pointer": "/interfaces/groups/0/signals/0"
+    },
+    {
+      "id": "f_wb_sel_i",
+      "statement": "The specification defines WB_SEL_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_SEL_I 4 Input Select signal",
+      "plan_pointer": "/interfaces/groups/0/signals/1"
+    },
+    {
+      "id": "f_wb_dat_i",
+      "statement": "The specification defines WB_DAT_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_DAT_I 32 or 8 Input Data input",
+      "plan_pointer": "/interfaces/groups/0/signals/2"
+    },
+    {
+      "id": "f_wb_dat_o",
+      "statement": "The specification defines WB_DAT_O as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_DAT_O 32 or 8 Output Data output",
+      "plan_pointer": "/interfaces/groups/0/signals/3"
+    },
+    {
+      "id": "f_wb_we_i",
+      "statement": "The specification defines WB_WE_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_WE_I 1 Input Write or read cycle selection",
+      "plan_pointer": "/interfaces/groups/0/signals/4"
+    },
+    {
+      "id": "f_wb_stb_i",
+      "statement": "The specification defines WB_STB_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_STB_I 1 Input Specifies transfer cycle",
+      "plan_pointer": "/interfaces/groups/0/signals/5"
+    },
+    {
+      "id": "f_wb_cyc_i",
+      "statement": "The specification defines WB_CYC_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_CYC_I 1 Input A bus cycle is in progress",
+      "plan_pointer": "/interfaces/groups/0/signals/6"
+    },
+    {
+      "id": "f_wb_ack_o",
+      "statement": "The specification defines WB_ACK_O as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ACK_O 1 Output Acknowledge of a transfer",
+      "plan_pointer": "/interfaces/groups/0/signals/7"
+    }
+  ],
+  "agents": [
+    {
+      "id": "interrupt_output",
+      "protocol": "custom",
+      "bindings": {
+        "INT_O": "int_o"
+      },
+      "fact_ids": [
+        "f_port_int_o_2",
+        "f_dut_source"
+      ],
+      "bit_cycles": 2,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "active": false,
+      "coverage_enabled": false,
+      "idle_values": {}
+    },
+    {
+      "id": "uart_serial_data",
+      "protocol": "serial",
+      "bindings": {
+        "tx": "stx_pad_o",
+        "rx": "srx_pad_i"
+      },
+      "fact_ids": [
+        "f_srx_port",
+        "f_function",
+        "f_protocol",
+        "f_peer",
+        "f_category"
+      ],
+      "bit_cycles": 16,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "active": true,
+      "coverage_enabled": false,
+      "idle_values": {
+        "srx_pad_i": 1
+      }
+    },
+    {
+      "id": "modem_control_if",
+      "protocol": "custom",
+      "bindings": {
+        "RTS_PAD_O": "rts_pad_o",
+        "DTR_PAD_O": "dtr_pad_o",
+        "CTS_PAD_I": "cts_pad_i",
+        "DSR_PAD_I": "dsr_pad_i",
+        "RI_PAD_I": "ri_pad_i",
+        "DCD_PAD_I": "dcd_pad_i"
+      },
+      "fact_ids": [
+        "f_cts_pad_i",
+        "f_dsr_pad_i",
+        "f_ri_pad_i",
+        "f_function_1",
+        "f_connected_1"
+      ],
+      "bit_cycles": 2,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "active": true,
+      "coverage_enabled": false,
+      "idle_values": {
+        "cts_pad_i": 0,
+        "dsr_pad_i": 0,
+        "ri_pad_i": 0,
+        "dcd_pad_i": 0
+      }
+    },
+    {
+      "id": "wishbone_slave_interface",
+      "protocol": "wishbone",
+      "bindings": {
+        "addr": "wb_adr_i",
+        "wdata": "wb_dat_i",
+        "rdata": "wb_dat_o",
+        "we": "wb_we_i",
+        "stb": "wb_stb_i",
+        "cyc": "wb_cyc_i",
+        "ack": "wb_ack_o"
+      },
+      "fact_ids": [
+        "f_wb_stb_i",
+        "f_wb_cyc_i",
+        "f_wb_ack_o"
+      ],
+      "bit_cycles": 2,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "active": true,
+      "coverage_enabled": false,
+      "idle_values": {
+        "wb_adr_i": 0,
+        "wb_dat_i": 0,
+        "wb_we_i": 0,
+        "wb_stb_i": 0,
+        "wb_cyc_i": 0
+      }
+    }
+  ],
+  "tie_offs": [
+    {
+      "id": "hold_wb_sel_i",
+      "signal": "wb_sel_i",
+      "value": 0,
+      "fact_ids": [
+        "f_wb_stb_i",
+        "f_wb_cyc_i",
+        "f_wb_ack_o"
+      ]
+    }
+  ],
+  "registers": [],
+  "sequences": [],
+  "sequencer_variables": [],
+  "routes": [],
+  "checks": [],
+  "tests": [],
+  "hooks": [],
+  "coverage": [],
+  "questions": [
+    "What is the asserted active level of int_o and its deasserted state for interpreting observed edges, since sources document INT_O as 1-bit Output Interrupt output but leave active_level unknown?",
+    "Evidence substituted: f_iir_pending could not be proven from the retrieved sources (Fact quote must occur in a retrieved source excerpt); the documented facts of this interface are cited instead. Review the choice that cited them.",
+    "What is the asserted active level of int_o for interpreting observed edges, given documented INT_O 1-bit Output Interrupt output leaves active_level unknown?",
+    "On which sampling reference should int_o be observed for later-phase event correlation, deferred from this observe-only infrastructure?",
+    "For uart_serial_data srx_pad_i/stx_pad_o: documented sources confirm RS232 external-device link and input/output directions but do not specify frame parameters and divisor-to-baud sampling reference; what baud/frame configuration should the full_agent use to drive SRX and reconstruct STX bytes and coordinate with WISHBONE payload in later phases?",
+    "For uart_serial_data stx_pad_o/srx_pad_i: documented sources confirm RS232 external-device link and input/output directions [f_protocol,f_peer,f_stx_port,f_srx_port] but do not specify data_bits/parity/stop_bits or divisor-to-baud mapping; what frame and baud configuration should the serial agent assume for later-phase TX/RX byte framing, with current collateral using placeholder 8N1?",
+    "Evidence substituted: f_stx_port could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them.",
+    "What DUT sampling edge, if any, applies to cts_pad_i, dsr_pad_i, ri_pad_i, dcd_pad_i and rts_pad_o, dtr_pad_o for later monitor phases?",
+    "Is any modem status-change or interrupt mapping needed for later scoreboard and functional phases?",
+    "Evidence substituted: f_dcd_pad_i, f_dtr_pad_o, f_rts_pad_o could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them.",
+    "For wishbone_slave_interface on CLK: which clock edge samples wb_adr_i/wb_dat_i/wb_dat_o/wb_we_i/wb_stb_i/wb_cyc_i/wb_ack_o, since spec defines ports and transfer descriptions but no sampling edge; needed to finalize monitor sampling in a later phase, not to block scaffold.",
+    "For wishbone_slave_interface handshake wb_stb_i/wb_cyc_i/wb_ack_o with wb_dat_o: what acknowledge latency and stability rule applies, since spec states Specifies transfer cycle and Acknowledge of a transfer but no timing bound; needed for later protocol checks, not for infrastructure ownership.",
+    "For wishbone_slave_interface wb_adr_i/wb_dat_i/wb_dat_o/wb_we_i/wb_stb_i/wb_cyc_i/wb_ack_o: which wb_clk_i edge samples these signals, since spec defines ports but no sampling edge; needed for later monitor sampling, not blocking scaffold.",
+    "For wishbone_slave_interface handshake wb_stb_i/wb_cyc_i/wb_ack_o with wb_dat_o: what acknowledge latency and stability rule applies, since spec states transfer descriptions but no timing bound; needed for later protocol checks, not for infrastructure ownership.",
+    "Evidence substituted: f_wb_adr_i, f_wb_dat_i, f_wb_dat_o, f_wb_sel_i, f_wb_we_i could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them.",
+    "wb_sel_i is held at 0: the 8-bit data bus configuration does not use byte lanes.",
+    "How should observed int_o edges be interpreted in later phases when active_level is undocumented for documented INT_O 1-bit Output Interrupt output?",
+    "What DUT sampling edge if any applies to cts_pad_i, dsr_pad_i, ri_pad_i, dcd_pad_i and rts_pad_o, dtr_pad_o for later monitor phases?",
+    "Is any modem status change or interrupt mapping needed for later scoreboard and functional phases?",
+    "Evidence substituted: f_peer_1, port_dcd_pad_i, port_dtr_pad_o, port_rts_pad_o could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them.",
+    "For wishbone_slave_interface: which clock edge samples wb_adr_i/wb_dat_i/wb_dat_o/wb_we_i/wb_stb_i/wb_cyc_i/wb_ack_o, since spec defines ports and transfer descriptions but no sampling edge; needed to finalize monitor sampling in a later phase, not to block scaffold.",
+    "Evidence substituted: f_category, f_connected_to, f_function, f_protocol, f_wb_adr_i, f_wb_dat_i, f_wb_dat_o, f_wb_sel_i, f_wb_we_i could not be proven from the retrieved sources (Fact must reference a retrieved documented item; Fact quote must occur in a retrieved source excerpt); the documented facts of this interface are cited instead. Review the choice that cited them."
+  ]
+}

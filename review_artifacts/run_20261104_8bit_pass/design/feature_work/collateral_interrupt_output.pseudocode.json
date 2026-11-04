@@ -1,0 +1,57 @@
+{
+  "understanding": "DUT sources single-wire 1-bit INT_O as int_o interrupt sideband; collateral_interrupt_output provides passive observe-only ownership exposing assertion and deassertion edges for later correlation with WISHBONE handling and SoC interrupt routing, while wb_clk_i wb_rst_i and all other interfaces remain owned elsewhere with no driving tie-offs checks or coverage in this unit.",
+  "actions": [
+    "Declare passive agent collateral_interrupt_output owning observe-only access to int_o mapped from INT_O per spec_rtl_relation normalized_name PASS",
+    "Configure monitor to passively observe 1-bit DUT-output int_o assertion and deassertion edges without driving and with no tie-offs",
+    "Expose observed int_o transition events for later-phase correlation without implementing checks scoreboard coverage sequences or tests",
+    "Leave wb_clk_i clocking wb_rst_i reset control and all other interfaces to owning infrastructures"
+  ],
+  "completion": [
+    "Passive observe-only ownership of int_o declared from documented INT_O 1-bit Output",
+    "DUT-source direction and sideband observation configuration complete with no inputs driven and no tie-offs",
+    "Event exposure ready for later-phase use with scoreboard tests and full register map explicitly deferred"
+  ],
+  "facts": [
+    {
+      "id": "f_port_int_o",
+      "statement": "Specification defines INT_O as 1-bit Output Interrupt output",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/signals/0"
+    },
+    {
+      "id": "f_function_interrupt",
+      "statement": "Function of interrupt_output is Interrupt output to signal UART events to system",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/function"
+    },
+    {
+      "id": "f_category_interrupt",
+      "statement": "Category of interrupt_output is interrupt",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/category"
+    },
+    {
+      "id": "f_dut_source",
+      "statement": "DUT role for interrupt_output is source with direction out of DUT",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/dut_role"
+    },
+    {
+      "id": "f_core_interrupt",
+      "statement": "The core requires one interrupt",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "The core requires one interrupt.",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/connected_to"
+    }
+  ],
+  "questions": [
+    "How should observed int_o edges be interpreted in later phases when active_level is undocumented for documented INT_O 1-bit Output Interrupt output?",
+    "On which sampling reference should int_o be observed for later-phase event correlation, deferred from this observe-only infrastructure?"
+  ],
+  "blockers": [],
+  "ambiguities": []
+}

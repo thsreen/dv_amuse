@@ -1,0 +1,680 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_wb_init_cfg_div_msb",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "f_init_divorder",
+        "f_addr_divmsb",
+        "f_init_divreset",
+        "t_wb_mon_f_bus_8"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_div_lsb",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 1,
+      "fact_ids": [
+        "f_init_divorder",
+        "f_addr_divlsb",
+        "f_init_divreset",
+        "t_wb_mon_f_bus_8"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_fcr_byte",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 192,
+      "fact_ids": [
+        "f_fcr_trigdef",
+        "f_fcr_trig14",
+        "f_fcr_clear",
+        "f_addr_fcr"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_ier_byte",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "f_ier_bit0",
+        "f_ier_en",
+        "f_ier_dis",
+        "f_ier_reserved",
+        "f_init_ier"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_lcr_dlab1",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 131,
+      "fact_ids": [
+        "f_init_dlab1",
+        "f_init_lcrfmt",
+        "f_addr_lcr"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_lcr_dlab0",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 3,
+      "fact_ids": [
+        "f_init_dlab0",
+        "f_init_lcrfmt",
+        "f_addr_lcr"
+      ]
+    }
+  ],
+  "registers": [
+    {
+      "id": "t_wb_init_cfg_lcr",
+      "agent": "wishbone_slave_interface",
+      "address": 3,
+      "width": 8,
+      "access": "RW",
+      "reset": null,
+      "mask": 255,
+      "fact_ids": [
+        "f_addr_lcr",
+        "f_init_lcrfmt",
+        "f_init_dlab1",
+        "f_init_dlab0"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_fcr",
+      "agent": "wishbone_slave_interface",
+      "address": 2,
+      "width": 8,
+      "access": "WO",
+      "reset": null,
+      "mask": 255,
+      "fact_ids": [
+        "f_addr_fcr",
+        "f_fcr_trigdef",
+        "f_fcr_trig14",
+        "f_fcr_clear"
+      ]
+    }
+  ],
+  "facts": [
+    {
+      "id": "f_init_dlab1",
+      "statement": "LCR bit7 set to 1 allows access to Divisor Latches",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set bit 7 to \u20181\u2019",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_dlab0",
+      "statement": "LCR bit7 cleared to 0 disables Divisor Latch access and returns to normal registers",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set bit 7 of LCR to \u20180\u2019 to disable access to Divisor Latches.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_divorder",
+      "statement": "Divisor programming order is MSB first then LSB next",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set the Divisor Latches, MSB first, LSB next.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_divreset",
+      "statement": "Post-reset Divisor Latch value is 0",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Divisor Latch register is set to 0.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_fifotrig",
+      "statement": "Initialization requires setting FIFO trigger level after DLAB cleared",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set the FIFO trigger level.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_ier",
+      "statement": "Initialization requires enabling desired interrupts via Interrupt Enable Register",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Enable desired interrupts by setting appropriate bits in the Interrupt Enable",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_lcrfmt",
+      "statement": "Post-reset LCR is 8 bits data no parity 1 stop bit",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Line Control Register is set to communication of 8 bits of data, no parity, 1",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_dlab_gate",
+      "statement": "When DLAB is 1 normal registers at addresses 0-1 cannot be accessed",
+      "source_id": "CH-f88915355b",
+      "quote": "At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_addr_lcr",
+      "statement": "LCR is at bus address 3 width 8 access RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Line Control Register 3 8 RW Control connection",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_addr_divlsb",
+      "statement": "Divisor LSB is at bus address 0 width 8 access RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 1 (LSB) 0 8 RW The LSB of the divisor",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_addr_divmsb",
+      "statement": "Divisor MSB is at bus address 1 width 8 access RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 2 1 8 RW The MSB of the divisor",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_addr_ier",
+      "statement": "IER is at bus address 1 width 8 access RW when DLAB is 0",
+      "source_id": "CH-f88915355b",
+      "quote": "Interrupt Enable 1 8 RW Enable/Mask interrupts",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_addr_fcr",
+      "statement": "FCR is at bus address 2 width 8 access W",
+      "source_id": "CH-f88915355b",
+      "quote": "FIFO Control 2 8 W Control FIFO options",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_fcr_trigdef",
+      "statement": "FCR bits 7-6 define Receiver FIFO interrupt trigger level",
+      "source_id": "CH-dfb1048908",
+      "quote": "Define the Receiver FIFO Interrupt trigger level",
+      "plan_pointer": "/sections/12/entries/1"
+    },
+    {
+      "id": "f_fcr_trig14",
+      "statement": "FCR trigger encoding 11 selects 14 bytes",
+      "source_id": "CH-dfb1048908",
+      "quote": "\u201811\u2019 \u2013 14 bytes",
+      "plan_pointer": "/sections/12/entries/1"
+    },
+    {
+      "id": "f_fcr_clear",
+      "statement": "FCR bit1 write 1 clears Receiver FIFO so init drives it 0 unless clearing",
+      "source_id": "CH-dfb1048908",
+      "quote": "Writing a \u20181\u2019 to bit 1 clears the Receiver FIFO",
+      "plan_pointer": "/sections/12/entries/1"
+    },
+    {
+      "id": "f_ier_bit0",
+      "statement": "IER bit0 is Received Data available interrupt RW",
+      "source_id": "CH-de51b2eafc",
+      "quote": "0 RW Received Data available interrupt",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_en",
+      "statement": "IER enable value 1 means enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "\u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_dis",
+      "statement": "IER enable value 0 means disabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "\u20180\u2019 \u2013 disabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_reserved",
+      "statement": "IER bits 7-4 reserved should be 0",
+      "source_id": "CH-de51b2eafc",
+      "quote": "7-4 RW Reserved. Should be logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/2"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "t_wb_init_cfg_init_seq",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Directed init_config_sequence after chip_reset: LCR DLAB 1 then Divisor MSB first LSB next then DLAB 0 then FIFO trigger and IER enables",
+      "operations": [
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 131,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "write",
+          "register_id": null,
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "write",
+          "register_id": null,
+          "address": 0,
+          "data": 1,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 3,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_fcr",
+          "address": 2,
+          "data": 192,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "write",
+          "register_id": null,
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_init_dlab1",
+        "f_init_divorder",
+        "f_init_dlab0",
+        "f_init_fifotrig",
+        "f_init_ier",
+        "f_addr_lcr",
+        "f_addr_divlsb",
+        "f_addr_divmsb",
+        "f_addr_ier",
+        "f_addr_fcr",
+        "f_dlab_gate",
+        "t_wb_mon_f_bus_8",
+        "f_fcr_trigdef",
+        "f_fcr_trig14",
+        "f_fcr_clear",
+        "f_ier_bit0",
+        "f_ier_en",
+        "f_ier_dis",
+        "f_ier_reserved"
+      ],
+      "extends": null,
+      "controls": [
+        {
+          "operation": 0,
+          "field": "data",
+          "variable": "t_wb_init_cfg_lcr_dlab1"
+        },
+        {
+          "operation": 1,
+          "field": "data",
+          "variable": "t_wb_init_cfg_div_msb"
+        },
+        {
+          "operation": 2,
+          "field": "data",
+          "variable": "t_wb_init_cfg_div_lsb"
+        },
+        {
+          "operation": 3,
+          "field": "data",
+          "variable": "t_wb_init_cfg_lcr_dlab0"
+        },
+        {
+          "operation": 4,
+          "field": "data",
+          "variable": "t_wb_init_cfg_fcr_byte"
+        },
+        {
+          "operation": 5,
+          "field": "data",
+          "variable": "t_wb_init_cfg_ier_byte"
+        }
+      ]
+    }
+  ],
+  "routes": [],
+  "checks": [
+    {
+      "id": "t_wb_init_cfg_ier_check",
+      "agent": "wishbone_slave_interface",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_ier_bit0",
+        "f_ier_en",
+        "f_ier_dis",
+        "f_ier_reserved",
+        "f_addr_ier",
+        "f_init_ier"
+      ]
+    }
+  ],
+  "hooks": [],
+  "coverage": [
+    {
+      "id": "t_wb_init_cfg_cg_dlab_divisor",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "cp_dlab",
+          "field": "address",
+          "mask": 7,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "dlab_1_divisor",
+              "values": [
+                0,
+                1
+              ]
+            },
+            {
+              "name": "dlab_0_normal",
+              "values": [
+                2,
+                3
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cp_div_lsb",
+          "field": "data",
+          "mask": 255,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "lsb_zero_0x00",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "lsb_min_0x01",
+              "values": [
+                1
+              ]
+            },
+            {
+              "name": "lsb_mid_low",
+              "values": [
+                2,
+                64,
+                127
+              ]
+            },
+            {
+              "name": "lsb_mid_high",
+              "values": [
+                128,
+                192,
+                254
+              ]
+            },
+            {
+              "name": "lsb_max_0xFF",
+              "values": [
+                255
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cp_div_msb",
+          "field": "data",
+          "mask": 255,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "msb_zero_0x00",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "msb_min_0x01",
+              "values": [
+                1
+              ]
+            },
+            {
+              "name": "msb_mid_low",
+              "values": [
+                2,
+                64,
+                127
+              ]
+            },
+            {
+              "name": "msb_mid_high",
+              "values": [
+                128,
+                192,
+                254
+              ]
+            },
+            {
+              "name": "msb_max_0xFF",
+              "values": [
+                255
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [],
+      "sample_address": null,
+      "fact_ids": [
+        "f_dlab_gate",
+        "f_addr_divlsb",
+        "f_addr_divmsb",
+        "f_init_divorder"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_rc_divisor_bytes",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "cp_lsb_val",
+          "field": "data",
+          "mask": 255,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "lsb_zero_0x00",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "lsb_mid_0x01_0xFE",
+              "values": [
+                1,
+                127,
+                254
+              ]
+            },
+            {
+              "name": "lsb_max_0xFF",
+              "values": [
+                255
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cp_msb_val",
+          "field": "data",
+          "mask": 255,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "msb_zero_0x00",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "msb_mid_0x01_0xFE",
+              "values": [
+                1,
+                127,
+                254
+              ]
+            },
+            {
+              "name": "msb_max_0xFF",
+              "values": [
+                255
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [
+        {
+          "name": "rc_combined",
+          "points": [
+            "cp_lsb_val",
+            "cp_msb_val"
+          ]
+        }
+      ],
+      "sample_kinds": [],
+      "sample_address": null,
+      "fact_ids": [
+        "f_init_divorder",
+        "f_dlab_gate",
+        "f_init_divreset"
+      ]
+    }
+  ],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "How is chip_reset done signaled with wb_clk_i stable when clock and reset are common UVCs not agents, and what TEST_TIMEOUT_CYCLES abort applies before any config?"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [
+        "t_wb_init_cfg_init_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [
+        "t_wb_init_cfg_init_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [
+        "t_wb_init_cfg_init_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [
+        "t_wb_init_cfg_init_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/5",
+      "component_ids": [
+        "t_wb_init_cfg_init_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/6",
+      "component_ids": [
+        "t_wb_init_cfg_init_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [
+        "t_wb_init_cfg_init_seq",
+        "t_wb_init_cfg_ier_check"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [],
+      "question": "How is FCR trigger observed when all listed bits are write-only or ignored and what is post-reset trigger level?"
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [
+        "t_wb_init_cfg_cg_dlab_divisor"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [
+        "t_wb_init_cfg_rc_divisor_bytes"
+      ],
+      "question": ""
+    }
+  ],
+  "questions": [
+    "What symbolic divisor LSB/MSB values form legal nonzero divisor for bring-up and is divisor 0 illegal beyond reset value 0 and MSB-first LSB-next order?",
+    "What specific FCR trigger selection 00-1B 01-4B 10-8B 11-14B is required for bring-up given 14 bytes only recommended if system responds fast enough?",
+    "What specific IER bits 3-0 enables are desired for bring-up versus later traffic?",
+    "What LCR bits 6-0 line parameters must accompany DLAB 1 then DLAB 0 during init?",
+    "How is FCR trigger observed when all listed bits are write-only or ignored and what is post-reset trigger level?",
+    "What documented deassert-to-first-write delay is required after wb_rst_i before init_config_sequence?",
+    "How is chip_reset done signaled with wb_clk_i stable when clock and reset are common UVCs not agents, and what TEST_TIMEOUT_CYCLES abort applies before any config?",
+    "Deferred (quick testing): hook t_wb_init_cfg_cov_hook_dlab does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_wb_init_cfg_cov_hook_rc does not fit the testbench: Agent hook requires an agent target"
+  ]
+}

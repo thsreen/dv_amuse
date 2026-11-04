@@ -1,0 +1,233 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_wb_top_seq_addr",
+      "agent": "wishbone_slave_interface",
+      "width": 3,
+      "default": 0,
+      "fact_ids": [
+        "t_wb_reg_cov_f_rbr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_lcr_1",
+        "f_mcr_lsr_msr_addr456"
+      ]
+    },
+    {
+      "id": "t_wb_top_seq_wdata",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_lcr_1",
+        "f_addr_divlsb"
+      ]
+    },
+    {
+      "id": "t_wb_top_seq_lcr_dlab0",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 3,
+      "fact_ids": [
+        "t_wb_reg_cov_f_lcr_1",
+        "f_dlab_disable_access",
+        "f_lcr_format"
+      ]
+    }
+  ],
+  "registers": [],
+  "facts": [
+    {
+      "id": "f_mcr_lsr_msr_addr456",
+      "statement": "Modem Control at address 4 is write-only, Line Status at address 5 is read-only, Modem Status at address 6 is read-only.",
+      "source_id": "CH-f88915355b",
+      "quote": "Modem Control 4 8 W Controls modem\nLine Status 5 8 R Status information\nModem Status 6 8 R Modem Status",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_dlab_disable_access",
+      "statement": "Clearing LCR bit 7 to 0 disables Divisor Latch access and returns to normal registers.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set bit 7 of LCR to \u20180\u2019 to disable access to Divisor Latches.",
+      "plan_pointer": "/sections/8/entries/1"
+    }
+  ],
+  "sequences": [],
+  "routes": [],
+  "checks": [],
+  "hooks": [],
+  "coverage": [
+    {
+      "id": "t_wb_top_seq_cg_dlab_divisor",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "t_wb_top_seq_d_p_dlab",
+          "field": "data",
+          "mask": 128,
+          "shift": 7,
+          "bins": [
+            {
+              "name": "b_dlab0",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "b_dlab1",
+              "values": [
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "t_wb_top_seq_d_p_addr",
+          "field": "address",
+          "mask": 7,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "b_addr0",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "b_addr1",
+              "values": [
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "t_wb_top_seq_d_p_data",
+          "field": "data",
+          "mask": 255,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "b_zero",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "b_min",
+              "values": [
+                1
+              ]
+            },
+            {
+              "name": "b_mid_low",
+              "values": [
+                64
+              ]
+            },
+            {
+              "name": "b_mid_high",
+              "values": [
+                192
+              ]
+            },
+            {
+              "name": "b_max",
+              "values": [
+                255
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [
+        {
+          "name": "cr_div_dlab_addr_data",
+          "points": [
+            "t_wb_top_seq_d_p_dlab",
+            "t_wb_top_seq_d_p_addr",
+            "t_wb_top_seq_d_p_data"
+          ]
+        }
+      ],
+      "sample_kinds": [
+        1
+      ],
+      "sample_address": null,
+      "fact_ids": [
+        "f_addr_divlsb",
+        "f_addr_divmsb"
+      ]
+    }
+  ],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "Deferred: sequence t_wb_top_seq_top_seq does not fit the testbench: Random data and explicit sequencer data control conflict; coverage t_wb_top_seq_cg_wb_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_rc_wb_regs does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_top_seq_hook_wb_reg_access does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_rc_regs does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_divisor does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [],
+      "question": "Deferred: sequence t_wb_top_seq_top_seq does not fit the testbench: Random data and explicit sequencer data control conflict; coverage t_wb_top_seq_cg_wb_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_rc_wb_regs does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_top_seq_hook_wb_reg_access does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_rc_regs does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_divisor does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [],
+      "question": "Deferred: sequence t_wb_top_seq_top_seq does not fit the testbench: Random data and explicit sequencer data control conflict; coverage t_wb_top_seq_cg_wb_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_rc_wb_regs does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_top_seq_hook_wb_reg_access does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_rc_regs does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_divisor does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [],
+      "question": "Deferred: sequence t_wb_top_seq_top_seq does not fit the testbench: Random data and explicit sequencer data control conflict; coverage t_wb_top_seq_cg_wb_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_rc_wb_regs does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_top_seq_hook_wb_reg_access does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_rc_regs does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_divisor does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [],
+      "question": "Deferred: sequence t_wb_top_seq_top_seq does not fit the testbench: Random data and explicit sequencer data control conflict; coverage t_wb_top_seq_cg_wb_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_rc_wb_regs does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_top_seq_hook_wb_reg_access does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_rc_regs does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_divisor does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "stimulus_steps/5",
+      "component_ids": [],
+      "question": "Deferred: sequence t_wb_top_seq_top_seq does not fit the testbench: Random data and explicit sequencer data control conflict; coverage t_wb_top_seq_cg_wb_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_rc_wb_regs does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_top_seq_hook_wb_reg_access does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_rc_regs does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_divisor does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [],
+      "question": "Deferred: sequence t_wb_top_seq_top_seq does not fit the testbench: Random data and explicit sequencer data control conflict; coverage t_wb_top_seq_cg_wb_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_rc_wb_regs does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_top_seq_hook_wb_reg_access does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_rc_regs does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_divisor does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [],
+      "question": "Deferred: sequence t_wb_top_seq_top_seq does not fit the testbench: Random data and explicit sequencer data control conflict; coverage t_wb_top_seq_cg_wb_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_rc_wb_regs does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_top_seq_hook_wb_reg_access does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_rc_regs does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_divisor does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [],
+      "question": "Deferred: sequence t_wb_top_seq_top_seq does not fit the testbench: Random data and explicit sequencer data control conflict; coverage t_wb_top_seq_cg_wb_reg_access does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_rc_wb_regs does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_wb_top_seq_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_wb_top_seq_hook_wb_reg_access does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_rc_regs does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_wb_top_seq_hook_divisor does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/3",
+      "component_ids": [
+        "t_wb_top_seq_cg_dlab_divisor"
+      ],
+      "question": ""
+    }
+  ],
+  "questions": [
+    "What are documented legal masks and access types per WISHBONE address for random constraints?",
+    "What is wb_rst_i polarity and required deassert-to-first-write delay after reset before init and top traffic?",
+    "What are required wb_sel_i values, owners and tie-offs for 8-bit FIFO-only use, and inactive levels of wb_stb_i and wb_cyc_i that must be driven?",
+    "What are documented legal data values/masks per writable register (IER enables, LCR line bits, FCR trigger, MCR, THR, divisor LSB/MSB including whether divisor 0 is illegal) for constrained random?",
+    "What is explicit bus address representation for wb_adr_i pin values (3-bit vs 5-bit) and required handling of addr 7 which is illegal for 8-bit use?",
+    "Deferred (quick testing): sequence t_wb_top_seq_top_seq does not fit the testbench: Random data and explicit sequencer data control conflict",
+    "Deferred (quick testing): coverage t_wb_top_seq_cg_wb_reg_access does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): coverage t_wb_top_seq_rc_wb_regs does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): coverage t_wb_top_seq_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): hook t_wb_top_seq_hook_wb_reg_access does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_wb_top_seq_hook_rc_regs does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_wb_top_seq_hook_cross does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_wb_top_seq_hook_divisor does not fit the testbench: Agent hook requires an agent target"
+  ]
+}

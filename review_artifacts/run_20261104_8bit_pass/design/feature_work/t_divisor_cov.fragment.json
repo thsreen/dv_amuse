@@ -1,0 +1,571 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_divisor_cov_mid_low",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 64,
+      "fact_ids": [
+        "f_lsb_addr",
+        "f_msb_addr",
+        "f_div_single",
+        "f_div_both"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_mid_high",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 160,
+      "fact_ids": [
+        "f_lsb_addr",
+        "f_msb_addr",
+        "f_div_single",
+        "f_div_both"
+      ]
+    }
+  ],
+  "registers": [
+    {
+      "id": "t_divisor_cov_lsb",
+      "agent": "wishbone_slave_interface",
+      "address": 0,
+      "width": 8,
+      "access": "RW",
+      "reset": null,
+      "mask": 255,
+      "fact_ids": [
+        "f_lsb_addr",
+        "f_dlab_gating",
+        "f_div_single",
+        "f_div_zero"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_msb",
+      "agent": "wishbone_slave_interface",
+      "address": 1,
+      "width": 8,
+      "access": "RW",
+      "reset": null,
+      "mask": 255,
+      "fact_ids": [
+        "f_msb_addr",
+        "f_dlab_gating",
+        "f_div_single",
+        "f_div_both"
+      ]
+    }
+  ],
+  "facts": [
+    {
+      "id": "f_lsb_addr",
+      "statement": "Divisor Latch LSB is 8-bit RW at bus address 0.",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 1 (LSB) 0 8 RW The LSB of the divisor",
+      "plan_pointer": "/registers/registers/0"
+    },
+    {
+      "id": "f_msb_addr",
+      "statement": "Divisor Latch MSB is 8-bit RW at bus address 1.",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 2 1 8 RW The MSB of the divisor",
+      "plan_pointer": "/registers/registers/3"
+    },
+    {
+      "id": "f_dlab_gating",
+      "statement": "Divisor registers accessible when LCR DLAB bit 7 is 1; normal registers at addresses 0-1 not accessible then.",
+      "source_id": "CH-f88915355b",
+      "quote": "The registers can be accessed when the 7th (DLAB) bit of the Line Control Register is set\nto \u20181\u2019. At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/registers/registers/0"
+    },
+    {
+      "id": "f_dlab_bit",
+      "statement": "LCR bit 7 value 1 selects divisor latches, value 0 selects normal registers.",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "\u20181\u2019 \u2013 The divisor latches can be accessed\n \u20180\u2019 \u2013 The normal registers are accessed",
+      "plan_pointer": "/registers/registers/7/fields/6"
+    },
+    {
+      "id": "f_div_single",
+      "statement": "LSB and MSB form one 16-bit divisor accessed internally as single number.",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The 2 bytes form one 16-bit register, which is\ninternally accessed as a single number.",
+      "plan_pointer": "/sections/1/entries/8"
+    },
+    {
+      "id": "f_div_both",
+      "statement": "Both divisor bytes must be set to ensure normal operation.",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "You should therefore set all 2 bytes of the register\nto ensure normal operation.",
+      "plan_pointer": "/sections/1/entries/8"
+    },
+    {
+      "id": "f_div_order",
+      "statement": "Program divisor MSB first LSB last; counter starts when LSB written.",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The internal counter starts to work when the LSB of DL is written, so when setting the\ndivisor, write the MSB first and the LSB last.",
+      "plan_pointer": "/sections/1/entries/8"
+    },
+    {
+      "id": "f_div_zero",
+      "statement": "Divisor default 0 on reset disables serial I/O requiring explicit setup.",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The register is set to the default value of 0 on reset, which\ndisables all serial I/O operations in order to ensure explicit setup of the register in the\nsoftware.",
+      "plan_pointer": "/sections/1/entries/8"
+    },
+    {
+      "id": "f_dlab_restore",
+      "statement": "Access divisor by setting LCR bit 7 to 1 and restore to 0 after to restore other registers.",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The divisor latches can be accessed by setting the 7th bit of LCR to \u20181\u2019. You should\nrestore this bit to \u20180\u2019 after setting the divisor latches in order to restore access to the other\nregisters that occupy the same addresses.",
+      "plan_pointer": "/sections/1/entries/8"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "t_divisor_cov_seq",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Cover DLAB-gated divisor latch programming with LSB MSB zero max and combined value bins sampled on Wishbone write completions with DLAB 1.",
+      "operations": [
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 128,
+          "mask": 128,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_msb",
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_lsb",
+          "address": 0,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_msb",
+          "address": 1,
+          "data": 1,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_lsb",
+          "address": 0,
+          "data": 1,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_msb",
+          "address": 1,
+          "data": 64,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_lsb",
+          "address": 0,
+          "data": 64,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_msb",
+          "address": 1,
+          "data": 160,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_lsb",
+          "address": 0,
+          "data": 160,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_msb",
+          "address": 1,
+          "data": 255,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_lsb",
+          "address": 0,
+          "data": 255,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_msb",
+          "address": 1,
+          "data": 255,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_lsb",
+          "address": 0,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_msb",
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_lsb",
+          "address": 0,
+          "data": 255,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 0,
+          "mask": 128,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_dlab_gating",
+        "f_dlab_bit",
+        "f_dlab_restore",
+        "f_lsb_addr",
+        "f_msb_addr",
+        "f_div_order",
+        "f_div_single",
+        "f_div_both",
+        "f_div_zero"
+      ],
+      "extends": "t_wb_init_cfg_init_seq",
+      "controls": [
+        {
+          "operation": 5,
+          "field": "data",
+          "variable": "t_divisor_cov_mid_low"
+        },
+        {
+          "operation": 6,
+          "field": "data",
+          "variable": "t_divisor_cov_mid_low"
+        },
+        {
+          "operation": 7,
+          "field": "data",
+          "variable": "t_divisor_cov_mid_high"
+        },
+        {
+          "operation": 8,
+          "field": "data",
+          "variable": "t_divisor_cov_mid_high"
+        }
+      ]
+    }
+  ],
+  "routes": [],
+  "checks": [],
+  "hooks": [],
+  "coverage": [
+    {
+      "id": "t_divisor_cov_cg_dlab_divisor",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "cp_dlab",
+          "field": "data",
+          "mask": 128,
+          "shift": 7,
+          "bins": [
+            {
+              "name": "dlab_0_normal",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "dlab_1_divisor",
+              "values": [
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cp_div_lsb",
+          "field": "data",
+          "mask": 255,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "lsb_zero_0x00",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "lsb_min_0x01",
+              "values": [
+                1
+              ]
+            },
+            {
+              "name": "lsb_mid_low_0x02_0x7F",
+              "values": [
+                2,
+                64,
+                127
+              ]
+            },
+            {
+              "name": "lsb_mid_high_0x80_0xFE",
+              "values": [
+                128,
+                160,
+                254
+              ]
+            },
+            {
+              "name": "lsb_max_0xFF",
+              "values": [
+                255
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cp_div_msb",
+          "field": "data",
+          "mask": 255,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "msb_zero_0x00",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "msb_min_0x01",
+              "values": [
+                1
+              ]
+            },
+            {
+              "name": "msb_mid_low_0x02_0x7F",
+              "values": [
+                2,
+                64,
+                127
+              ]
+            },
+            {
+              "name": "msb_mid_high_0x80_0xFE",
+              "values": [
+                128,
+                160,
+                254
+              ]
+            },
+            {
+              "name": "msb_max_0xFF",
+              "values": [
+                255
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [
+        1
+      ],
+      "sample_address": null,
+      "fact_ids": [
+        "f_dlab_gating",
+        "f_dlab_bit",
+        "f_lsb_addr",
+        "f_msb_addr"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_rc_divisor_bytes",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "cp_divisor_value",
+          "field": "data",
+          "mask": 255,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "lsb_zero_0x00",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "lsb_mid_0x01_0xFE",
+              "values": [
+                1,
+                64,
+                160,
+                254
+              ]
+            },
+            {
+              "name": "lsb_max_0xFF",
+              "values": [
+                255
+              ]
+            },
+            {
+              "name": "msb_zero_0x00",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "msb_mid_0x01_0xFE",
+              "values": [
+                1,
+                64,
+                160,
+                254
+              ]
+            },
+            {
+              "name": "msb_max_0xFF",
+              "values": [
+                255
+              ]
+            },
+            {
+              "name": "combined_zero_disables",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "combined_nonzero_enables",
+              "values": [
+                1,
+                64,
+                160,
+                255
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [
+        1
+      ],
+      "sample_address": null,
+      "fact_ids": [
+        "f_div_single",
+        "f_div_both",
+        "f_div_zero",
+        "f_lsb_addr",
+        "f_msb_addr"
+      ]
+    }
+  ],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [
+        "t_divisor_cov_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [
+        "t_divisor_cov_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [
+        "t_divisor_cov_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [
+        "t_divisor_cov_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [
+        "t_divisor_cov_cg_dlab_divisor"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [
+        "t_divisor_cov_rc_divisor_bytes"
+      ],
+      "question": ""
+    }
+  ],
+  "questions": [
+    "What are documented legal divisor values including zero and maximum handling for bins? Is combined 0x0000 only disabling I/O versus illegal and is 0xFFFF legal maximum for combined_zero_disables versus combined_nonzero_enables?",
+    "What are reset values of LSB at address 0 and MSB at address 1 for mirror comparison masks? Documented reset is empty so unknown reset must be null.",
+    "Deferred (quick testing): hook t_divisor_cov_hook_cg does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_divisor_cov_hook_rc does not fit the testbench: Agent hook requires an agent target"
+  ]
+}

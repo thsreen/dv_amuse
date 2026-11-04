@@ -1,0 +1,2288 @@
+{
+  "contract": "verification_codegen_v1",
+  "status": "BUILT_NEEDS_REVIEW",
+  "build_id": "a7836a4101734528f402bdca7759be27fd2e950eea5a5279031503e8c36b0a3a",
+  "code_dir": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code/a7836a4101734528",
+  "test_only": true,
+  "source_plan": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/dv/testplan_doc.json",
+  "interface": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/rtl/interface_definition.json",
+  "template_hash": "117053f682f105db5b760f4a1e1146faa67e73d28aa5023d9eafb1a813dd734f",
+  "input_hashes": {
+    "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/dv/testplan_doc.json": "34df98433a40121249b6652be2cdf2ecda03b50d117a752f49adbc28ae84911c",
+    "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/rtl/interface_definition.json": "7fd355ecec455e055fc52c1bb6fbd3bfa5d4804a3fa14f21a002b62a14bf72a4"
+  },
+  "rtl_files": [
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/raminfr.v",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_debug_if.v",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_receiver.v",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_regs.v",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_rfifo.v",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_sync_flops.v",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_tfifo.v",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_top.v",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_transmitter.v",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_wb.v"
+  ],
+  "rtl_hashes": {
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/raminfr.v": "ec3a76795df9354ca6bfb5cbd5fb348eadf5e97057c32f36decdcbe92aeb6fe1",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_debug_if.v": "261f2e511888810cdd911c7c9f67487297e032ec8215f9080877a1efee259c6b",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_receiver.v": "f0ec7e8aee95ab272578da0a5a3e78e48223fe3621d15159fb12252a14792919",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_regs.v": "b4220c64c8e9ccf1d0ce5ee2fa8fb8ae81bf75a8f4a6b20fa10a64d9aebec6a0",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_rfifo.v": "4c4f32c990ed62ff5a98312e1d0df3e6c831a5ab1febad570259ce9ff9f651ea",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_sync_flops.v": "c30b2c869965cdfd6b61284f4b9c10d8f19896aaea0b4f590f3bec57e0b702e1",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_tfifo.v": "df31d67b7740f7f31869d3019a12458106f1afea50c7c50f87aa80cd0c815c9c",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_top.v": "4d52ae3224e4ca811cf798aacab882e9b1cfbcdc6d9835ae2456e5244a0c29b1",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_transmitter.v": "87b0d5c5cbb7d364a66cf9cd68aaa05d8f1f9ee7d7f6a1bf22727287b09b4afc",
+    "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_wb.v": "68eaa1721eded61f52230a93b126620be5bca9638a9e210b999b9735380a579b"
+  },
+  "top": "uart_top",
+  "compile_files": [
+    "common_uvc/clock/clock_if.sv",
+    "common_uvc/reset/reset_if.sv",
+    "common_uvc/clock/clock_pkg.sv",
+    "common_uvc/reset/reset_pkg.sv",
+    "common_uvc/common/common_pkg.sv",
+    "interfaces/interrupt_output_if.sv",
+    "interfaces/uart_serial_data_if.sv",
+    "interfaces/modem_control_if_if.sv",
+    "interfaces/wishbone_slave_interface_if.sv",
+    "uart_top_verification_pkg.sv",
+    "checks/wishbone_slave_interface_assertions.sv",
+    "verification_top.sv"
+  ],
+  "defines": [
+    "DATA_BUS_WIDTH_8"
+  ],
+  "files": {
+    "uvm/cg_item.svh": "883e46a18a291af2f034d6aa59b6347b95365adc16673973ec20e25fab4482b9",
+    "uvm/cg_reg_access.svh": "8306c680af3cf441358af5d71730a76bef01b7f53a52e8e1234f0cff47f648f0",
+    "interfaces/interrupt_output_if.sv": "7edcfb38f04f3a63caad4a411823ede1a5b969ffa3dfe70d3d49d9da5f854a54",
+    "uvm/interrupt_output_cfg.svh": "13cb70b1c18a5811c718e2d14b786690c32168a4106149ee4447f86cbcbd25e3",
+    "uvm/interrupt_output_monitor.svh": "b890477747f5a7c0751f0316621cf1b734ca4d41608acb74fce5f99ff17783e4",
+    "uvm/interrupt_output_agent.svh": "5526f16509381032662bd6f65b6323e65cbb16c3e153044d83df9d1b51a64fed",
+    "interfaces/uart_serial_data_if.sv": "53d9362eed53360b2f673e2fbd3cff6dfe0581b5df5128ae8c441d27ae69e6b8",
+    "uvm/uart_serial_data_cfg.svh": "bfb1c5949d5b71aa6c1a81defc727f47e060598c077a807850d3c491c5e5f50b",
+    "uvm/uart_serial_data_sequencer.svh": "62b90cf563272ec1c87c439b50beb4bd195d4c122164cb6bb452aeee1f252ca0",
+    "uvm/uart_serial_data_driver.svh": "ef2817ea1fdff4088614f449d442540097177bdadb7040439e66eb0b9d9837ba",
+    "uvm/uart_serial_data_monitor.svh": "f0c7dd308d696dbe473c8745428d5991b7d764dd3639b746140e57ce8d7fd175",
+    "uvm/uart_serial_data_agent.svh": "d133c276a537bfbeca951be5d455fa3cf9417665f09e10b931d8840ea82cec10",
+    "interfaces/modem_control_if_if.sv": "5345f57ad4ddbd5609d6a6b38437dd257ae4876355c63e2924dc2bb324f14459",
+    "uvm/modem_control_if_cfg.svh": "2297024e5563c2d5c0bc89f5cf0feca4264f7bb6f799ead9d47ea0bfd79015de",
+    "uvm/modem_control_if_sequencer.svh": "89ab381fff78cf4eb94148b7295576ea3d906c8f175d0424c1a3e6d0e1390d19",
+    "uvm/modem_control_if_driver.svh": "e49fd8c6c9f057d4b7f0b230093c4e3c419137ab7e69d856cc52206d2a61a600",
+    "uvm/modem_control_if_monitor.svh": "ef9140575a8d24cd7ad438678777500571a6b6d3fcaf140a7b2ba88bdc5ac67c",
+    "uvm/modem_control_if_agent.svh": "4128b9c052af7a524f3ffbb55bf17b9017919f2911ba0e32c14dc9a240943ee7",
+    "interfaces/wishbone_slave_interface_if.sv": "7775f91484b505d12176ae06041f121fef18e8ff03628eeed12189a416bbbf70",
+    "uvm/wishbone_slave_interface_cfg.svh": "518761d8bef7a897e8c056e3666e108fb43db183c5723f49c21c6f1b8152ea72",
+    "uvm/wishbone_slave_interface_sequencer.svh": "2a7abf0ea9ea8a9ff0b2c7386b3754c9725241c1ffdeb66c90bc717c5b6f9353",
+    "uvm/wishbone_slave_interface_driver.svh": "239273ea9f4df405aca37eb5dfa6a9c25a6e779450135baa34a516b30d911456",
+    "uvm/wishbone_slave_interface_monitor.svh": "487ef6c45750a9c8c323c21103016776607b71ed7484cf7560779842dab3c34e",
+    "uvm/wishbone_slave_interface_agent.svh": "1723b05706797f8f9b9de6bc5b21fc61cec16ed62430725f0080f96f4b9849b3",
+    "checks/wishbone_slave_interface_assertions.sv": "e70bc6ef8e7cdad05d3fd0350ae0839be49bdc939a0ed9147b527447cca8fb1e",
+    "uvm/cg_scoreboard.svh": "35b349519f6b2b8dcd337c600dc61f65642f0fe9bf54821be28820a03c505c23",
+    "uvm/cg_system_coverage.svh": "586c57fc1988898cfc0d8b323a35b2288fb00404843cf708ae07d54b79d8cd91",
+    "uvm/t_clk_cov_raw_cov_coverage.svh": "2778c884ae74a5319ec3bb7dc338a08340ad5fda12cb20d84903c815d5cf9ef7",
+    "uvm/t_irq_baud_mon_cov_int_o_coverage.svh": "6c8ccf6801a7897194018fe17c179051cf884a420c46dece91146ba2ee9941c9",
+    "uvm/t_irq_id_cov_cg_iir_coverage.svh": "0a2a5daee49e7a2506f9a82aa7735e9b45bd37412c6a010587c7f39c8b586904",
+    "uvm/t_wb_init_cfg_cg_dlab_divisor_coverage.svh": "2c6d170e0cd6ee569b97f4ad790dd8d7e8ab27e2b48aa0cbc6299472f2d81539",
+    "uvm/t_wb_init_cfg_rc_divisor_bytes_coverage.svh": "ab8a91ad1882bc7f65993a3b93d6513af88d7bb0415f6f469dac41b2ba6a20ef",
+    "uvm/t_wb_reg_cov_rc_write_coverage.svh": "7e3c0d58755bf92ea157efa251b441e7ed3d1926f0773293b40f48bf0fba6611",
+    "uvm/t_divisor_cov_cg_dlab_divisor_coverage.svh": "97062a732ca83a5770471802771f9108382c0af79fa2947982a33f992231af2a",
+    "uvm/t_divisor_cov_rc_divisor_bytes_coverage.svh": "cf787441ed3e80590f81bdbdd8bf455df918959adbea37358a25777e88e6a446",
+    "uvm/t_traffic_seq_cov_modem_coverage.svh": "366617db3868b108a6d4fbf602fb9f3c2ab67a8976bf6ff33431c2ac09fa76a0",
+    "uvm/t_traffic_seq_cov_ier_coverage.svh": "65fd212d2ebb14aeef5bd2b1c64ae1617d24906b9f9de6f306dd89f4d148d5a3",
+    "uvm/t_traffic_seq_cov_payload_wb_coverage.svh": "b74c3416cfa8b40e08d017577a8acbee30f05372f9d2e05f08e4a7383349889a",
+    "uvm/t_traffic_seq_cov_payload_uart_coverage.svh": "5d0b2cbffa2ac95de0329e7cf1da8645e1beaaa57bfb4302988e0ca63779f532",
+    "uvm/t_wb_top_seq_cg_dlab_divisor_coverage.svh": "0951b99e32e4486673dc68f9296979fdcf7f3661a61172b55fa95c4a1d8a0717",
+    "uvm/t_modem_irq_cov_delta_coverage.svh": "03e9cbc0d3b616f1f29522f80a558f86c4a53533611d89e6a887d89d209fb319",
+    "uvm/t_modem_irq_cov_ier_coverage.svh": "72ca4b568972dd8cd26cbbab0e6136426597b87b2b9119b16d6f729046205d5d",
+    "uvm/t_modem_irq_cov_iir_coverage.svh": "227c1d4445f6fe15303f8fcbd6feb6e8951e7c9305f646c278b56927497c259c",
+    "uvm/t_modem_traffic_cov_cg_coverage.svh": "66df63299a481e654373f286710fa52915e25e8b76c40813edc3dab23631a6a2",
+    "uvm/cg_env.svh": "2f29e3ebcae0b71a297ac60e0a4a7ae3585f1b060ae233c67832b6baaf73c0c1",
+    "sequences/t_reset_state_seq_lcr_reset.svh": "960297ddf7e3d7d198e011688261fd59807c52fbe337a06d89957aa71f35f208",
+    "sequences/t_wb_init_cfg_init_seq.svh": "a3a45f24623569c6327b73e2e880e02b155c3cbf4d12d82bb81dcc1866196f54",
+    "sequences/t_xz_check_seq_wb_idle.svh": "38d6824d3c830078cafe727c6a3f7f32b96b2a3caff1eb46b16d15793a9a8e8a",
+    "sequences/t_xz_check_seq_uart_idle.svh": "db252ae6a9cd95ba693108aab6d15b47dbd54ba9e1d2c802d879e4842f773702",
+    "sequences/t_xz_check_seq_modem_idle.svh": "0fc9ddcc14caf5ad7bc63c64304a35e0c66848b3bc11fb62145e1062118b91c2",
+    "sequences/t_traffic_seq_uart_normal_seq.svh": "02ad2e5c6901f1db8381dc3ec15e7ab6044cb21f7e9fc5d8d3d521256cb7ec41",
+    "sequences/t_traffic_seq_modem_normal_seq.svh": "850ff8beaebd9a5cdffbc8b04bce7c6486cd526e906dd52472a939df4fbb143b",
+    "sequences/t_traffic_seq_modem_random_seq.svh": "77835c21d3ffd27870bce6677ed8398296a051ee1bb62a943ae4e324114d70d3",
+    "sequences/t_traffic_seq_normal_virt.svh": "f6281de63a147a24d8070edbe1c4c4e66f9d0da284d90bb814eef7144d464fa2",
+    "sequences/t_traffic_seq_loopback_virt.svh": "c02240b6089a859619967fba522f56dfe1b9c3f3895b5418753c56a20c00564b",
+    "sequences/t_uart_mon_uart_rx_seq.svh": "df73a8eb1222d4734f770ba3a49ab0a7e4d748df53b5ec62f844e8cd527f45ae",
+    "sequences/t_uart_mon_tx_observe_seq.svh": "f7f9e925c5064114dd663fb99b691ca44cdfb79ccad44ca9dd05fc4b95166561",
+    "sequences/t_uart_mon_virt_seq.svh": "6c1a48c808c8a9d99650bb8edfad32ff4c49dbd5161f2b0da72394a182934a27",
+    "sequences/t_modem_irq_wb_clear_seq.svh": "4100cfe71375a535231b24cdd23acf8707fb9d23217212751f1424b1e6f1f31b",
+    "sequences/t_modem_traffic_cov_uart_idle_seq.svh": "4625a5eef8bbb5dabdf0e7f5cdd0d89bf99cec2dee19d1c799e275ecff8941fb",
+    "sequences/t_modem_traffic_cov_modem_idle_seq.svh": "68a82ed41f3d2025c930ca138814a1562aa1f92e68be8d5cb8ffed28c2070240",
+    "sequences/quick_basic_setup.svh": "5272aca9c160a84ceeff1072d91b3ccaa9d2d7ffd8f1edfe41a286d0b787a43b",
+    "sequences/quick_basic_write.svh": "daa9e0c1fc68776fc8d0e338e3a73814b81cd54ab8e4612e72de678bbf285308",
+    "sequences/quick_basic_send.svh": "6ee42aad98327e59d403d2972f562eee3308ac58a2408a29ee947b66ac5afbd8",
+    "sequences/quick_basic_read.svh": "22d399d729c0400d8bdbac1672048322b5ea0030106fecbec21230e0401ec3f6",
+    "sequences/t_wb_reg_cov_directed_seq.svh": "b31e8aef64bd1a687cdbaf5451a937519d2c10ba61aadc2dc8c2074dfe019c64",
+    "sequences/t_divisor_cov_seq.svh": "165fd78bc97284dc9480c11974c04f1a845bac86775c7b5d676673993a947990",
+    "sequences/t_dlab_gate_chk_seq.svh": "3cc309fb435e5d2f6ab85a8831d83745d3da4903a792150d66ed7c604b452e59",
+    "sequences/t_traffic_seq_wb_normal_seq.svh": "28b1062316dcdc4a1ae420417a767db3bde1ce3fe1b70d8b508caa46c359495b",
+    "sequences/t_traffic_seq_wb_loopback_seq.svh": "11c364d175c4e6efc42c09296453f57558837354a6caa38bf95456e795683ed2",
+    "sequences/t_uart_mon_bringup_seq.svh": "eec857546f5ca6c3ff3a356a736d34cc45c4adfb1cd193f5c7e94db96d5e2cd9",
+    "sequences/t_modem_irq_wb_bringup_seq.svh": "697283ee139106d85bd3541f10b85084a3a5e4573e450c878d0b0901a2d30b83",
+    "sequences/t_modem_irq_modem_toggle_seq.svh": "5990c62b3d1cffff0476818537eecbb78dcbb474b24922c5c1d8cbed7afb875b",
+    "sequences/t_modem_irq_virt_seq.svh": "3c758ea4506181f36cb872583eabe7c2bb47e9bd76423010fdd95457df0e13b6",
+    "sequences/t_modem_traffic_cov_wb_idle_observe_seq.svh": "29601fec875ee86a925d97ad463262123c6f6c84e8bf429a95310d556ef04c24",
+    "sequences/t_modem_traffic_cov_wb_traffic_observe_seq.svh": "7beec1483ab98e90a6301ed34c2069cef16dfaec91b55ac4b402f12012262b29",
+    "sequences/t_modem_traffic_cov_uart_rx_seq.svh": "b9aa452ba37e106472988b3eb7e00babebb85f5848d96b1cb0672e3441b8ae26",
+    "sequences/t_addr_dlab_cov_seq.svh": "73062c187ddf557595524e857c2a45621e77ceb9f8d89ae458d7901c77d8d5af",
+    "sequences/t_modem_traffic_cov_wb_bringup_seq.svh": "ff26759b51ee6e0a6ce60a71ccc0ada5e93d0f68d286bebee95dcf9d71182865",
+    "sequences/t_modem_traffic_cov_modem_toggle_seq.svh": "dc48847eb93a3feba7a3b713fb10c55d654783c42bc43ee455d9e225b0648760",
+    "sequences/t_modem_traffic_cov_virt_seq.svh": "a0016a543a959ca50348f44ca8e1df7333c1709b05b58e4c20413b54dc569162",
+    "sequences/quick_basic_uart_serial_data_drain.svh": "ea7efc5d5abbc88ea652ec361d66951f7de4cd44d4a68e2f0db86c619f7c9432",
+    "sequences/quick_basic_modem_control_if_drain.svh": "62ace55998483d5cdef9e82e118fecf5dcb72a38149307642e775b47b7f180ae",
+    "sequences/quick_basic_wishbone_slave_interface_drain.svh": "928cc8f07fb1c04013733626e9300786eb4678ca1da3ecb435c1618dfbc78173",
+    "sequences/quick_basic_vseq.svh": "67edb562fa9e960a10a6de6e253c866f87b0d4498fc848efc4b65332b7daf975",
+    "tests/quick_basic.svh": "811a247ec06a66a60aec9caf20882c0b4ef56ccf6b4b57e7968148354f4db146",
+    "uart_top_verification_pkg.sv": "837e11aa34aa8ea80545f90f8ada0467cfa332d699daba71d304aba05285a4c4",
+    "verification_top.sv": "2e07d6205c65fd841249f8cfe493360693f19d8354b2d18f19b0a7b25066e30c",
+    "common_uvc/clock/clock_agent.svh": "5390a359c6814a9cc01901ae67019ae0d61f42e69b2fc1f255a37643cafbf62a",
+    "common_uvc/clock/clock_cfg.svh": "f64e951294e7bd287e8300a93017d48ac331eb999ccea65cb27cd473c04b6dcb",
+    "common_uvc/clock/clock_driver.svh": "4920152a2bd91b94b171034ab35d90d4ea4ba4112264a61c6d49a9e9e345884e",
+    "common_uvc/clock/clock_if.sv": "3f3fed87586919b51a4a42d4a63d9db9947eaef5980ba5622963a4479e52c786",
+    "common_uvc/clock/clock_monitor.svh": "2f1ae354cc3b1d5356c90c3232826d65e07789ba970ce207aa2d073ceaae5dcd",
+    "common_uvc/clock/clock_pkg.sv": "4304f12f2fc96125eeae0cd31f27cadf616aa9791afa5866ff8af50ea5d93643",
+    "common_uvc/clock/clock_tick.svh": "484c2748235047f9fe7915ce9031eece042d2120b58294929f86571f4e755109",
+    "common_uvc/reset/reset_agent.svh": "1e1e209c6d17bc7b8f47cdfcfebe36365f4b87adbfd114945116dd9a394af862",
+    "common_uvc/reset/reset_cfg.svh": "77fbbf00f1a146a8d4c7b1af8631758c0aab68464dcdffe9c7f04a78bc660571",
+    "common_uvc/reset/reset_driver.svh": "cae4a017dbc383e2667610283929f794c8194ebdb39f3fbd1439f3326622cfe6",
+    "common_uvc/reset/reset_if.sv": "4acfa21ca274801295372f6d96dd38a1a2c7c7b6ac49fedbba51abded4130cde",
+    "common_uvc/reset/reset_item.svh": "cc4124475ad3b351ffb8df985cdf605e9faaf30e6e09096ffc7d7d8d3d48653b",
+    "common_uvc/reset/reset_monitor.svh": "2c2b872a69736f233186db303bb6d721784407a3e02c6540b261cb8928f7563c",
+    "common_uvc/reset/reset_pkg.sv": "19a544ff9294b179a2677d6dff604a7939a62ccd40d59750a2c8d8598780ec4c",
+    "common_uvc/reset/reset_pulse_seq.svh": "508df54a7c5895f599495eff6a4d0e232d15b4666dc2929fa1be0357312fc33d",
+    "common_uvc/reset/reset_sequencer.svh": "b85823487e9eb1143634b0d3b8b9e538b6f17ba89ca2c56c08604c724025f54b",
+    "common_uvc/common/common_agent.svh": "41912710a01681d1963f46fc3ab9be9d2a6c0bcc24189d2bc2afae3280cf7ed0",
+    "common_uvc/common/common_cfg.svh": "d73dfb8c0e74eb7c396687899d0065e6a868e6cef030429142a1f23ecade7a5a",
+    "common_uvc/common/common_env.svh": "f5d22cdb9e3730b91b1da0afac14b2d33b3f409775295b3d8c822d4d61324394",
+    "common_uvc/common/common_pkg.sv": "018914940083df50aa377cb163bb67580ffb4a3487ee8d7069ff1b2520ba6f52",
+    "compile.f": "67648e0d5c58edcab7f403ff7bfcf68fbbaa28f44dad0009adae2df38f8d515a",
+    "template_catalog.json": "7ffbd4d6a237910ec70300007b32ac80231c82663a3a107d5934dbc4efa8f738"
+  },
+  "coverage_collectors": [
+    {
+      "id": "t_clk_cov_raw_cov",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_clk_cov_raw_cov_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "t_clk_seq_f_clk_1",
+        "t_clk_seq_f_rst_1"
+      ]
+    },
+    {
+      "id": "t_irq_baud_mon_cov_int_o",
+      "source": "monitor interrupt_output",
+      "file": "uvm/t_irq_baud_mon_cov_int_o_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "t_irq_baud_mon_f_core_interrupt",
+        "t_irq_baud_mon_f_clk_input"
+      ]
+    },
+    {
+      "id": "t_irq_id_cov_cg_iir",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_irq_id_cov_cg_iir_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "t_irq_id_cov_f_pending",
+        "t_irq_id_cov_f_highest",
+        "t_irq_id_cov_f_rls",
+        "t_irq_id_cov_f_rda",
+        "t_irq_id_cov_f_timeout",
+        "t_irq_id_cov_f_thre",
+        "t_irq_id_cov_f_modem",
+        "t_irq_id_cov_f_fixed45",
+        "t_irq_id_cov_f_fixed67",
+        "t_irq_id_cov_f_reset",
+        "t_irq_id_cov_f_addr",
+        "t_irq_id_cov_f_cg"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_cg_dlab_divisor",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_wb_init_cfg_cg_dlab_divisor_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_dlab_gate",
+        "f_addr_divlsb",
+        "f_addr_divmsb",
+        "f_init_divorder"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_rc_divisor_bytes",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_wb_init_cfg_rc_divisor_bytes_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_init_divorder",
+        "f_dlab_gate",
+        "f_init_divreset"
+      ]
+    },
+    {
+      "id": "t_wb_reg_cov_rc_write",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_wb_reg_cov_rc_write_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_fcr_1",
+        "t_wb_reg_cov_f_lcr_1",
+        "t_wb_reg_cov_f_mcr_1",
+        "t_wb_reg_cov_f_dlab_block_1",
+        "t_wb_reg_cov_f_dlab_gate_1",
+        "f_addr_divlsb",
+        "t_wb_reg_cov_f_bus8_1"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_cg_dlab_divisor",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_divisor_cov_cg_dlab_divisor_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_dlab_gating",
+        "f_dlab_bit",
+        "f_lsb_addr",
+        "f_msb_addr"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_rc_divisor_bytes",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_divisor_cov_rc_divisor_bytes_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_div_single",
+        "f_div_both",
+        "f_div_zero",
+        "f_lsb_addr",
+        "f_msb_addr"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_modem",
+      "source": "monitor modem_control_if",
+      "file": "uvm/t_traffic_seq_cov_modem_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_mcr_map",
+        "f_mcr_loopback",
+        "f_mcr_dtr_rts"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_ier",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_traffic_seq_cov_ier_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_ier_rda",
+        "f_ier_thre",
+        "f_ier_lsi",
+        "f_ier_msi"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_payload_wb",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_traffic_seq_cov_payload_wb_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_lcr_dlab"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_payload_uart",
+      "source": "monitor uart_serial_data",
+      "file": "uvm/t_traffic_seq_cov_payload_uart_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_lcr_dlab"
+      ]
+    },
+    {
+      "id": "t_wb_top_seq_cg_dlab_divisor",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_wb_top_seq_cg_dlab_divisor_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_addr_divlsb",
+        "f_addr_divmsb"
+      ]
+    },
+    {
+      "id": "t_modem_irq_cov_delta",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_modem_irq_cov_delta_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_msr_delta_1",
+        "f_msr_dcts_1",
+        "f_msr_ddsr_1",
+        "f_msr_teri_1",
+        "f_msr_ddcd_1",
+        "f_msr_addr_1"
+      ]
+    },
+    {
+      "id": "t_modem_irq_cov_ier",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_modem_irq_cov_ier_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_ier_msi",
+        "f_ier_enable"
+      ]
+    },
+    {
+      "id": "t_modem_irq_cov_iir",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_modem_irq_cov_iir_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_iir_prio_1",
+        "f_iir_1",
+        "f_modem_irq_1"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_cg",
+      "source": "monitor wishbone_slave_interface",
+      "file": "uvm/t_modem_traffic_cov_cg_coverage.svh",
+      "sampling": "completed observed transaction",
+      "fact_ids": [
+        "f_iir_addr_1",
+        "f_serial_link_1",
+        "f_modem_pads_1",
+        "f_modem_src_1",
+        "f_iir_pending_1",
+        "f_iir_fixed_1"
+      ]
+    },
+    {
+      "id": "system_coverage",
+      "source": "all interface monitors",
+      "file": "uvm/cg_system_coverage.svh",
+      "sampling": "observed route event",
+      "fact_ids": [
+        "f_divisor_access",
+        "f_divisor_lsb_addr",
+        "f_divisor_msb_addr",
+        "f_divisor_order",
+        "f_dlab_access",
+        "f_lcr_dlab",
+        "f_mcr_loopback",
+        "f_mcr_map"
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "name": "quick_basic",
+      "kind": "uvm_functional",
+      "top": "verification_top",
+      "seed": 1,
+      "minimum_comparisons": 2
+    }
+  ],
+  "policy": {
+    "source": "documented expected behavior; template-owned infrastructure",
+    "test_only": true,
+    "quick_testing_warning": "QUICK TESTING ONLY: inferred auto approvals are not human approval or design sign-off.",
+    "guidance": "Plan proposals guide implementation but are not expectation authority",
+    "kept": 189,
+    "skipped": 241
+  },
+  "assertion_covers": [
+    {
+      "check_id": "t_wb_mon_check_xz",
+      "assertion": "a_t_wb_mon_check_xz",
+      "cover": "c_t_wb_mon_check_xz",
+      "activation_cover": "activation_t_wb_mon_check_xz",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 4,
+      "cover_line": 5,
+      "activation_line": 6
+    },
+    {
+      "check_id": "t_wb_mon_check_known",
+      "assertion": "a_t_wb_mon_check_known",
+      "cover": "c_t_wb_mon_check_known",
+      "activation_cover": "activation_t_wb_mon_check_known",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 8,
+      "cover_line": 9,
+      "activation_line": 10
+    },
+    {
+      "check_id": "t_reset_state_check_lcr_reset",
+      "assertion": "a_t_reset_state_check_lcr_reset",
+      "cover": "c_t_reset_state_check_lcr_reset",
+      "activation_cover": "activation_t_reset_state_check_lcr_reset",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 12,
+      "cover_line": 13,
+      "activation_line": 14
+    },
+    {
+      "check_id": "t_wb_init_cfg_ier_check",
+      "assertion": "a_t_wb_init_cfg_ier_check",
+      "cover": "c_t_wb_init_cfg_ier_check",
+      "activation_cover": "activation_t_wb_init_cfg_ier_check",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 16,
+      "cover_line": 17,
+      "activation_line": 18
+    },
+    {
+      "check_id": "t_xz_check_check_xz_wb",
+      "assertion": "a_t_xz_check_check_xz_wb",
+      "cover": "c_t_xz_check_check_xz_wb",
+      "activation_cover": "activation_t_xz_check_check_xz_wb",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 20,
+      "cover_line": 21,
+      "activation_line": 22
+    },
+    {
+      "check_id": "t_xz_check_check_known_wb",
+      "assertion": "a_t_xz_check_check_known_wb",
+      "cover": "c_t_xz_check_check_known_wb",
+      "activation_cover": "activation_t_xz_check_check_known_wb",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 24,
+      "cover_line": 25,
+      "activation_line": 26
+    },
+    {
+      "check_id": "t_dlab_gate_chk_alias_class_check",
+      "assertion": "a_t_dlab_gate_chk_alias_class_check",
+      "cover": "c_t_dlab_gate_chk_alias_class_check",
+      "activation_cover": "activation_t_dlab_gate_chk_alias_class_check",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 28,
+      "cover_line": 29,
+      "activation_line": 30
+    },
+    {
+      "check_id": "t_traffic_seq_ier_chk",
+      "assertion": "a_t_traffic_seq_ier_chk",
+      "cover": "c_t_traffic_seq_ier_chk",
+      "activation_cover": "activation_t_traffic_seq_ier_chk",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 32,
+      "cover_line": 33,
+      "activation_line": 34
+    },
+    {
+      "check_id": "t_ier_iir_pend_chk_ier",
+      "assertion": "a_t_ier_iir_pend_chk_ier",
+      "cover": "c_t_ier_iir_pend_chk_ier",
+      "activation_cover": "activation_t_ier_iir_pend_chk_ier",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 36,
+      "cover_line": 37,
+      "activation_line": 38
+    },
+    {
+      "check_id": "t_ier_iir_pend_chk_reset",
+      "assertion": "a_t_ier_iir_pend_chk_reset",
+      "cover": "c_t_ier_iir_pend_chk_reset",
+      "activation_cover": "activation_t_ier_iir_pend_chk_reset",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 40,
+      "cover_line": 41,
+      "activation_line": 42
+    },
+    {
+      "check_id": "t_ier_iir_pend_chk_iir_mask",
+      "assertion": "a_t_ier_iir_pend_chk_iir_mask",
+      "cover": "c_t_ier_iir_pend_chk_iir_mask",
+      "activation_cover": "activation_t_ier_iir_pend_chk_iir_mask",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 44,
+      "cover_line": 45,
+      "activation_line": 46
+    },
+    {
+      "check_id": "t_modem_irq_chk_iir",
+      "assertion": "a_t_modem_irq_chk_iir",
+      "cover": "c_t_modem_irq_chk_iir",
+      "activation_cover": "activation_t_modem_irq_chk_iir",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 48,
+      "cover_line": 49,
+      "activation_line": 50
+    },
+    {
+      "check_id": "t_modem_irq_chk_e2e",
+      "assertion": "a_t_modem_irq_chk_e2e",
+      "cover": "c_t_modem_irq_chk_e2e",
+      "activation_cover": "activation_t_modem_irq_chk_e2e",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 52,
+      "cover_line": 53,
+      "activation_line": 54
+    },
+    {
+      "check_id": "t_modem_traffic_cov_chk_pending",
+      "assertion": "a_t_modem_traffic_cov_chk_pending",
+      "cover": "c_t_modem_traffic_cov_chk_pending",
+      "activation_cover": "activation_t_modem_traffic_cov_chk_pending",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 56,
+      "cover_line": 57,
+      "activation_line": 58
+    },
+    {
+      "check_id": "t_modem_traffic_cov_chk_fixed",
+      "assertion": "a_t_modem_traffic_cov_chk_fixed",
+      "cover": "c_t_modem_traffic_cov_chk_fixed",
+      "activation_cover": "activation_t_modem_traffic_cov_chk_fixed",
+      "file": "checks/wishbone_slave_interface_assertions.sv",
+      "assertion_line": 60,
+      "cover_line": 61,
+      "activation_line": 62
+    }
+  ],
+  "uvm_status": "NEEDS_REVIEW",
+  "expected_behavior_review": "NEEDS_REVIEW",
+  "operational_limits": {
+    "request_timeout_cycles": 10000,
+    "note": "testbench operational limits are not DUT timing requirements"
+  },
+  "work_documents": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work_manifest.json",
+  "compile": {
+    "status": "NOT_RUN",
+    "reason": "Deferred to /run or /regress"
+  },
+  "reused": false,
+  "clock_period_ranges": [],
+  "interface_port_comparison": {
+    "status": "PASS",
+    "spec_hash": "a0ffd4df905180d0e31fedfd03312a6efdc7dcf2f3388d30da4fa78d97fcc198",
+    "rtl_hash": "2ab01c62b63ade871a3147d4e3c660c500f2b7f1e50b2515c2866d1ee5ced2bd",
+    "direction_reference": "DUT",
+    "rows": [
+      {
+        "spec": "CLK",
+        "rtl": "wb_clk_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-63ad4d61a5",
+        "availability": "",
+        "reviewed_alias": true
+      },
+      {
+        "spec": "WB_RST_I",
+        "rtl": "wb_rst_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-63ad4d61a5",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "WB_ADDR_I",
+        "rtl": "wb_adr_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 3,
+        "rtl_width": 3,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-63ad4d61a5",
+        "availability": "",
+        "reviewed_alias": true
+      },
+      {
+        "spec": "WB_SEL_I",
+        "rtl": "wb_sel_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 4,
+        "rtl_width": 4,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-63ad4d61a5",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "WB_DAT_I",
+        "rtl": "wb_dat_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 8,
+        "rtl_width": 8,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-63ad4d61a5",
+        "availability": "",
+        "reviewed_alias": true
+      },
+      {
+        "spec": "WB_DAT_O",
+        "rtl": "wb_dat_o",
+        "spec_direction": "output",
+        "rtl_direction": "output",
+        "spec_width": 8,
+        "rtl_width": 8,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-63ad4d61a5",
+        "availability": "",
+        "reviewed_alias": true
+      },
+      {
+        "spec": "WB_WE_I",
+        "rtl": "wb_we_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-63ad4d61a5",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "WB_STB_I",
+        "rtl": "wb_stb_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-63ad4d61a5",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "WB_CYC_I",
+        "rtl": "wb_cyc_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-63ad4d61a5",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "WB_ACK_O",
+        "rtl": "wb_ack_o",
+        "spec_direction": "output",
+        "rtl_direction": "output",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-63ad4d61a5",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "INT_O",
+        "rtl": "int_o",
+        "spec_direction": "output",
+        "rtl_direction": "output",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-8c2c8e9408",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "BAUD_O",
+        "rtl": null,
+        "status": "INACTIVE_REVIEWED",
+        "reason": "Documented conditional output is disabled in the selected RTL configuration.",
+        "source_id": "CH-8c2c8e9408"
+      },
+      {
+        "spec": "STX_PAD_O",
+        "rtl": "stx_pad_o",
+        "spec_direction": "output",
+        "rtl_direction": "output",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-98be4510fb",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "SRX_PAD_I",
+        "rtl": "srx_pad_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-98be4510fb",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "RTS_PAD_O",
+        "rtl": "rts_pad_o",
+        "spec_direction": "output",
+        "rtl_direction": "output",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-98be4510fb",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "DTR_PAD_O",
+        "rtl": "dtr_pad_o",
+        "spec_direction": "output",
+        "rtl_direction": "output",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-98be4510fb",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "CTS_PAD_I",
+        "rtl": "cts_pad_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-98be4510fb",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "DSR_PAD_I",
+        "rtl": "dsr_pad_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-98be4510fb",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "RI_PAD_I",
+        "rtl": "ri_pad_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-98be4510fb",
+        "availability": "",
+        "reviewed_alias": false
+      },
+      {
+        "spec": "DCD_PAD_I",
+        "rtl": "dcd_pad_i",
+        "spec_direction": "input",
+        "rtl_direction": "input",
+        "spec_width": 1,
+        "rtl_width": 1,
+        "status": "PASS",
+        "issues": [],
+        "source_id": "CH-98be4510fb",
+        "availability": "",
+        "reviewed_alias": false
+      }
+    ],
+    "errors": [],
+    "unmatched_rtl": [],
+    "review_decisions": {
+      "spec_hash": "a0ffd4df905180d0e31fedfd03312a6efdc7dcf2f3388d30da4fa78d97fcc198",
+      "rtl_hash": "2ab01c62b63ade871a3147d4e3c660c500f2b7f1e50b2515c2866d1ee5ced2bd",
+      "reviewer": "quick-testing-inference-evaluator",
+      "reason": "Directions and widths align after selecting configured variants: CLK 1-bit to wb_clk_i, WB_ADDR_I 3-bit to wb_adr_i, WB_DAT_I/O 8-bit to wb_dat_i/o, with BAUD_O explicitly inactive per its conditional define and RTL absence.",
+      "inactive_spec_ports": {
+        "BAUD_O": "Documented conditional output is disabled in the selected RTL configuration."
+      },
+      "mappings": {
+        "CLK": "wb_clk_i",
+        "WB_ADDR_I": "wb_adr_i",
+        "WB_DAT_I": "wb_dat_i",
+        "WB_DAT_O": "wb_dat_o"
+      },
+      "width_choices": {
+        "WB_ADDR_I": 3,
+        "WB_DAT_I": 8,
+        "WB_DAT_O": 8
+      },
+      "review_status": "TEST_AUTO_APPROVED",
+      "test_only": true,
+      "request_id": "1bad84dc8cba324a89e3",
+      "source_id": "QUICK-TEST-1bad84dc8cba324a89e3",
+      "assumptions": [
+        "Guessed choice: CLK maps to wb_clk_i despite name difference; I rejected leaving CLK unmapped because wb_clk_i is the sole 1-bit clock candidate and architecture expects logical-to-physical aliasing.",
+        "Outside-knowledge assumption: WB_ADDR_I maps to wb_adr_i via common WISHBONE ADR/ADDR abbreviation convention; I rejected leaving it unmapped because width 3 and input direction match the candidate.",
+        "Outside-knowledge assumption: width_choices WB_ADDR_I=3 and WB_DAT_I=8 and WB_DAT_O=8 selected to match RTL inventory widths wb_adr_i 3 and wb_dat_i/o 8; I rejected the 5 and 32 alternatives because they do not match the configured RTL.",
+        "Guessed choice: BAUD_O is inactive because UART_HAS_BAUDRATE_OUTPUT is not defined in this DATA_BUS_WIDTH_8 build and it is absent from RTL; I rejected synthesizing a port because conditional absence requires an inactive configuration reason."
+      ]
+    },
+    "relationship_context": {
+      "authority": "Specification defines behavior; RTL defines physical connectivity. Alignment does not promote inferred semantics.",
+      "rtl_sources": [
+        "uart_top.v"
+      ],
+      "parameters": [
+        {
+          "name": "UART_DATA_WIDTH",
+          "width": 8
+        },
+        {
+          "name": "UART_ADDR_WIDTH",
+          "width": 3
+        }
+      ],
+      "ports": [
+        {
+          "spec_name": "CLK",
+          "rtl_name": "wb_clk_i",
+          "status": "PASS",
+          "match_basis": "reviewed_alias",
+          "dut_direction": "input",
+          "width": 1,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "CLK",
+            "description": "Block\u2019s clock input",
+            "quote": "CLK 1 Input Block\u2019s clock input",
+            "chunk_id": "CH-63ad4d61a5",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/1"
+          ]
+        },
+        {
+          "spec_name": "WB_RST_I",
+          "rtl_name": "wb_rst_i",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "input",
+          "width": 1,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "WB_RST_I",
+            "description": "Asynchronous Reset",
+            "quote": "WB_RST_I 1 Input Asynchronous Reset",
+            "chunk_id": "CH-63ad4d61a5",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/2"
+          ]
+        },
+        {
+          "spec_name": "WB_ADDR_I",
+          "rtl_name": "wb_adr_i",
+          "status": "PASS",
+          "match_basis": "reviewed_alias",
+          "dut_direction": "input",
+          "width": 3,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "WB_ADDR_I",
+            "description": "Used for register selection",
+            "quote": "WB_ADDR_I 5 or 3 Input Used for register selection",
+            "chunk_id": "CH-63ad4d61a5",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "not_applicable",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/0"
+          ]
+        },
+        {
+          "spec_name": "WB_SEL_I",
+          "rtl_name": "wb_sel_i",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "input",
+          "width": 4,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "WB_SEL_I",
+            "description": "Select signal",
+            "quote": "WB_SEL_I 4 Input Select signal",
+            "chunk_id": "CH-63ad4d61a5",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/0"
+          ]
+        },
+        {
+          "spec_name": "WB_DAT_I",
+          "rtl_name": "wb_dat_i",
+          "status": "PASS",
+          "match_basis": "reviewed_alias",
+          "dut_direction": "input",
+          "width": 8,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "WB_DAT_I",
+            "description": "Data input",
+            "quote": "WB_DAT_I 32 or 8 Input Data input",
+            "chunk_id": "CH-63ad4d61a5",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "not_applicable",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/0"
+          ]
+        },
+        {
+          "spec_name": "WB_DAT_O",
+          "rtl_name": "wb_dat_o",
+          "status": "PASS",
+          "match_basis": "reviewed_alias",
+          "dut_direction": "output",
+          "width": 8,
+          "testbench_responsibility": "observe",
+          "specification": {
+            "name": "WB_DAT_O",
+            "description": "Data output",
+            "quote": "WB_DAT_O 32 or 8 Output Data output",
+            "chunk_id": "CH-63ad4d61a5",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "not_applicable",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/0"
+          ]
+        },
+        {
+          "spec_name": "WB_WE_I",
+          "rtl_name": "wb_we_i",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "input",
+          "width": 1,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "WB_WE_I",
+            "description": "Write or read cycle selection",
+            "quote": "WB_WE_I 1 Input Write or read cycle selection",
+            "chunk_id": "CH-63ad4d61a5",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/0"
+          ]
+        },
+        {
+          "spec_name": "WB_STB_I",
+          "rtl_name": "wb_stb_i",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "input",
+          "width": 1,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "WB_STB_I",
+            "description": "Specifies transfer cycle",
+            "quote": "WB_STB_I 1 Input Specifies transfer cycle",
+            "chunk_id": "CH-63ad4d61a5",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/0"
+          ]
+        },
+        {
+          "spec_name": "WB_CYC_I",
+          "rtl_name": "wb_cyc_i",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "input",
+          "width": 1,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "WB_CYC_I",
+            "description": "A bus cycle is in progress",
+            "quote": "WB_CYC_I 1 Input A bus cycle is in progress",
+            "chunk_id": "CH-63ad4d61a5",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/0"
+          ]
+        },
+        {
+          "spec_name": "WB_ACK_O",
+          "rtl_name": "wb_ack_o",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "output",
+          "width": 1,
+          "testbench_responsibility": "observe",
+          "specification": {
+            "name": "WB_ACK_O",
+            "description": "Acknowledge of a transfer",
+            "quote": "WB_ACK_O 1 Output Acknowledge of a transfer",
+            "chunk_id": "CH-63ad4d61a5",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/0"
+          ]
+        },
+        {
+          "spec_name": "INT_O",
+          "rtl_name": "int_o",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "output",
+          "width": 1,
+          "testbench_responsibility": "observe",
+          "specification": {
+            "name": "INT_O",
+            "description": "Interrupt output",
+            "quote": "INT_O 1 Output Interrupt output",
+            "chunk_id": "CH-8c2c8e9408",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/3"
+          ]
+        },
+        {
+          "spec_name": "BAUD_O",
+          "rtl_name": null,
+          "status": "INACTIVE_REVIEWED",
+          "match_basis": "unresolved",
+          "dut_direction": null,
+          "width": null,
+          "testbench_responsibility": "unresolved",
+          "specification": {
+            "name": "BAUD_O",
+            "description": "Optional baud rate output signal. The signal here is the 16 x actual baud rate.",
+            "quote": "BAUD_O 1 Output Optional baud rate output signal.\nThe signal here is the 16 x actual baud rate.\nIt is enabled if UART_HAS_BAUDRATE_OUTPUT\nis defined",
+            "chunk_id": "CH-8c2c8e9408",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": true,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": "if UART_HAS_BAUDRATE_OUTPUT is defined"
+          },
+          "groups": [
+            "/interfaces/groups/6"
+          ]
+        },
+        {
+          "spec_name": "STX_PAD_O",
+          "rtl_name": "stx_pad_o",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "output",
+          "width": 1,
+          "testbench_responsibility": "observe",
+          "specification": {
+            "name": "STX_PAD_O",
+            "description": "The serial output signal",
+            "quote": "STX_PAD_O 1 Output The serial output signal",
+            "chunk_id": "CH-98be4510fb",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "not_applicable",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/4"
+          ]
+        },
+        {
+          "spec_name": "SRX_PAD_I",
+          "rtl_name": "srx_pad_i",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "input",
+          "width": 1,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "SRX_PAD_I",
+            "description": "The serial input signal",
+            "quote": "SRX_PAD_I 1 Input The serial input signal",
+            "chunk_id": "CH-98be4510fb",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "not_applicable",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/4"
+          ]
+        },
+        {
+          "spec_name": "RTS_PAD_O",
+          "rtl_name": "rts_pad_o",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "output",
+          "width": 1,
+          "testbench_responsibility": "observe",
+          "specification": {
+            "name": "RTS_PAD_O",
+            "description": "Request To Send",
+            "quote": "RTS_PAD_O 1 Output Request To Send",
+            "chunk_id": "CH-98be4510fb",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/5"
+          ]
+        },
+        {
+          "spec_name": "DTR_PAD_O",
+          "rtl_name": "dtr_pad_o",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "output",
+          "width": 1,
+          "testbench_responsibility": "observe",
+          "specification": {
+            "name": "DTR_PAD_O",
+            "description": "Data Terminal Ready",
+            "quote": "DTR_PAD_O 1 Output Data Terminal Ready",
+            "chunk_id": "CH-98be4510fb",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/5"
+          ]
+        },
+        {
+          "spec_name": "CTS_PAD_I",
+          "rtl_name": "cts_pad_i",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "input",
+          "width": 1,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "CTS_PAD_I",
+            "description": "Clear To Send",
+            "quote": "CTS_PAD_I 1 Input Clear To Send",
+            "chunk_id": "CH-98be4510fb",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/5"
+          ]
+        },
+        {
+          "spec_name": "DSR_PAD_I",
+          "rtl_name": "dsr_pad_i",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "input",
+          "width": 1,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "DSR_PAD_I",
+            "description": "Data Set Ready",
+            "quote": "DSR_PAD_I 1 Input Data Set Ready",
+            "chunk_id": "CH-98be4510fb",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/5"
+          ]
+        },
+        {
+          "spec_name": "RI_PAD_I",
+          "rtl_name": "ri_pad_i",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "input",
+          "width": 1,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "RI_PAD_I",
+            "description": "Ring Indicator",
+            "quote": "RI_PAD_I 1 Input Ring Indicator",
+            "chunk_id": "CH-98be4510fb",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/5"
+          ]
+        },
+        {
+          "spec_name": "DCD_PAD_I",
+          "rtl_name": "dcd_pad_i",
+          "status": "PASS",
+          "match_basis": "normalized_name",
+          "dut_direction": "input",
+          "width": 1,
+          "testbench_responsibility": "drive",
+          "specification": {
+            "name": "DCD_PAD_I",
+            "description": "Data Carrier Detect",
+            "quote": "DCD_PAD_I 1 Input Data Carrier Detect",
+            "chunk_id": "CH-98be4510fb",
+            "doc_path": "uart16550/doc/UART_spec.pdf",
+            "pages": [
+              6,
+              6
+            ],
+            "provenance": "DOCUMENTED",
+            "documented": {
+              "name": true,
+              "width": true,
+              "direction": true,
+              "active_level": false,
+              "availability": false,
+              "description": true
+            },
+            "active_level": "unknown",
+            "active_level_documented": false,
+            "availability": ""
+          },
+          "groups": [
+            "/interfaces/groups/5"
+          ]
+        }
+      ],
+      "groups": [
+        {
+          "plan_pointer": "/interfaces/groups/0",
+          "properties": {
+            "name": "wishbone_slave_interface",
+            "category": "bus",
+            "function": "WISHBONE SoC bus slave interface for register access to UART",
+            "protocol": "WISHBONE",
+            "dut_role": "responder",
+            "connected_to": "WISHBONE bus",
+            "peer_type": "interconnect",
+            "is_sideband": false
+          },
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "2.1 WISHBONE interface signals",
+              "inference_reason": "Group label chosen to reflect WISHBONE bus interface functionality",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "86085d646bd36b0e848f"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core implements the WISNBONE SoC bus interface for communication with the\nsystem.",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core implements the WISNBONE SoC bus interface for communication with the\nsystem.",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "2.1 WISHBONE interface signals",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core implements the WISNBONE SoC bus interface for communication with the\nsystem.",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core implements the WISNBONE SoC bus interface for communication with the\nsystem.",
+              "inference_reason": "On-chip SoC bus implies interconnect fabric; no explicit peer type stated",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "6537ee58e9128f9910c0"
+            },
+            "dut_role": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_STB_I 1 Input Specifies transfer cycle\nWB_CYC_I 1 Input A bus cycle is in progress\nWB_ACK_O 1 Output Acknowledge of a transfer",
+              "inference_reason": "Master-driven STB/CYC inputs with slave-driven ACK output indicates responder/slave role per WISHBONE convention",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "e3aba34653036e304a3a"
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "2.1 WISHBONE interface signals",
+              "inference_reason": "Main functional bus, not a sideband interrupt/status/tick/enable per grouping rules",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "b5f266ce838115c3d379"
+            }
+          },
+          "spec_signals": [
+            "WB_ADDR_I",
+            "WB_SEL_I",
+            "WB_DAT_I",
+            "WB_DAT_O",
+            "WB_WE_I",
+            "WB_STB_I",
+            "WB_CYC_I",
+            "WB_ACK_O"
+          ]
+        },
+        {
+          "plan_pointer": "/interfaces/groups/1",
+          "properties": {
+            "name": "system_clock",
+            "category": "clock",
+            "function": "Block clock input for UART core logic",
+            "protocol": "",
+            "dut_role": "sink",
+            "connected_to": "WISHBONE bus",
+            "peer_type": "clock_generator",
+            "is_sideband": false
+          },
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": "Label chosen for clock input signal",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "19c4c8ef179b2786ca7c"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8e56094e71"
+              ],
+              "quote": "clk WISHBONE\nbus",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8e56094e71"
+              ],
+              "quote": "clk WISHBONE\nbus",
+              "inference_reason": "Clock source on WISHBONE bus assumed driven by clock generator; type not explicitly stated",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "d48d73a4229797b32a3d"
+            },
+            "dut_role": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": ""
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "CLK 1 Input Block\u2019s clock input",
+              "inference_reason": "Main clock in own group, not a sideband per grouping rules",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "115f062383983b7c2994"
+            }
+          },
+          "spec_signals": [
+            "CLK"
+          ]
+        },
+        {
+          "plan_pointer": "/interfaces/groups/2",
+          "properties": {
+            "name": "wishbone_reset",
+            "category": "reset",
+            "function": "Asynchronous reset input for UART core",
+            "protocol": "",
+            "dut_role": "sink",
+            "connected_to": "",
+            "peer_type": "reset_controller",
+            "is_sideband": false
+          },
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": "Label chosen for reset signal",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "27fe08b10667279152d8"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": "Reset input presumed driven by reset controller; type not explicitly stated",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "2e6e3b9488a67ad8c833"
+            },
+            "dut_role": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": ""
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-63ad4d61a5"
+              ],
+              "quote": "WB_RST_I 1 Input Asynchronous Reset",
+              "inference_reason": "Reset in own group, not a sideband per grouping rules",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "51643885639814abcdf8"
+            }
+          },
+          "spec_signals": [
+            "WB_RST_I"
+          ]
+        },
+        {
+          "plan_pointer": "/interfaces/groups/3",
+          "properties": {
+            "name": "interrupt_output",
+            "category": "interrupt",
+            "function": "Interrupt output to signal UART events to system",
+            "protocol": "",
+            "dut_role": "source",
+            "connected_to": "",
+            "peer_type": "interrupt_controller",
+            "is_sideband": true
+          },
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": "Label chosen for interrupt signal",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "1f94c6fb46bff2a329d8"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core requires one interrupt.",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-d62a4ba2db"
+              ],
+              "quote": "The core requires one interrupt.",
+              "inference_reason": "Interrupt output presumed to connect to interrupt controller; type not explicitly stated",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "c115f640912121d9a558"
+            },
+            "dut_role": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": ""
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "INT_O 1 Output Interrupt output",
+              "inference_reason": "Interrupt line is sideband bundle per grouping rules requiring own sideband group",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "1a14b7016f6e279fa6b2"
+            }
+          },
+          "spec_signals": [
+            "INT_O"
+          ]
+        },
+        {
+          "plan_pointer": "/interfaces/groups/4",
+          "properties": {
+            "name": "uart_serial_data",
+            "category": "serial_data",
+            "function": "UART serial transmit and receive data lines",
+            "protocol": "RS232",
+            "dut_role": "bidirectional",
+            "connected_to": "modem or other external devices",
+            "peer_type": "external_device",
+            "is_sideband": false
+          },
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+              "inference_reason": "Label chosen to reflect serial data functionality",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "13b4d7f0aa4de89ad4d8"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-2baa4497c0"
+              ],
+              "quote": "The UART (Universal Asynchronous Receiver/Transmitter) core provides serial\ncommunication capabilities",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-2baa4497c0"
+              ],
+              "quote": "like another computer using a serial cable and RS232 protocol.",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-2baa4497c0"
+              ],
+              "quote": "which allow communication with modem or other external\ndevices, like another computer using a serial cable and RS232 protocol.",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-2baa4497c0"
+              ],
+              "quote": "which allow communication with modem or other external\ndevices, like another computer using a serial cable and RS232 protocol.",
+              "inference_reason": ""
+            },
+            "dut_role": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+              "inference_reason": ""
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+              "inference_reason": "Main serial data path, not sideband handshake/status per grouping rules",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "50a7bb11f7d6995fa92a"
+            }
+          },
+          "spec_signals": [
+            "STX_PAD_O",
+            "SRX_PAD_I"
+          ]
+        },
+        {
+          "plan_pointer": "/interfaces/groups/5",
+          "properties": {
+            "name": "modem_control",
+            "category": "flow_control",
+            "function": "Modem control and status handshake signals (RTS/CTS/DTR/DSR/RI/DCD)",
+            "protocol": "",
+            "dut_role": "bidirectional",
+            "connected_to": "modem",
+            "peer_type": "external_device",
+            "is_sideband": true
+          },
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "2.3 External (off-chip) connections",
+              "inference_reason": "Label chosen to reflect modem handshake functionality",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "b331d663651876a01fd7"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-6abe65aeff"
+              ],
+              "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "RTS_PAD_O 1 Output Request To Send",
+              "inference_reason": ""
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "RTS_PAD_O 1 Output Request To Send",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-6abe65aeff"
+              ],
+              "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "2.3 External (off-chip) connections",
+              "inference_reason": ""
+            },
+            "dut_role": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb",
+                "CH-98be4510fb",
+                "CH-98be4510fb",
+                "CH-98be4510fb",
+                "CH-98be4510fb",
+                "CH-98be4510fb"
+              ],
+              "quote": "",
+              "inference_reason": "Presence of output handshake (RTS) and input handshake (CTS) indicates bidirectional",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "8bb0c7ded8c493dceaa8"
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-98be4510fb"
+              ],
+              "quote": "RTS_PAD_O 1 Output Request To Send",
+              "inference_reason": "Handshake/status lines are sidebands requiring own sideband group per rules",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "d4decfea8fc906164010"
+            }
+          },
+          "spec_signals": [
+            "RTS_PAD_O",
+            "DTR_PAD_O",
+            "CTS_PAD_I",
+            "DSR_PAD_I",
+            "RI_PAD_I",
+            "DCD_PAD_I"
+          ]
+        },
+        {
+          "plan_pointer": "/interfaces/groups/6",
+          "properties": {
+            "name": "baud_rate_output",
+            "category": "clock",
+            "function": "Optional 16x baud rate tick output",
+            "protocol": "",
+            "dut_role": "source",
+            "connected_to": "",
+            "peer_type": "unknown",
+            "is_sideband": true
+          },
+          "property_evidence": {
+            "name": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": "Label chosen for baud output functionality",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "498a39541d357a95dd8e"
+            },
+            "function": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.\nThe signal here is the 16 x actual baud rate.",
+              "inference_reason": ""
+            },
+            "category": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "The signal here is the 16 x actual baud rate.",
+              "inference_reason": "16x baud toggling output interpreted as clock-related tick; source does not label it clock",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "e3a830b8e91516f639c3"
+            },
+            "protocol": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": ""
+            },
+            "connected_to": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": ""
+            },
+            "peer_type": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": ""
+            },
+            "dut_role": {
+              "provenance": "DOCUMENTED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": ""
+            },
+            "is_sideband": {
+              "provenance": "INFERRED",
+              "cited_chunk_ids": [
+                "CH-8c2c8e9408"
+              ],
+              "quote": "BAUD_O 1 Output Optional baud rate output signal.",
+              "inference_reason": "Tick/status output is sideband per grouping rules requiring own sideband group",
+              "source_kind": "QUICK_TEST_PLAN_APPROVAL",
+              "review_status": "TEST_AUTO_APPROVED",
+              "test_only": true,
+              "quick_testing_approval_id": "4a43b998fb5b1c8abe31"
+            }
+          },
+          "spec_signals": [
+            "BAUD_O"
+          ]
+        }
+      ]
+    },
+    "independent_validation": {
+      "validator": "independent_port_audit",
+      "status": "PASS",
+      "spec_hash": "a0ffd4df905180d0e31fedfd03312a6efdc7dcf2f3388d30da4fa78d97fcc198",
+      "rtl_hash": "2ab01c62b63ade871a3147d4e3c660c500f2b7f1e50b2515c2866d1ee5ced2bd",
+      "report_hash": "5b2a34760fff2cb7ace52f386f5bcd6f2f418a9cba2eb497b7fa0ced285a739d",
+      "issues": [],
+      "checks": [
+        "inventory completeness",
+        "one-to-one identity",
+        "DUT directions",
+        "independent width evaluation",
+        "review scope and snapshots",
+        "source and provenance preservation",
+        "relationship consistency"
+      ]
+    }
+  },
+  "clock_randomization": {
+    "change_policy": "fixed_per_test_before_reset",
+    "status": "NOT_CONFIGURED",
+    "distribution": "equal period-space strata in every band; directed endpoints and nominal/midpoint",
+    "units": "ps",
+    "resolution_ps": 1,
+    "coverage_status": "NOT_RUN"
+  }
+}

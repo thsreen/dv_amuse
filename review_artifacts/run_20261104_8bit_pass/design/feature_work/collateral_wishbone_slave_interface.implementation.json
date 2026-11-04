@@ -1,0 +1,79 @@
+{
+  "agents": [
+    {
+      "id": "wishbone_slave_interface",
+      "protocol": "wishbone",
+      "bindings": {
+        "addr": "wb_adr_i",
+        "wdata": "wb_dat_i",
+        "rdata": "wb_dat_o",
+        "we": "wb_we_i",
+        "stb": "wb_stb_i",
+        "cyc": "wb_cyc_i",
+        "ack": "wb_ack_o"
+      },
+      "fact_ids": [
+        "f_wb_stb_i",
+        "f_wb_cyc_i",
+        "f_wb_ack_o"
+      ],
+      "bit_cycles": 2,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "active": true,
+      "coverage_enabled": false,
+      "idle_values": {
+        "wb_adr_i": 0,
+        "wb_dat_i": 0,
+        "wb_we_i": 0,
+        "wb_stb_i": 0,
+        "wb_cyc_i": 0
+      }
+    }
+  ],
+  "tie_offs": [
+    {
+      "id": "hold_wb_sel_i",
+      "signal": "wb_sel_i",
+      "value": 0,
+      "fact_ids": [
+        "f_wb_stb_i",
+        "f_wb_cyc_i",
+        "f_wb_ack_o"
+      ]
+    }
+  ],
+  "registers": [],
+  "hooks": [],
+  "defines": [],
+  "facts": [
+    {
+      "id": "f_wb_stb_i",
+      "statement": "The specification defines WB_STB_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_STB_I 1 Input Specifies transfer cycle",
+      "plan_pointer": "/interfaces/groups/0/signals/5"
+    },
+    {
+      "id": "f_wb_cyc_i",
+      "statement": "The specification defines WB_CYC_I as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_CYC_I 1 Input A bus cycle is in progress",
+      "plan_pointer": "/interfaces/groups/0/signals/6"
+    },
+    {
+      "id": "f_wb_ack_o",
+      "statement": "The specification defines WB_ACK_O as a port of this interface",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_ACK_O 1 Output Acknowledge of a transfer",
+      "plan_pointer": "/interfaces/groups/0/signals/7"
+    }
+  ],
+  "questions": [
+    "For wishbone_slave_interface wb_adr_i/wb_dat_i/wb_dat_o/wb_we_i/wb_stb_i/wb_cyc_i/wb_ack_o: which wb_clk_i edge samples these signals, since spec defines ports but no sampling edge; needed for later monitor sampling, not blocking scaffold.",
+    "For wishbone_slave_interface handshake wb_stb_i/wb_cyc_i/wb_ack_o with wb_dat_o: what acknowledge latency and stability rule applies, since spec states transfer descriptions but no timing bound; needed for later protocol checks, not for infrastructure ownership.",
+    "Evidence substituted: f_wb_adr_i, f_wb_dat_i, f_wb_dat_o, f_wb_sel_i, f_wb_we_i could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them.",
+    "wb_sel_i is held at 0: the 8-bit data bus configuration does not use byte lanes."
+  ]
+}

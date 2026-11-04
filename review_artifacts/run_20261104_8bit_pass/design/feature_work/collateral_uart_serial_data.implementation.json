@@ -1,0 +1,73 @@
+{
+  "agents": [
+    {
+      "id": "uart_serial_data",
+      "protocol": "serial",
+      "bindings": {
+        "tx": "stx_pad_o",
+        "rx": "srx_pad_i"
+      },
+      "fact_ids": [
+        "f_srx_port",
+        "f_function",
+        "f_protocol",
+        "f_peer",
+        "f_category"
+      ],
+      "bit_cycles": 16,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "active": true,
+      "coverage_enabled": false,
+      "idle_values": {
+        "srx_pad_i": 1
+      }
+    }
+  ],
+  "tie_offs": [],
+  "registers": [],
+  "hooks": [],
+  "defines": [],
+  "facts": [
+    {
+      "id": "f_srx_port",
+      "statement": "SRX_PAD_I is a 1-bit DUT input defined as The serial input signal",
+      "source_id": "CH-98be4510fb",
+      "quote": "SRX_PAD_I 1 Input The serial input signal",
+      "plan_pointer": "/interfaces/groups/4/signals/1"
+    },
+    {
+      "id": "f_function",
+      "statement": "uart_serial_data function is UART serial transmit and receive data lines using STX_PAD_O and SRX_PAD_I",
+      "source_id": "CH-98be4510fb",
+      "quote": "STX_PAD_O 1 Output The serial output signal\nSRX_PAD_I 1 Input The serial input signal",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/function"
+    },
+    {
+      "id": "f_protocol",
+      "statement": "uart_serial_data protocol is RS232 over serial cable",
+      "source_id": "CH-2baa4497c0",
+      "quote": "like another computer using a serial cable and RS232 protocol.",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/protocol"
+    },
+    {
+      "id": "f_peer",
+      "statement": "uart_serial_data connects to modem or other external devices for serial communication",
+      "source_id": "CH-2baa4497c0",
+      "quote": "which allow communication with modem or other external\ndevices, like another computer using a serial cable and RS232 protocol.",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/connected_to"
+    },
+    {
+      "id": "f_category",
+      "statement": "UART core provides serial communication capabilities for this interface",
+      "source_id": "CH-2baa4497c0",
+      "quote": "The UART (Universal Asynchronous Receiver/Transmitter) core provides serial\ncommunication capabilities",
+      "plan_pointer": "/interfaces/groups/4/property_evidence/category"
+    }
+  ],
+  "questions": [
+    "For uart_serial_data stx_pad_o/srx_pad_i: documented sources confirm RS232 external-device link and input/output directions [f_protocol,f_peer,f_stx_port,f_srx_port] but do not specify data_bits/parity/stop_bits or divisor-to-baud mapping; what frame and baud configuration should the serial agent assume for later-phase TX/RX byte framing, with current collateral using placeholder 8N1?",
+    "Evidence substituted: f_stx_port could not be proven from the retrieved sources (Fact must reference a retrieved documented item); the documented facts of this interface are cited instead. Review the choice that cited them."
+  ]
+}

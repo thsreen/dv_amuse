@@ -1,0 +1,96 @@
+{
+  "understanding": "Coordinate normal_traffic with wishbone payload plus uart TX RX plus modem toggles under IER-gated interrupt observe, and loopback_traffic by programming MCR Loopback 1 for internal TX-shift to RX-shift with documented modem remapping, reusing t_wb_init_cfg divisor line FIFO IER base with DLAB 0.",
+  "preconditions": [
+    "WAIT for clock running at fixed period per test and reset released",
+    "REQUIRE t_wb_init_cfg_init_seq DONE with LCR DLAB 0 so normal registers accessible and wishbone bus idle-owned for handoff",
+    "REQUIRE symbolic bring-up divisor plus line-format plus FIFO trigger plus IER enables programmed; IER enables use symbolic SYM_IER with documented bits 3-0 polarity",
+    "REQUIRE MCR Loopback starting at normal 0; use symbolic SYM_PAYLOAD and SYM_MODEM_LEVELS without inventing bus values"
+  ],
+  "stimulus_steps": [
+    "STAGE normal_directed: SPAWN virtual normal_traffic_sequence that spawns only; wishbone_slave_interface spawns wishbone payload moves owning wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i, uart_serial_data spawns RX drives owning srx_pad_i and observes stx_pad_o, modem_control_if spawns handshake toggles owning cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i and observes rts_pad_o dtr_pad_o, interrupt_output observes int_o",
+    "FOR each SYM_BURST with SYM_LEN: wishbone_slave_interface WRITE symbolic THR payload bytes; uart_serial_data DRIVE symbolic srx_pad_i frames with SYM_LINE matching LCR; modem_control_if DRIVE symbolic handshake levels; WAIT for wb_ack_o then wishbone_slave_interface READ symbolic RBR; observe stx_pad_o and int_o",
+    "STAGE loopback_directed: wishbone_slave_interface WRITE MCR Loopback 1 using symbolic MCR address; WAIT for idle; FOR each SYM_LOOP_BYTES: wishbone_slave_interface WRITE symbolic THR payload; WAIT for internal TX-to-RX transfer; wishbone_slave_interface READ symbolic RBR; modem_control_if OBSERVE remapped levels; interrupt_output OBSERVE int_o",
+    "STAGE random: FOR seed-controlled iterations: wishbone_slave_interface RANDOMIZE payload bytes with corner bias all-zeros all-ones within documented IER and MCR legal values 0 1; uart_serial_data RANDOMIZE gaps and TX versus RX interleave; modem_control_if RANDOMIZE handshake timing; IF Loopback equals 1 THEN constrain to internal transfer ELSE drive external serial"
+  ],
+  "check_steps": [
+    "COMPARE loopback TX queue versus RX queue in order filtered by origin and address excluding configuration writes; PASS when order preserved without loss duplication or misorder",
+    "COMPARE stx_pad_o equals 1 WHILE MCR Loopback equals 1",
+    "COMPARE IER readback versus programmed enables for bits 3-0 with reserved 7-4 as 0"
+  ],
+  "coverage_steps": [
+    "SAMPLE modem routing normal versus loopback via modem_control_if monitor tap on RTS_PAD_O DTR_PAD_O CTS_PAD_I DSR_PAD_I RI_PAD_I DCD_PAD_I plus MCR Loopback value",
+    "SAMPLE interrupt enables via wishbone_slave_interface monitor tap on IER bits 3-0 values",
+    "SAMPLE payload bytes with corner bias all-zeros all-ones via wishbone_slave_interface monitor tap and uart_serial_data monitor tap on TX versus RX"
+  ],
+  "completion": [
+    "Done when directed normal burst plus directed loopback burst plus bounded random bursts all ACKed with queues COMPAREd and coverage SAMPLEd",
+    "Bound by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing",
+    "Cleanup: program MCR Loopback to 0 for normal, leave LCR DLAB 0 with wishbone bus idle-owned for handoff"
+  ],
+  "facts": [
+    {
+      "id": "f_ier_rda",
+      "statement": "IER bit 0 enables Received Data available interrupt with 0 disabled and 1 enabled.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "0 RW Received Data available interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_thre",
+      "statement": "IER bit 1 enables Transmitter Holding Register empty interrupt with 0 disabled and 1 enabled.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "1 RW Transmitter Holding Register empty interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_lsi",
+      "statement": "IER bit 2 enables Receiver Line Status interrupt with 0 disabled and 1 enabled.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "2 RW Receiver Line Status Interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_msi",
+      "statement": "IER bit 3 enables Modem Status interrupt with 0 disabled and 1 enabled.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "3 RW Modem Status Interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_mcr_loopback",
+      "statement": "MCR bit 4 selects normal versus loopback with STX_PAD_O set to 1 and transmitter shift internally connected to receiver shift in loopback.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "4 W Loopback mode\n \u20180\u2019 \u2013 normal operation\n \u20181\u2019 \u2013 loopback mode. When in loopback mode, the Serial\nOutput Signal (STX_PAD_O) is set to logic \u20181\u2019. The signal of the\ntransmitter shift register is internally connected to the input of the\nreceiver shift register.",
+      "plan_pointer": "/sections/4/strategy/agents/5"
+    },
+    {
+      "id": "f_mcr_map",
+      "statement": "In loopback DTR connects to DSR and RTS to CTS and Out1 to RI and Out2 to DCD.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The following connections are made:\nDTR \u00ce  DSR\nRTS \u00ce CTS\nOut1 \u00ce RI\nOut2 \u00ce DCD",
+      "plan_pointer": "/sections/4/strategy/agents/5"
+    },
+    {
+      "id": "f_mcr_dtr_rts",
+      "statement": "MCR bits 0 and 1 control DTR and RTS levels with inverted polarity.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "0 W Data Terminal Ready (DTR) signal control\n \u20180\u2019 \u2013 DTR is \u20181\u2019\n \u20181\u2019 \u2013 DTR is \u20180\u2019\n1 W Request To Send (RTS) signal control\n \u20180\u2019 \u2013 RTS is \u20181\u2019\n \u20181\u2019 \u2013 RTS is \u20180\u2019",
+      "plan_pointer": "/sections/4/strategy/agents/5"
+    },
+    {
+      "id": "f_lcr_dlab",
+      "statement": "LCR bit 7 selects divisor latches when 1 and normal registers when 0.",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "7 RW Divisor Latch Access bit.\n \u20181\u2019 \u2013 The divisor latches can be accessed\n \u20180\u2019 \u2013 The normal registers are accessed",
+      "plan_pointer": "/sections/12/entries/5"
+    }
+  ],
+  "questions": [
+    "What are actual wb_adr_i pin values for THR RBR IER MCR FCR LCR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling and reset release to first write delay?",
+    "What symbolic divisor LSB MSB nonzero values plus LCR line-format values and FIFO trigger level and IER bits 3-0 combination bound normal versus loopback bring-up and traffic?",
+    "What uart_serial_data data_bits parity stop_bits bit_cycles settings must agree with LCR programming and divisor baud for TX observe and RX drive?",
+    "What Out1 Out2 control applies in normal operation outside loopback and what exact loopback data path beyond documented TX-shift to RX-shift plus DTR to DSR RTS to CTS Out1 to RI Out2 to DCD with STX held at 1 must be compared?",
+    "What documented interrupt observe mapping binds Received Data THRE Line Status Modem Status to normal versus loopback traffic and what overrun parity framing Data Ready order preservation without loss duplication applies?"
+  ],
+  "blockers": []
+}

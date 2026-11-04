@@ -1,0 +1,147 @@
+{
+  "understanding": "Cover LSR Data Ready Overrun Parity Framing and Break via LSR reads and cross THR writes and RBR reads with concurrent LSR errors for data plus error reporting.",
+  "preconditions": [
+    "RESET_AND_DEPENDENCY: WAIT for common clock stable and common reset to reach inactive level with polarity and deassert to first access delay per questions; REQUIRE t_uart_mon bringup done with divisor ACKed and DLAB equals 0 and uart_serial_data monitor emitting TX plus RX byte transactions or TEST_TIMEOUT_CYCLES expiry as operational limit [f_dlab_gate]",
+    "BINDINGS_AND_OWNERSHIP: wishbone_slave_interface owns wb_adr_i 3BIT pin values plus wb_dat_i plus wb_we_i plus wb_stb_i plus wb_cyc_i plus wb_sel_i and observes wb_dat_o plus wb_ack_o; uart_serial_data drives srx_pad_i and observes srx_pad_i plus stx_pad_o; interrupt_output observes int_o; modem_control_if owns cts_pad_i plus dsr_pad_i plus ri_pad_i plus dcd_pad_i and owns rts_pad_o plus dtr_pad_o; wb_clk_i is common clock and wb_rst_i is common reset; write read addresses are pin values 0 for THR_RBR and 5 for LSR with DLAB equals 0 [f_lsr_addr,f_thr_input,f_rbr_output,f_dlab_gate]",
+    "CONFIG_AGREEMENT: REQUIRE LCR bus programming equals uart_serial_data SYM_DATA_BITS plus SYM_PARITY plus SYM_STOP and divisor derived SYM_BIT_CYCLES; KEEP bus idle owned by wishbone_slave_interface and srx_pad_i idle owned by uart_serial_data without assuming inactive levels; LSR reset is null and no mirror is used for side effect status [f_lsr_clear]"
+  ],
+  "stimulus_steps": [
+    "STAGE0_BRINGUP: wishbone_slave_interface drives divisor latch writes at pin values 0 and 1 with DLAB equals 1 then drives LCR write to clear DLAB to 0 and to set SYM_LINE_FORMAT; WAIT for wb_ack_o per write; virtual sequence spawns per agent sequences only with no VIFs and no delays [f_dlab_gate]",
+    "STAGE1_BASIC: FOR one payload byte DO wishbone_slave_interface drives THR write at pin value 0 then uart_serial_data drives RX frame with no error using SYM settings then wishbone_slave_interface drives LSR read at pin value 5 then RBR read at pin value 0; WAIT for drain_cycles between transfers as operational limit [f_thr_input,f_rbr_output,f_dr]",
+    "STAGE2_ERROR_CROSS: FOR each ERR in OE PE FE BI DO IF ERR equals OE THEN uart_serial_data drives back to back RX frames to fill FIFO plus one extra shift char ELSE IF ERR equals PE THEN drives RX frame with inverted parity ELSE IF ERR equals FE THEN drives RX frame with missing stop ELSE drives srx_pad_i held at 0 for one char time of start plus data plus parity plus stop; CONCURRENTLY wishbone_slave_interface drives THR writes and RBR reads and LSR reads at pin values 0 and 5 to capture concurrent error status [f_oe_cond,f_pe_cond,f_fe_cond,f_bi_cond,f_bi_zero]",
+    "STAGE3_RANDOM: FOR N iterations DO wishbone_slave_interface drives constrained random THR writes plus LSR reads plus RBR reads filtered to pin values 0 and 5 with DLAB equals 0 and uart_serial_data drives constrained random RX frames with random ERR injection using agreed SYM settings; EXCLUDE divisor and config writes from payload; virtual sequence spawns only [f_dr,f_oe_cond,f_pe_cond,f_fe_cond,f_bi_cond]",
+    "CLEANUP: wishbone_slave_interface drives DLAB equals 0 and releases bus to idle; uart_serial_data releases srx_pad_i to idle owned level; WAIT for drain_cycles then TERMINATE or on TEST_TIMEOUT_CYCLES expiry TERMINATE [f_dlab_gate]"
+  ],
+  "check_steps": [
+    "CHECK_LSR_STATUS: COMPARE observed completed LSR read data at pin value 5 DR OE PE FE BI bits against injected RX condition where DR 1 means data present and OE means FIFO full plus extra char and PE means top char parity error and FE means top char no valid stop and BI means break with zero char; COMPARE second LSR read to expect cleared bits upon reading [f_dr,f_oe_cond,f_pe_cond,f_fe_cond,f_bi_cond,f_bi_zero,f_lsr_clear]",
+    "CHECK_RLS_INT_AND_ROUTE: WAIT for int_o via interrupt_output then COMPARE Receiver Line Status source versus LSR error with reset by LSR read; COMPARE queue of observed completed RBR reads at pin value 0 versus queue of uart RX drives and queue of observed serial TX on stx_pad_o versus queue of THR writes at pin value 0 filtered by origin and address excluding config writes with TX as DUT output and RX as DUT input and never comparing an event with itself [f_rls_src,f_rls_reset,f_thr_input,f_rbr_output,f_tx_clear,f_err_summary]"
+  ],
+  "coverage_steps": [
+    "COVER_LSR: SAMPLE cg_lsr_status on each LSR read completion via wishbone_slave_interface monitor analysis port with coverpoints cp_lsr_dr plus cp_lsr_oe plus cp_lsr_pe plus cp_lsr_fe plus cp_lsr_bi using bins dr_0_empty dr_1_data oe_0_no oe_1_overrun pe_0_no pe_1_parity fe_0_no fe_1_framing bi_0_no bi_1_break with per instance false [f_dr,f_oe_cond,f_pe_cond,f_fe_cond,f_bi_cond]",
+    "COVER_CROSS: SAMPLE cg_cross_transfer_error on each THR write at pin value 0 or RBR read at pin value 0 with concurrent LSR error status via combined wishbone_slave_interface plus uart_serial_data monitor analysis ports using bins thr_write_X_no_error thr_write_X_oe thr_write_X_pe thr_write_X_fe thr_write_X_bi rbr_read_X_no_error rbr_read_X_oe rbr_read_X_pe rbr_read_X_fe rbr_read_X_bi and ignore_bins idle_no_transfer with per instance false [f_thr_input,f_rbr_output,f_rls_src,f_err_summary]",
+    "COVER_INFRA: USE dedicated coverage subscribers tapping monitor analysis ports for sampling with drivers never supplying actual results or coverage events and with every assertion receiving property plus activation covers [f_lsr_clear,f_rls_reset]"
+  ],
+  "completion": [
+    "DONE when cg_lsr_status has hit both values for DR OE PE FE BI and cg_cross_transfer_error has hit THR plus RBR crossed with no_error OE PE FE BI or TEST_TIMEOUT_CYCLES expires as testbench operational limit",
+    "BOUND by TEST_TIMEOUT_CYCLES plus drain_cycles plus request_timeout_cycles as testbench operational limits not DUT timing; ON common reset WAIT then DISCARD partial serial frames in uart_serial_data monitor and REALIGN to next start bit",
+    "CLEANUP leaves DLAB equals 0 with wishbone bus idle owned by wishbone_slave_interface and srx_pad_i idle owned by uart_serial_data [f_dlab_gate]"
+  ],
+  "facts": [
+    {
+      "id": "f_lsr_addr",
+      "statement": "Line Status is 8BIT read status at pin address 5.",
+      "source_id": "CH-f88915355b",
+      "quote": "Line Status 5 8 R Status information",
+      "plan_pointer": "/registers/registers/9"
+    },
+    {
+      "id": "f_thr_input",
+      "statement": "THR is Transmit FIFO input at pin address 0.",
+      "source_id": "CH-f88915355b",
+      "quote": "Transmit FIFO input",
+      "plan_pointer": "/sections/9/entries/6"
+    },
+    {
+      "id": "f_rbr_output",
+      "statement": "Receiver Buffer is Receiver FIFO output at pin address 0.",
+      "source_id": "CH-f88915355b",
+      "quote": "Receiver FIFO output",
+      "plan_pointer": "/sections/9/entries/6"
+    },
+    {
+      "id": "f_dlab_gate",
+      "statement": "When DLAB access is active then registers at addresses 0 to 1 cannot be accessed as THR RBR.",
+      "source_id": "CH-f88915355b",
+      "quote": "At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/sections/9/entries/6"
+    },
+    {
+      "id": "f_dr",
+      "statement": "DR 0 means no characters in FIFO and DR 1 means at least one character received in FIFO.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "No characters in the FIFO",
+      "plan_pointer": "/sections/9/entries/3"
+    },
+    {
+      "id": "f_oe_cond",
+      "statement": "OE 1 means FIFO full and another character received in receiver shift register and 0 means no overrun.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "If the FIFO is full and another character has been",
+      "plan_pointer": "/registers/registers/9/fields/1"
+    },
+    {
+      "id": "f_pe_cond",
+      "statement": "PE 1 means character at top of FIFO received with parity error and 0 means no parity error.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The character that is currently at the top of the FIFO",
+      "plan_pointer": "/registers/registers/9/fields/2"
+    },
+    {
+      "id": "f_fe_cond",
+      "statement": "FE 1 means received character at top of FIFO did not have valid stop bit and 0 means no framing error.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The received character at the top of the FIFO did not",
+      "plan_pointer": "/registers/registers/9/fields/3"
+    },
+    {
+      "id": "f_bi_cond",
+      "statement": "BI 1 means break condition reached when line held in logic 0 for time of one character of start plus data plus parity plus stop.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The break occurs when the line is held in logic 0 for a",
+      "plan_pointer": "/sections/9/entries/3"
+    },
+    {
+      "id": "f_bi_zero",
+      "statement": "On break one zero character enters FIFO and UART waits for valid start bit for next character.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "one zero character enters the FIFO and the UART waits for a",
+      "plan_pointer": "/sections/9/entries/3"
+    },
+    {
+      "id": "f_lsr_clear",
+      "statement": "OE PE FE BI bits are cleared upon reading LSR.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "The bit is cleared upon reading from the register.",
+      "plan_pointer": "/sections/8/entries/6"
+    },
+    {
+      "id": "f_rls_src",
+      "statement": "Receiver Line Status interrupt source is Parity Overrun Framing errors or Break Interrupt.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Parity, Overrun or Framing\nerrors or Break Interrupt",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_rls_reset",
+      "statement": "Receiver Line Status interrupt reset control is reading Line Status Register.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Reading the Line\nStatus Register",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_tx_clear",
+      "statement": "Transmitter empty indication is cleared when data is written to transmitter FIFO.",
+      "source_id": "CH-4e1d3a956c",
+      "quote": "The bit is cleared when data is being been written to the\ntransmitter FIFO.",
+      "plan_pointer": "/sections/8/entries/7"
+    },
+    {
+      "id": "f_err_summary",
+      "statement": "Error summary is set when at least one parity framing or break indication is inside FIFO.",
+      "source_id": "CH-4e1d3a956c",
+      "quote": "At least one parity error, framing error or break",
+      "plan_pointer": "/sections/8/entries/7"
+    }
+  ],
+  "questions": [
+    "What is wb_rst_i polarity and required deassert to first wishbone access delay?",
+    "What is exact divisor to bit timing including divisor times 16 relation plus SYM_BIT_CYCLES value and mid bit sampling offset for monitor reconstruction?",
+    "What are idle plus start plus stop levels on srx_pad_i and stx_pad_o and owned idle level for srx_pad_i and modem inputs cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i?",
+    "What are legal wb_sel_i values under DATA_BUS_WIDTH_8 with 8BIT data and 3BIT wb_adr_i pin representation for addresses 0 and 5?",
+    "What is RX FIFO depth plus FCR trigger plus IER enable programming needed to deterministically cause OE and observe Receiver Line Status interrupt without loss?",
+    "What is LSR reset value which is undocumented and must remain null plus effect of Transmit empty and error summary bits 5 to 7 on this coverage?",
+    "What is exact Even Parity select generation versus checking rule for odd versus even number of 1s including stick parity interaction for transmit versus receive?",
+    "What defines concurrent LSR error sampling window for THR write or RBR read cross including same clock versus read after write ordering?"
+  ],
+  "blockers": []
+}

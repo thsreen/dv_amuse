@@ -1,0 +1,36 @@
+{
+  "id": "verification_templates_v1",
+  "description": "Design-agnostic template-owned UVM components. All names, widths, protocol bindings, values and evidence are arguments.",
+  "protocols": {
+    "wishbone": {"driver": "wishbone_driver.svh.tmpl", "monitor": "wishbone_monitor.svh.tmpl", "events": ["write", "read"], "roles": ["addr", "wdata", "rdata", "sel", "we", "stb", "cyc", "ack"]},
+    "serial": {"driver": "serial_driver.svh.tmpl", "monitor": "serial_monitor.svh.tmpl", "events": ["rx", "tx"], "roles": ["rx", "tx"]},
+    "custom": {"driver": "custom_driver.svh.tmpl", "monitor": "custom_monitor.svh.tmpl", "requires": ["driver.body", "monitor.body"]}
+  },
+  "components": ["item", "reg_access", "cfg", "sequencer", "driver", "monitor", "coverage", "plan_coverage", "agent", "scoreboard", "env", "sequence", "virtual_sequence", "test", "package", "top", "assertions"],
+  "artifacts": [
+    {"id": "interface", "template": "interface.sv.tmpl", "output": "interfaces/<agent>_if.sv", "inputs": ["port bindings", "resolved widths", "clock", "reset"], "dependencies": []},
+    {"id": "item", "template": "item.svh.tmpl", "output": "uvm/cg_item.svh", "inputs": [], "dependencies": []},
+    {"id": "reg_access", "template": "reg_access.svh.tmpl", "output": "uvm/cg_reg_access.svh", "inputs": ["declared registers (id, agent, address, width, access, mask, reset)"], "dependencies": ["item"]},
+    {"id": "configuration", "template": "cfg.svh.tmpl", "output": "uvm/<agent>_cfg.svh", "inputs": ["protocol parameters", "active/passive", "operational limits"], "dependencies": ["interface"]},
+    {"id": "sequencer", "template": "sequencer.svh.tmpl", "output": "uvm/<agent>_sequencer.svh", "inputs": ["agent id"], "dependencies": ["item", "configuration"]},
+    {"id": "coverage", "template": "coverage.svh.tmpl", "output": "uvm/<agent>_coverage.svh", "inputs": ["observed event kinds", "register classifications", "data classifications"], "dependencies": ["item", "configuration"]},
+    {"id": "plan_coverage", "template": "plan_coverage.svh.tmpl", "output": "uvm/<goal>_coverage.svh", "inputs": ["monitor agent", "typed points/bins/crosses", "event/address filters", "source fact IDs"], "dependencies": ["item"]},
+    {"id": "agent", "template": "agent.svh.tmpl", "output": "uvm/<agent>_agent.svh", "inputs": ["agent id"], "dependencies": ["sequencer", "driver", "monitor", "coverage"]},
+    {"id": "scoreboard", "template": "scoreboard.svh.tmpl", "output": "uvm/cg_scoreboard.svh", "inputs": ["register predictions", "observed routes", "reset flush rules", "minimum comparisons"], "dependencies": ["item"]},
+    {"id": "system_coverage", "template": "system_coverage.svh.tmpl", "output": "uvm/cg_system_coverage.svh", "inputs": ["observed cross-interface routes"], "dependencies": ["item"]},
+    {"id": "environment", "template": "env.svh.tmpl", "output": "uvm/cg_env.svh", "inputs": ["agents", "analysis connections"], "dependencies": ["agent", "scoreboard", "system_coverage"]},
+    {"id": "sequence", "template": "sequence.svh.tmpl", "output": "sequences/<sequence>.svh", "inputs": ["typed operations", "supported values/masks"], "dependencies": ["item"]},
+    {"id": "virtual_sequence", "template": "virtual_sequence.svh.tmpl", "output": "sequences/<test>_vseq.svh", "inputs": ["ordered/concurrent stages", "explicit sequencer handles"], "dependencies": ["sequence", "sequencer"]},
+    {"id": "test", "template": "test.svh.tmpl", "output": "tests/<test>.svh", "inputs": ["configuration", "clock/reset UVCs", "virtual sequence"], "dependencies": ["environment", "virtual_sequence"]},
+    {"id": "package", "template": "package.sv.tmpl", "output": "<top>_verification_pkg.sv", "inputs": ["dependency-ordered includes"], "dependencies": ["test"]},
+    {"id": "assertions", "template": "assertions.sv.tmpl", "output": "checks/<agent>_assertions.sv", "inputs": ["source-supported properties", "activation covers"], "dependencies": ["interface"]},
+    {"id": "top", "template": "top.sv.tmpl", "output": "verification_top.sv", "inputs": ["physical bindings", "tie-offs", "DUT file list"], "dependencies": ["package", "assertions"]}
+  ],
+  "hooks": {
+    "driver.body": {"purpose": "Drive one transaction through this agent's declared virtual interface", "context": "task; req and cfg available"},
+    "monitor.body": {"purpose": "Publish fresh observed transactions through ap; never use driver intent", "context": "task; cfg and ap available"},
+    "scoreboard.compare": {"purpose": "Extend comparisons using observed transactions", "context": "function; tr available"},
+    "coverage.sample": {"purpose": "Extend transaction-derived coverage classifications", "context": "function; observed snapshot available"}
+  },
+  "invariants": ["one class per svh", "packages contain imports/includes only", "explicit sequencer handles", "monitor-fed coverage and scoreboards", "no DUT source modification", "every assertion has property and activation covers"]
+}

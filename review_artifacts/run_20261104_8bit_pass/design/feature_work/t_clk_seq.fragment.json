@@ -1,0 +1,96 @@
+{
+  "sequencer_variables": [],
+  "registers": [],
+  "facts": [
+    {
+      "id": "t_clk_seq_f_clk_1",
+      "statement": "Spec CLK is 1-bit input block clock mapped to RTL wb_clk_i",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input Block\u2019s clock input",
+      "plan_pointer": "/sections/4/strategy/agents/1"
+    },
+    {
+      "id": "t_clk_seq_f_rst_1",
+      "statement": "Spec WB_RST_I is 1-bit input asynchronous reset mapped to RTL wb_rst_i",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_RST_I 1 Input Asynchronous Reset",
+      "plan_pointer": "/sections/4/strategy/agents/1"
+    },
+    {
+      "id": "t_clk_seq_f_reset_clear_1",
+      "statement": "Upon reset the receiver and transmitter FIFOs are cleared",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter FIFOs are cleared.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "t_clk_seq_f_baud_1",
+      "statement": "Input Clock Speed divided by Divisor Latch value equals 16 times communication baud rate",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "(Input Clock Speed)/(Divisor Latch value) = 16 x the communication\nbaud rate.",
+      "plan_pointer": "/sections/8/entries/1"
+    }
+  ],
+  "sequences": [],
+  "routes": [],
+  "checks": [],
+  "hooks": [],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "Which common clock UVC drives wb_clk_i with fixed period P_fixed started before reset and held constant through traffic, since shared_agents contains no clock agent and clock is a common UVC not an agent?"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [],
+      "question": "Which common clock UVC drives wb_clk_i with fixed period P_fixed started before reset and held constant through traffic, since shared_agents contains no clock agent and clock is a common UVC not an agent?"
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [],
+      "question": "Which common reset UVC drives wb_rst_i with period-scaled duration before configuration including active-level polarity and required CLK cycles, since shared_agents contains no reset agent and reset is a common UVC not an agent?"
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [],
+      "question": "Which common clock UVC drives wb_clk_i with fixed period P_fixed started before reset and held constant through traffic, since shared_agents contains no clock agent and clock is a common UVC not an agent?"
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [],
+      "question": "Which common clock UVC drives wb_clk_i with fixed period P_fixed started before reset and held constant through traffic, since shared_agents contains no clock agent and clock is a common UVC not an agent?"
+    },
+    {
+      "step": "stimulus_steps/5",
+      "component_ids": [],
+      "question": "Which common clock UVC drives wb_clk_i with fixed period P_fixed started before reset and held constant through traffic, since shared_agents contains no clock agent and clock is a common UVC not an agent?"
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [],
+      "question": "Which common clock monitor observes wb_clk_i edges to measure sampled period band boundary and seed stratum, since shared_agents contains no clock monitor agent and clock is a common UVC not an agent?"
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [],
+      "question": "Which common clock monitor observes wb_clk_i edges to measure sampled period band boundary and seed stratum, since shared_agents contains no clock monitor agent and clock is a common UVC not an agent?"
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [],
+      "question": "Which common clock monitor observes wb_clk_i edges to measure sampled period band boundary and seed stratum, since shared_agents contains no clock monitor agent and clock is a common UVC not an agent?"
+    }
+  ],
+  "questions": [
+    "What are documented CLK period bands and Max Min Resolution meanings for 3.6864 for 115200 bps and 1258Mhz for 1200 bps points?",
+    "What is nominal CLK frequency and period to use as P_fixed?",
+    "What are minimum and maximum operating CLK frequencies periods plus duty-cycle and jitter tolerance?",
+    "Is dynamic period change during operation permitted or must period stay fixed per test changed only between tests before reset and traffic?",
+    "What is active level polarity of wb_rst_i and required reset duration in CLK cycles for scaling to P_fixed?",
+    "Which common clock UVC drives wb_clk_i with fixed period P_fixed started before reset and held constant through traffic, since shared_agents contains no clock agent and clock is a common UVC not an agent?",
+    "Which common reset UVC drives wb_rst_i with period-scaled duration before configuration including active-level polarity and required CLK cycles, since shared_agents contains no reset agent and reset is a common UVC not an agent?",
+    "Which common clock monitor observes wb_clk_i edges to measure sampled period band boundary and seed stratum, since shared_agents contains no clock monitor agent and clock is a common UVC not an agent?"
+  ]
+}

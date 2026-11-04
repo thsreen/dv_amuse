@@ -1,0 +1,134 @@
+{
+  "sequencer_variables": [],
+  "registers": [],
+  "facts": [
+    {
+      "id": "t_irq_baud_mon_f_core_interrupt",
+      "statement": "UART core requires one interrupt output",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "The core requires one interrupt.",
+      "plan_pointer": "/sections/4/strategy/agents/3"
+    },
+    {
+      "id": "t_irq_baud_mon_f_clk_input",
+      "statement": "CLK is block clock input used for timestamp base",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input Block\u2019s clock input",
+      "plan_pointer": "/sections/4/strategy/agents/2"
+    },
+    {
+      "id": "t_irq_baud_mon_f_reset_input",
+      "statement": "WB_RST_I is asynchronous reset input",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_RST_I 1 Input Asynchronous Reset",
+      "plan_pointer": "/sections/4/strategy/agents/2"
+    }
+  ],
+  "sequences": [],
+  "routes": [],
+  "checks": [],
+  "hooks": [
+    {
+      "id": "t_irq_baud_mon_mon_int_o",
+      "target": "interrupt_output",
+      "slot": "monitor.body",
+      "purpose": "Sample int_o each wb_clk_i edge without driving; emit timestamped edge event; clear pending and restart base on reset",
+      "fact_ids": [
+        "t_irq_baud_mon_f_core_interrupt",
+        "t_irq_baud_mon_f_clk_input",
+        "t_irq_baud_mon_f_reset_input"
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "id": "t_irq_baud_mon_cov_int_o",
+      "agent": "interrupt_output",
+      "points": [
+        {
+          "name": "t_irq_baud_mon_pt_int_o_toggle",
+          "field": "data",
+          "mask": 1,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "level_0",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "level_1",
+              "values": [
+                1
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [],
+      "sample_address": null,
+      "fact_ids": [
+        "t_irq_baud_mon_f_core_interrupt",
+        "t_irq_baud_mon_f_clk_input"
+      ]
+    }
+  ],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [
+        "t_irq_baud_mon_mon_int_o"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [
+        "t_irq_baud_mon_mon_int_o"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [
+        "t_irq_baud_mon_mon_int_o"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [
+        "t_irq_baud_mon_mon_int_o"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [],
+      "question": "Is BAUD_O present on uart_top.v and what is its exact physical port name and UART_HAS_BAUDRATE_OUTPUT enable for binding?"
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [
+        "t_irq_baud_mon_cov_int_o"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [],
+      "question": "What is documented divisor to 16x tick period mapping and which divisor value stalls or disables tick for stability checks?"
+    }
+  ],
+  "questions": [
+    "What is documented INT_O polarity and inactive level for assertion versus deassertion observation?",
+    "Is BAUD_O present on uart_top.v and what is its exact physical port name and UART_HAS_BAUDRATE_OUTPUT enable for binding?",
+    "What is documented divisor to 16x tick period mapping and which divisor value stalls or disables tick for stability checks?",
+    "What is active level polarity of wb_rst_i and required reset duration in CLK cycles for clearing pending events?",
+    "What is nominal P_fixed CLK period to use for INT_O and tick timestamping?",
+    "Deferred (quick testing): sequence t_irq_baud_mon_interrupt_observe does not fit the testbench: Sequence needs an active agent",
+    "Deferred (quick testing): hook t_irq_baud_mon_cov_int_o_smp does not fit the testbench: Coverage hook requires selected coverage infrastructure"
+  ]
+}

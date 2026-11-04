@@ -1,0 +1,50 @@
+{
+  "understanding": "Clock period coverage samples observed wb_clk_i spec CLK edges with one symbolic fixed period P_fixed per test started before reset and held through traffic; raw period sampling is supported, band boundary stratum classification deferred until documented bands defined with no invented bounds or dynamic switching.",
+  "preconditions": [
+    "DUT clock input wb_clk_i spec CLK available f_clk_1",
+    "DUT reset input wb_rst_i spec WB_RST_I available as asynchronous reset f_reset_1",
+    "Symbolic fixed period P_fixed selected per test as testbench infrastructure choice started before reset and held fixed through traffic",
+    "No DOCUMENTED band boundary or stratum limits assumed"
+  ],
+  "stimulus_steps": [
+    "START clock on wb_clk_i with symbolic period P_fixed before reset",
+    "ASSERT reset via wb_rst_i at symbolic active level R_ACTIVE then DEASSERT before traffic with duration scaled to P_fixed by symbolic count N_RST",
+    "HOLD clock period at P_fixed through traffic with no dynamic change or jitter injection",
+    "WAIT for traffic activity to provide sampleable clock edges"
+  ],
+  "check_steps": [],
+  "coverage_steps": [
+    "SAMPLE observed clock edges on wb_clk_i and MEASURE sampled period P_sampled per observation window",
+    "SAMPLE raw period P_sampled with P_fixed and test seed without inventing band boundary or stratum",
+    "IF documented band map with boundary and low middle high strata becomes available THEN COMPARE P_sampled to that map ELSE retain P_sampled raw for later classification",
+    "SAMPLE per-test fixed-period context without claiming exhaustive coverage"
+  ],
+  "completion": [
+    "WAIT for traffic done OR TEST_TIMEOUT_CYCLES operational limit; timeout is testbench operational limit not DUT timing",
+    "STOP sampling and retain P_fixed with P_sampled and test seed for this test then CLEANUP to idle without mid-test period change"
+  ],
+  "facts": [
+    {
+      "id": "f_clk_1",
+      "statement": "Spec CLK is 1-bit input block clock mapped to RTL wb_clk_i",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input Block\u2019s clock input",
+      "plan_pointer": "/sections/4/strategy/agents/1"
+    },
+    {
+      "id": "f_reset_1",
+      "statement": "Spec WB_RST_I is 1-bit input asynchronous reset mapped to RTL wb_rst_i",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_RST_I 1 Input Asynchronous Reset",
+      "plan_pointer": "/sections/4/strategy/agents/1"
+    }
+  ],
+  "questions": [
+    "What are documented CLK period bands and Max Min Resolution meanings for 1258Mhz for 1200 bps and 3.6864 for 115200 bps points?",
+    "What is nominal CLK frequency and period to use as P_fixed?",
+    "What are minimum and maximum operating CLK frequencies periods plus duty-cycle and jitter tolerance?",
+    "Is dynamic period change during operation permitted or must period stay fixed per test changed only between tests before reset and traffic?",
+    "What is active level polarity of wb_rst_i and required reset duration in CLK cycles for scaling to P_fixed?"
+  ],
+  "blockers": []
+}

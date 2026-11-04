@@ -1,0 +1,111 @@
+{
+  "understanding": "After global reset top-level scoreboard reconstructs idle WISHBONE reads on observed wb_clk_i edges to check receiver/transmitter FIFOs and shift registers cleared, Divisor Latch 0, LCR 8N1, and IER interrupts disabled, depending on chip-reset bring-up and wishbone monitor.",
+  "preconditions": [
+    "wb_clk_i running with fixed period before wb_rst_i assert and held fixed through reset-state checks",
+    "wb_rst_i owned by reset drive with no init_config_sequence before reset-state reads",
+    "wishbone_slave_interface monitor active reconstructing only completed ACK reads and flushing in-flight on wb_rst_i",
+    "uart_serial_data holds srx_pad_i at documented idle and observes stx_pad_o; modem_control_if holds cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i stable; interrupt_output observes int_o",
+    "LCR read uses documented bus pin value 3; Divisor IER IIR LSR pin values remain symbolic pending documented binding"
+  ],
+  "stimulus_steps": [
+    "DRIVE wb_rst_i to documented active level via reset control",
+    "WAIT documented hold duration on observed wb_clk_i edges then DRIVE wb_rst_i to documented inactive level",
+    "WAIT documented deassert-to-access delay on observed wb_clk_i edges",
+    "READ LCR at wb_adr_i pin value 3 via wishbone_slave_interface driver [f_lcr_addr]",
+    "READ Divisor LSB MSB via DLAB-gated access and IER IIR LSR via symbolic addresses through wishbone_slave_interface driver without configuration writes [f_div_zero f_ier_disabled]",
+    "SAMPLE int_o via interrupt_output monitor and stx_pad_o idle via uart_serial_data monitor on observed wb_clk_i edges"
+  ],
+  "check_steps": [
+    "COMPARE LCR read data to 00000011b for 8 bits no parity 1 stop [f_lcr_reset f_lcr_format]",
+    "COMPARE Divisor Latch value to 0 [f_div_zero]",
+    "COMPARE IER enables to disabled state where 0 means disabled [f_ier_disabled]",
+    "COMPARE LSR DR to 0 meaning no characters in FIFO to confirm FIFOs cleared [f_fifo_cleared f_lsr_dr]",
+    "COMPARE IIR bit0 to 1 meaning no interrupt pending with int_o negated to confirm interrupts disabled [f_ier_disabled f_iir_idle]",
+    "COMPARE no received or transmitted payload observed after reset to confirm shift registers and FIFOs cleared [f_shift_cleared f_fifo_cleared]"
+  ],
+  "coverage_steps": [],
+  "completion": [
+    "COMPLETE when all reset-state COMPAREs evaluated after wb_rst_i deassert and reads sampled on observed wb_clk_i edges",
+    "TERMINATE on TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+  ],
+  "facts": [
+    {
+      "id": "f_fifo_cleared",
+      "statement": "After reset receiver and transmitter FIFOs are cleared.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter FIFOs are cleared.",
+      "plan_pointer": "/sections/1/entries/7"
+    },
+    {
+      "id": "f_shift_cleared",
+      "statement": "After reset receiver and transmitter shift registers are cleared.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter shift registers are cleared",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_div_zero",
+      "statement": "After reset Divisor Latch register is set to 0.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Divisor Latch register is set to 0.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_lcr_format",
+      "statement": "After reset Line Control Register is set to 8 bits data no parity 1 stop bit.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Line Control Register is set to communication of 8 bits of data, no parity, 1\nstop bit.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_ier_disabled",
+      "statement": "After reset all interrupts are disabled in Interrupt Enable Register.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "All interrupts are disabled in the Interrupt Enable Register.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_lcr_reset",
+      "statement": "Line Control Register reset value is 00000011b.",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "Reset Value: 00000011b",
+      "plan_pointer": "/registers/registers/7"
+    },
+    {
+      "id": "f_lcr_addr",
+      "statement": "Line Control Register is at bus pin value 3 width 8 access RW.",
+      "source_id": "CH-f88915355b",
+      "quote": "Line Control Register 3 8 RW Control connection",
+      "plan_pointer": "/registers/registers/7"
+    },
+    {
+      "id": "f_lsr_dr",
+      "statement": "LSR Data Ready 0 means no characters in FIFO for cleared check.",
+      "source_id": "CH-a2dd758e55",
+      "quote": "No characters in the FIFO",
+      "plan_pointer": "/sections/8/entries/6"
+    },
+    {
+      "id": "f_iir_idle",
+      "statement": "IIR bit0 value 1 means no interrupt pending for disabled-interrupt check.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "no interrupt\nis pending",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_fcr_reset",
+      "statement": "FCR lists Reset Value 11000000b with write-only or ignored bits.",
+      "source_id": "CH-dfb1048908",
+      "quote": "Reset Value : 11000000b",
+      "plan_pointer": "/sections/12/entries/1"
+    }
+  ],
+  "questions": [
+    "What is documented active level polarity and inactive level of WB_RST_I on wb_rst_i, minimum assert duration in CLK cycles, and required deassert-to-first-read delay before reset-state reads?",
+    "What are documented bus pin values for IER IIR LSR and Divisor LSB MSB reads in DATA_BUS_WIDTH_8 build, DLAB gating for divisor access, wb_sel_i legal values, and address representation as pin values?",
+    "What are documented reset values for IER including reserved bits and for FCR trigger and clear bits, and how is FCR reset observed when all listed FCR bits are write-only or ignored?",
+    "What documented status proves receiver and transmitter FIFOs and shift registers cleared after reset: expected LSR DR OE PE FE BI and transmitter empty, IIR value and int_o level, and serial idle levels?",
+    "What is documented CLK sampling edge on wb_clk_i for wishbone monitor reconstruction and scoreboard sampling of reset-state reads?"
+  ],
+  "blockers": []
+}

@@ -1,0 +1,134 @@
+{
+  "understanding": "Build wishbone_slave_interface monitor sampling RTL pins wb_adr_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_sel_i on observed CLK edges from fixed-period clock, reconstructing completed read and write transactions on WB_ACK_O assertion for analysis port, flushing in-flight on wb_rst_i, with X or Z and known-after-reset checks and ACK-sampled register and DLAB coverage for 8-bit addresses 0-6.",
+  "preconditions": [
+    "Clock active with fixed period P_fixed started before reset and held fixed through traffic with monitor sampling on observed CLK edges",
+    "Reset asserted via wb_rst_i before configuration and observed by monitor for flush with symbolic active level pending polarity answer",
+    "Monitor bound to wishbone_slave_interface RTL pins wb_clk_i wb_rst_i wb_adr_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_sel_i in 8-bit build",
+    "Register address space 0 to 6 with DLAB aliasing at 0 to 1 defined for reconstruction and coverage"
+  ],
+  "stimulus_steps": [
+    "SAMPLE wb_adr_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_sel_i on each observed CLK edge into current sample",
+    "IF reset asserted THEN flush in-flight latched request and discard partial transaction and WAIT for reset deassertion before resuming reconstruction",
+    "IF WB_ACK_O asserted THEN latch address control and data from current sample and reconstruct one completed read or write transaction by WE value and EMIT to analysis port",
+    "FOR each emitted transaction CONTINUE sampling without driving DUT inputs and without inserting DUT timing delays"
+  ],
+  "check_steps": [
+    "IF any sampled WB_ADDR_I or WB_SEL_I or WB_DAT_I or WB_DAT_O or WB_WE_I or WB_STB_I or WB_CYC_I or WB_ACK_O or CLK or WB_RST_I equals X or Z THEN report uvm_error immediately",
+    "AFTER reset deassertion CHECK DUT outputs wb_dat_o and wb_ack_o reach known non-X or Z values before first reconstruction"
+  ],
+  "coverage_steps": [
+    "SAMPLE cg_wb_reg_access on WB_ACK_O assertion observed on CLK edges: cp_wb_addr addr_0 to addr_6 with illegal addr_7 and cp_wb_dir read_WE0 write_WE1 and cp_wb_data_class zero min mid_low mid_high max",
+    "SAMPLE cg_cross_addr_dlab on WB_ACK_O completion observed on CLK edges: cross address with DLAB covering addr0_dlab0_RBR_THR addr0_dlab1_DLL_SB addr1_dlab0_IER addr1_dlab1_DLM_SB addr2_to_6 variants with illegal addr_7_any_dlab"
+  ],
+  "completion": [
+    "Monitor runs through reset and traffic until test end with in-flight flushed on reset and only completed ACK transactions emitted",
+    "Terminate on traffic done or TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+  ],
+  "facts": [
+    {
+      "id": "f_bus_8",
+      "statement": "Integration targets 8-bit data bus build for compatibility reason.",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "It has an 8-bit data bus for compatibility reason.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_rbr_0",
+      "statement": "Receiver Buffer at address 0 width 8 access R is Receiver FIFO output.",
+      "source_id": "CH-f88915355b",
+      "quote": "Receiver Buffer 0 8 R Receiver FIFO output",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_thr_0",
+      "statement": "Transmitter Holding at address 0 width 8 access W is Transmit FIFO input.",
+      "source_id": "CH-f88915355b",
+      "quote": "0 8 W Transmit FIFO input",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_ier_1",
+      "statement": "Interrupt Enable at address 1 width 8 access RW enables masks interrupts.",
+      "source_id": "CH-f88915355b",
+      "quote": "Interrupt Enable 1 8 RW Enable/Mask interrupts",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_iir_2",
+      "statement": "Interrupt Identification at address 2 width 8 access R gets interrupt information.",
+      "source_id": "CH-f88915355b",
+      "quote": "Interrupt Identification 2 8 R Get interrupt information",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_fcr_2",
+      "statement": "FIFO Control at address 2 width 8 access W controls FIFO options.",
+      "source_id": "CH-f88915355b",
+      "quote": "FIFO Control 2 8 W Control FIFO options",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_lcr_3",
+      "statement": "Line Control Register at address 3 width 8 access RW controls connection.",
+      "source_id": "CH-f88915355b",
+      "quote": "Line Control Register 3 8 RW Control connection",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_mcr_4",
+      "statement": "Modem Control at address 4 width 8 access W controls modem.",
+      "source_id": "CH-f88915355b",
+      "quote": "Modem Control 4 8 W Controls modem",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_lsr_5",
+      "statement": "Line Status at address 5 width 8 access R provides status information.",
+      "source_id": "CH-f88915355b",
+      "quote": "Line Status 5 8 R Status information",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_msr_6",
+      "statement": "Modem Status at address 6 width 8 access R provides modem status.",
+      "source_id": "CH-f88915355b",
+      "quote": "Modem Status 6 8 R Modem Status",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_dlab_set",
+      "statement": "Divisor Latch registers are accessed when DLAB bit 7 of Line Control Register is set.",
+      "source_id": "CH-f88915355b",
+      "quote": "The registers can be accessed when the 7th (DLAB) bit of the Line Control Register is set",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "f_dlab_block",
+      "statement": "When DLAB is set the normal registers at addresses 0-1 cannot be accessed.",
+      "source_id": "CH-f88915355b",
+      "quote": "the above registers at addresses 0-1",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "f_dll_0",
+      "statement": "Divisor Latch LSB at address 0 width 8 access RW holds LSB of divisor.",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 1 (LSB) 0 8 RW The LSB of the divisor",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "f_dlm_1",
+      "statement": "Divisor Latch MSB at address 1 width 8 access RW holds MSB of divisor.",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 2 1 8 RW The MSB of the divisor",
+      "plan_pointer": "/sections/9/entries/5"
+    }
+  ],
+  "questions": [
+    "What is active level polarity of wb_rst_i described as Asynchronous Reset and required reset duration in CLK cycles and must monitor flush in-flight transfer versus flag reset-during-transfer as error?",
+    "What are documented WISHBONE handshake semantics for reconstruction: stability of wb_adr_i wb_we_i wb_sel_i wb_stb_i wb_cyc_i during transfer and wb_ack_o assertion window single versus multi-cycle and wb_dat_o validity window on reads and back-to-back handling?",
+    "What is documented wb_sel_i usage in 8-bit build including legal values and ignored versus checked behavior and address representation as pin values 0-6 versus offsets and illegal addr_7 handling?",
+    "What is documented CLK sampling edge for wishbone_slave_interface monitor and reset sampling relative to CLK given fixed period P_fixed per test?"
+  ],
+  "blockers": []
+}

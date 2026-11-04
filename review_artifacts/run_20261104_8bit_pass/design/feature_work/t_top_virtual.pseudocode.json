@@ -1,0 +1,70 @@
+{
+  "understanding": "Top virtual spawn-only coordination across wishbone_slave_interface uart_serial_data modem_control_if interrupt_output with common clock and reset plus normal-traffic WISHBONE payload with serial TX RX and modem handshake in ordered stages with no VIFs or delays.",
+  "preconditions": [
+    "Virtual sequencer container holds handles for wishbone_slave_interface and uart_serial_data and modem_control_if and interrupt_output plus clock and reset without hierarchical pathing and without p_sequencer lock-in",
+    "Clock period P_fixed symbolic fixed per test started before reset and held fixed through traffic",
+    "Reset on wb_rst_i asserted first before any bus activity with duration tracking P_fixed polarity symbolic",
+    "DUT input ownership: wb_clk_i by clock and wb_rst_i by reset and wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i by wishbone_slave_interface and srx_pad_i by uart_serial_data and cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i by modem_control_if; outputs wb_dat_o wb_ack_o int_o stx_pad_o rts_pad_o dtr_pad_o observed",
+    "Bindings use RTL names wb_clk_i wb_rst_i wb_adr_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_sel_i int_o stx_pad_o srx_pad_i rts_pad_o dtr_pad_o cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i with UART_DATA_WIDTH 8 and UART_ADDR_WIDTH 3 and DATA_BUS_WIDTH_8",
+    "Virtual sequences start on null sequencer drive nothing directly touch no VIFs use no delays with handles passed explicitly to every spawn"
+  ],
+  "stimulus_steps": [
+    "START clock on wb_clk_i with symbolic P_fixed and HOLD fixed through all stages",
+    "ASSERT reset on wb_rst_i then WAIT done then DEASSERT before any configuration with duration tracking P_fixed",
+    "FOR seed S SAMPLE spawn order uniformly under S with knobs for burst length and idle without VIFs or delays",
+    "STAGE 0 bring-up: SPAWN symbolic divisor line-format FIFO programming using wishbone_slave_interface only driving its own wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i",
+    "STAGE 1 normal-traffic: SPAWN concurrently wishbone_slave_interface payload plus uart_serial_data TX-observe and RX-drive on srx_pad_i stx_pad_o plus modem_control_if handshake toggle plus interrupt_output observe",
+    "Per-agent rule: wishbone_slave_interface drives only WISHBONE inputs and uart_serial_data drives only srx_pad_i and modem_control_if drives only cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i",
+    "EXECUTE stages in order with concurrent spawns inside a stage and ordered stages across bring-up then traffic then cleanup leaving bus idle-owned"
+  ],
+  "check_steps": [
+    "IF int_o observed THEN COMPARE IIR contents for highest priority pending interrupt per f_iir_enable",
+    "COMPARE IIR Bit0 pending indication where 0 means pending and 1 means none per f_iir_bit0"
+  ],
+  "coverage_steps": [],
+  "completion": [
+    "Done when clock started before reset and held fixed through stages plus bring-up spawn plus normal-traffic spawns all finished with at least one scoreboard COMPARE observed",
+    "Bound by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing",
+    "Cleanup virtual only with no VIFs or delays and bus left idle-owned for handoff"
+  ],
+  "facts": [
+    {
+      "id": "f_core_8bit",
+      "statement": "UART core uses 8-bit data bus for system communication.",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "It has an 8-bit data bus for compatibility reason.",
+      "plan_pointer": "/sections/4/strategy/agents/4"
+    },
+    {
+      "id": "f_serial_pads",
+      "statement": "UART serial data uses two pads serial in and serial out with six optional modem signals.",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "It requires 2 pads in the chip (serial in and serial out)",
+      "plan_pointer": "/sections/4/strategy/agents/4"
+    },
+    {
+      "id": "f_iir_enable",
+      "statement": "IIR reports current highest priority pending interrupt.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "The IIR enables the programmer to retrieve what is the current highest priority pending",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_iir_bit0",
+      "statement": "IIR Bit0 zero indicates interrupt pending and one indicates none pending.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/4"
+    }
+  ],
+  "questions": [
+    "What is documented bring-up order for reset, divisor, line format and FIFO that virtual stages must enforce?",
+    "What is documented active and inactive polarity of wb_rst_i plus minimum assert duration in clock cycles and deassert to first write delay with duration tracking P_fixed?",
+    "What is documented nominal clock period P_fixed and permitted bands for 3.6864 and 1258Mhz points plus duty jitter tolerance and is dynamic period change permitted?",
+    "What are documented legal masks access types and values per WISHBONE address including DLAB gating and wb_sel_i handling and wb_adr_i pin representation 3-bit versus 5-bit and addr 7 handling for 8-bit FIFO-only use?",
+    "What uart_serial_data data_bits parity stop_bits bit_cycles settings must agree with LCR programming and divisor baud for TX observe and RX drive?",
+    "What documented modem Out1 Out2 behavior applies in normal operation and what interrupt mapping binds Receiver Data THRE Line Status Modem Status to normal traffic with order preservation without loss duplication?",
+    "What symbolic divisor LSB MSB nonzero values plus LCR line values plus FIFO trigger plus IER bits bound normal bring-up when legal divisor range is unresolved?"
+  ],
+  "blockers": []
+}

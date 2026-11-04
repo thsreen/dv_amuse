@@ -1,0 +1,67 @@
+{
+  "agents": [
+    {
+      "id": "interrupt_output",
+      "protocol": "custom",
+      "bindings": {
+        "INT_O": "int_o"
+      },
+      "fact_ids": [
+        "f_port_int_o_2",
+        "f_dut_source"
+      ],
+      "bit_cycles": 2,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "active": false,
+      "coverage_enabled": false,
+      "idle_values": {}
+    }
+  ],
+  "tie_offs": [],
+  "registers": [],
+  "hooks": [],
+  "defines": [],
+  "facts": [
+    {
+      "id": "f_port_int_o_2",
+      "statement": "Specification defines INT_O as 1-bit Output Interrupt output",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/signals/0"
+    },
+    {
+      "id": "f_function_interrupt",
+      "statement": "Function of interrupt_output is Interrupt output to signal UART events to system",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/function"
+    },
+    {
+      "id": "f_category_interrupt",
+      "statement": "Category of interrupt_output is interrupt",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/category"
+    },
+    {
+      "id": "f_dut_source",
+      "statement": "DUT role for interrupt_output is source with direction out of DUT",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/dut_role"
+    },
+    {
+      "id": "f_core_interrupt",
+      "statement": "The core requires one interrupt",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "The core requires one interrupt.",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/connected_to"
+    }
+  ],
+  "questions": [
+    "What is the asserted active level of int_o for interpreting observed edges, given documented INT_O 1-bit Output Interrupt output leaves active_level unknown?",
+    "On which sampling reference should int_o be observed for later-phase event correlation, deferred from this observe-only infrastructure?"
+  ]
+}

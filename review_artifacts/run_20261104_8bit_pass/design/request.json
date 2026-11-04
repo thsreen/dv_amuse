@@ -1,0 +1,29 @@
+{
+  "requirement": "Generate verification collateral for 8 bit UART under ../baseline_repos",
+  "flow": "/proj/work/silicon_copilot/dv_agent/src/orchestrator_agent/flows/testplan_flow.json",
+  "out": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z",
+  "variables": {
+    "include": [],
+    "scope": "",
+    "repo": "/proj/work/silicon_copilot/baseline_repos",
+    "rtl_files": [
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_top.v"
+    ],
+    "rtl_graph_files": [
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/raminfr.v",
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_debug_if.v",
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_receiver.v",
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_regs.v",
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_rfifo.v",
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_sync_flops.v",
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_tfifo.v",
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_top.v",
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_transmitter.v",
+      "/proj/work/silicon_copilot/baseline_repos/uart16550/rtl/verilog/uart_wb.v"
+    ],
+    "rtl_top": "uart_top",
+    "rtl_defines": [
+      "DATA_BUS_WIDTH_8"
+    ]
+  }
+}

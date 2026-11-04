@@ -1,0 +1,117 @@
+{
+  "understanding": "Cover IIR bit0 pending flag, bits3-1 priority codes for five sources, and fixed compatibility bits sampled on IIR reads.",
+  "preconditions": [
+    "IIR accessible as 8-bit read-only at bus pin value wb_adr_i==2 via wishbone_slave_interface with normal registers selected",
+    "Single UART instance with clock edges available for sampling and reset released from C1h state",
+    "Owning traffic sequences capable of producing RLS RDA Timeout THRE and Modem pending states executed by their agents",
+    "Passive observation only with no driving of IIR or int_o"
+  ],
+  "stimulus_steps": [],
+  "check_steps": [],
+  "coverage_steps": [
+    "WAIT for Wishbone read completion to address 2 observed via wishbone_slave_interface on clock edge",
+    "SAMPLE cp_iir_pending from bit0: IF bit0==0 THEN bin pending_0 ELSE IF bit0==1 THEN bin no_pending_1",
+    "SAMPLE cp_iir_code from bits 3-1: bins code_011_rls and code_010_rda and code_110_timeout and code_001_thre and code_000_modem; illegal codes 100_101_111 must never occur",
+    "SAMPLE cp_iir_fixed from bits 7-6 and 5-4: IF bits7-6==11 THEN bin fixed_76_11; IF bits5-4==00 THEN bin fixed_54_00; any other fixed bits illegal",
+    "FOR each IIR read REPEAT sampling until all legal pending and code and fixed bins are hit"
+  ],
+  "completion": [
+    "End collection after owning traffic sequences complete plus drain_cycles to flush pending IIR read events",
+    "Abort on request_timeout_cycles operational limit; timeout is testbench limit not DUT timing"
+  ],
+  "facts": [
+    {
+      "id": "f_pending",
+      "statement": "IIR bit0 0 means interrupt pending, 1 means no interrupt pending.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019. When it\u2019s \u20181\u2019 \u2013 no interrupt\nis pending.",
+      "plan_pointer": "/registers/registers/6/fields/0"
+    },
+    {
+      "id": "f_highest",
+      "statement": "IIR reports current highest priority pending interrupt.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "The IIR enables the programmer to retrieve what is the current highest priority pending\ninterrupt.",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_rls",
+      "statement": "IIR 011 is 1st priority Receiver Line Status from parity overrun framing break cleared by reading LSR.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Parity, Overrun or Framing\nerrors or Break Interrupt\nReading the Line\nStatus Register",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_rda",
+      "statement": "IIR 010 is 2nd priority Receiver Data Available when FIFO reaches trigger cleared when FIFO drops below trigger.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "FIFO trigger level reached FIFO drops below\ntrigger level",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_timeout",
+      "statement": "IIR 110 is 2nd priority Timeout when data remains without input or read for 4 char times cleared by reading FIFO.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "There\u2019s at least 1 character\nin the FIFO but no character\nhas been input to the FIFO\nor read from it for the last 4\nChar times.\nReading from the\nFIFO (Receiver\nBuffer Register)",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_thre",
+      "statement": "IIR 001 is 3rd priority Transmitter Holding Register Empty cleared by writing THR or reading IIR.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Transmitter Holding\nRegister Empty\nWriting to the\nTransmitter Holding\nRegister or reading\nIIR.",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_modem",
+      "statement": "IIR 000 is 4th priority Modem Status from CTS DSR RI DCD cleared by reading MSR.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 0 4 th Modem Status CTS, DSR, RI or DCD. Reading the Modem\nstatus register.",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_fixed45",
+      "statement": "IIR bits 5-4 are logic 0.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 4 and 5: Logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/5"
+    },
+    {
+      "id": "f_fixed67",
+      "statement": "IIR bits 7-6 are logic 1 for compatibility.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 6 and 7: Logic \u20181\u2019 for compatibility reason.",
+      "plan_pointer": "/sections/8/entries/5"
+    },
+    {
+      "id": "f_reset",
+      "statement": "IIR reset value is C1h meaning no pending with fixed bits set.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Reset Value: C1h",
+      "plan_pointer": "/registers/registers/6"
+    },
+    {
+      "id": "f_addr",
+      "statement": "IIR is 8-bit read-only register at bus address 2.",
+      "source_id": "CH-f88915355b",
+      "quote": "Interrupt Identification 2 8 R Get interrupt information",
+      "plan_pointer": "/registers/registers/6"
+    },
+    {
+      "id": "f_agent",
+      "statement": "interrupt_output agent passively observes INT_O without driving.",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "The core requires one interrupt.",
+      "plan_pointer": "/sections/4/strategy/agents/3"
+    },
+    {
+      "id": "f_cg",
+      "statement": "cg_iir_interrupt covers pending flag and priority encodings sampled on IIR read completion via wishbone on clock edges single instance.",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "The IIR enables the programmer to retrieve what is the current highest priority pending\ninterrupt.",
+      "plan_pointer": "/sections/9/entries/2"
+    }
+  ],
+  "questions": [],
+  "blockers": []
+}

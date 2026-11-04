@@ -1,0 +1,15 @@
+{
+  "top": "uart_top",
+  "clock": "wb_clk_i",
+  "clock_period_ns": 10.0,
+  "clock_period_ranges": [],
+  "facts": [
+    {
+      "id": "clock_binding",
+      "statement": "The specification defines CLK as the testbench-supplied clock",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input Block\u2019s clock input",
+      "plan_pointer": "/interfaces/groups/1/property_evidence/category"
+    }
+  ]
+}

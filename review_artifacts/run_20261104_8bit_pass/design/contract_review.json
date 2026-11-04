@@ -1,0 +1,336 @@
+{
+  "problems": [
+    "t_traffic_seq_mcr claims bus address 4 width 8: no cited fact defines MCR address. Cited f_mcr_loopback/f_mcr_dtr_rts/f_mcr_map describe bit 0/1 inverted DTR/RTS, bit 4 loopback with STX_PAD_O=1 and internal TX-to-RX connection, and DTR->DSR RTS->CTS Out1->RI Out2->DCD mapping only. No quote in batch gives address 4 for MCR, unlike LCR/FCR/Divisor which have explicit '3 8 RW'/'2 8 W'/'1 8 RW' quotes.",
+    "t_traffic_seq_mcr claims reset 0: no cited fact defines MCR reset value. Cited facts cover loopback behavior, DTR/RTS polarity and loopback mapping only, with no post-reset statement. No quote supports reset 0.",
+    "uart_serial_data sets bit_cycles 16 for serial timing: no cited fact supports 16. Cited f_srx_port/f_function/f_protocol/f_peer/f_category and quotes define 1-bit SRX/STX signals, RS232 serial cable function and modem peer only. Cited LCR format fact supports 8 data_bits/no parity/1 stop_bits, but no quote defines divisor-to-baud, 16x oversampling or BIT_CYCLES value.",
+    "hold_wb_sel_i ties wb_sel_i to 0: unjustified tie-off. Cited f_wb_stb_i/f_wb_cyc_i/f_wb_ack_o define only STB/CYC/ACK ports, with no definition of SEL, no select polarity/width requirement, and wishbone_slave_interface bindings do not include SEL. Value 0 is unsupported and as byte-enable would de-assert transfer on 8-bit DATA_BUS_WIDTH_8 build.",
+    "tie_off hold_wb_sel_i ties wb_sel_i to 0 with fact_ids f_wb_stb_i/f_wb_cyc_i/f_wb_ack_o which never define SEL; with DATA_BUS_WIDTH_8 tying byte-select low masks the data lane and breaks the wishbone transfers the sequences rely on",
+    "t_modem_irq_wb_bringup_seq programs LCR addr 3 data 131/3, divisor addr 1 data 0 and addr 0 data 1, FCR addr 2 data 0, MCR addr 4 data 0 mask 31 but cites only f_loopback_1/t_chip_reset_f_ier_disable/f_msr_addr_1; no cited fact supports DLAB=1 divisor gating at 0-1 per df7aa0fa2aba9181, LCR addr 3, FCR addr 2, or MCR addr 4",
+    "t_modem_irq_modem_toggle_seq custom addr 0 mask 15 data 1/2/4/8 assumes CTS=bit0 DSR=bit1 RI=bit2 DCD=bit3 lane mapping with no fact defining pad-to-bit order; sequence 1->2->4->8 clears prior pad while setting next, creating overlapping edges not isolated single toggles, violating f_msr_dcts_1/f_msr_ddsr_1/f_msr_ddcd_1 single-change and f_msr_teri_1 RI low-to-high edge without return to idle 0",
+    "t_modem_irq_wb_clear_seq read addr 6 data 0 mask 255 expects 0 immediately after toggles, contradicting f_msr_delta_1/0030b68f2198a44f/2684e06e36961371/806a30aa90b202b2/58bd054ca1b5e513 that delta bits are 1 on change; cites f_msr_delta_1+f_loopback_1 which do not define MSR addr 6 per efc58a8fb888742c, MCR addr 4, or LCR addr 3 data 3 DLAB 0 restore",
+    "t_modem_irq_virt_seq operation is only idle addr 0 mask 0 and spawns nothing despite purpose Virtual spawn only per agent sequences and extends t_traffic_seq_normal_virt; single wishbone_slave_interface agent cannot coordinate modem_control_if toggle and wb clear stages in order with no delays, and provides no INT_O observation for cited f_modem_irq_1/f_ier_enable",
+    "t_modem_traffic_cov_wb_bringup_seq op0 write addr 1 data 8 then op1 read addr 1 data 0 mask 255 expects 0, contradicting IER RW per 4ac88e8ccbead0c6 and f_ier_msi bit3 enabled value 8; op3 read addr 2 data 0 mask 255 expects 0 while cited f_iir_pending_1 fd9ff5e4a2edd0b4 requires idle no-pending bit0=1 so IIR !=0, and full-byte mask checks undefined IIR bits; IIR addr 2 has no cited address fact",
+    "t_modem_traffic_cov_wb_idle_observe_seq read addr 2 data 0 mask 255 and read addr 6 data 0 mask 255 expect 0 during idle; IIR idle baseline per f_iir_pending_1 is bit0=1 no interrupt pending so data 0 is wrong, and mask 255 checks 7 undefined bits beyond bit0",
+    "t_modem_traffic_cov_wb_traffic_observe_seq write addr 0 data 85 count 4 claims THR payload with no THR addr fact cited (cited f_iir_addr_1/f_msr_addr_1_2/f_serial_link_1/f_iir_pending_1 never define THR at 0 under DLAB 0, missing f_dlab_gate_1 df7aa0fa2aba9181); subsequent read addr 2 data 0 and read addr 6 data 0 expect 0 without checking pending vs no-pending per f_iir_pending_1 and MSR deltas per f_msr_delta_1 during TX/modem activity",
+    "quick_basic_send on agent uart_serial_data cites only WISHBONE/divisor/MCR facts f_mcr_loopback,f_mcr_map,f_lcr_dlab,f_divisor_access,f_divisor_order,f_divisor_lsb_addr,f_divisor_msb_addr,f_dlab_access with no serial fact f_serial_link_1/f_protocol/f_function: UART send protocol binding unsupported by cited facts",
+    "quick_basic_setup/quick_basic_write/quick_basic_send/quick_basic_read cite f_mcr_loopback and f_mcr_map but contain no MCR access at address 4, no Loopback bit4 programming and no DTR-DSR/RTS-CTS/Out1-RI/Out2-DCD observation: loopback expectation unsupported",
+    "quick_basic_write THR write at address 0 and quick_basic_read RBR read at address 0 and quick_basic_setup LSB write at address 0 use kind write/read with register_id null instead of register_write/register_read model (cf setup LCR t_wb_init_cfg_lcr and MSB t_divisor_cov_msb): DLAB-gated divisor versus THR/RBR alias checking missing and scoreboard routing incorrect, including setup LSB breaking MSB-first register_write consistency",
+    "quick_basic_read RBR read specifies data 0 mask 255 while paired quick_basic_send drives RX byte 165 (0xA5): expected data lane does not match driven serial byte, received-byte checking missing/incorrect",
+    "quick_basic_send send cycles 192 on shared uart_serial_data with bit_cycles 16,data_bits 8,parity none,stop_bits 1 mismatches 8N1 frame 10*16=160 clocks (192=12*16): serial configuration/timing unsupported; quick_basic_read idle uses address 0 mask 255 instead of mask 0 idle (cf t_modem_traffic_cov_modem_idle_seq mask 0): Wishbone idle drive unsupported and quick_basic_write/read assume DLAB 0 from separate setup with no LCR programming in-sequence: alias race divisor-LSB versus THR/RBR at address 0",
+    "tie-off hold_wb_sel_i unjustified: ties wb_sel_i to 0. Quoted evidence b7564a2db7eae1d6/f_wb_sel_1 defines WB_SEL_I as Select signal input and f24136cf71bdfea7/t_wb_mon_f_wb_sel adds wb_sel_i with DATA_BUS_WIDTH_8 8-bit build (9e70b5351f01d151). sel=0 selects no byte lanes, contradicting active wishbone_slave_interface transfers expecting wb_ack_o. Cited fact_ids f_wb_stb_i/f_wb_cyc_i/f_wb_ack_o do not justify sel value and bindings omit sel instead of driving it to 1 during cycles.",
+    "scoreboard route quick_basic_transmit incorrect: expects wishbone_slave_interface write expected_address 0 to cause uart_serial_data tx gated only on LCR DLAB=0 (when address 3 mask 128 value 0). Cited f_mcr_loopback quote 0cd4ab0d340edb1f requires in loopback STX_PAD_O set to logic 1 with transmitter shift internally connected to receiver, plus f_mcr_map remap DTR->DSR RTS->CTS Out1->RI Out2->DCD. No MCR bit4==0 guard, so in loopback external TX expectation is false.",
+    "scoreboard route quick_basic_receive incorrect: expects uart_serial_data rx to cause wishbone_slave_interface read actual_address 0 gated only on LCR DLAB=0. In loopback per same f_mcr_loopback/f_mcr_map quotes receiver is sourced internally, external srx_pad_i does not feed RBR. Missing MCR normal-mode guard, symmetric to transmit.",
+    "register address unsupported for both quick_basic routes: expected_address 0 for THR/RBR with DLAB 0 has no quote. Cited facts prove only Divisor LSB at 0 (0365316a3a55b097) MSB at 1 (ceaee4ac053b7c01) accessed when LCR bit7=1 (2c4391ae772aa023,4904da1029f41059,e8fa369a2f46195e) and IER at 1 when DLAB 0 (9e4d6bf41f1d063e). No cited fact states THR/RBR at 0 width/access, so address 0 normal alias expectation is unsupported.",
+    "checks t_reset_state_check_lcr_reset and t_wb_init_cfg_ier_check use kind known_controls for value facts: f_lcr_reset Reset Value 00000011b (30c13e9cc16379ca) with f_lcr_format 8-bits no parity 1 stop (39461b92c09923ab), and f_ier_bit0/f_ier_en/f_ier_dis/f_ier_reserved/f_addr_ier/f_init_ier - IER at 1 width 8 RW DLAB 0, bit0 RW, 1-enabled 0-disabled, bits 7-4 reserved 0. known_controls only proves known/XZ, cannot verify 0x03/8N1, RW, enable values, reserved-zero, address or init enable; missing read-compare checking.",
+    "check t_xz_check_check_known_wb kind known_controls on wishbone cites internal reset-state facts t_clk_seq_f_reset_clear_1 FIFOs cleared (9a099da1ceccff95), t_chip_reset_f_shift_clear shift cleared (73ad3f15b8323a7a), t_chip_reset_f_div_zero Divisor 0 (aa8bbb5974232019), f_lcr_format, t_chip_reset_f_ier_disable all interrupts disabled (430266c8b8aef5cd) plus t_irq_baud_mon_f_reset_input. Wishbone control knownness cannot observe FIFO/shift/divisor/LCR/IER state; unsupported expectation and missing functional read/monitor checking. Related t_wb_mon_check_xz/known similarly cite t_wb_mon_f_bus_8 8-bit bus build which known_controls cannot verify and do not catch sel tied 0.",
+    "t_modem_irq_chk_iir cites f_modem_irq_iir_bits_1 to expect IIR bits 6-7=1 and reset C1h but quote_reference a420c71d1c2bc7b2 is only \"Bits 4 and 5: Logic '0'.\" - bits 6-7=1 and reset C1h unsupported by cited quote (only supported by f_iir_one/f_iir_reset which are not cited).",
+    "t_modem_irq_chk_iir bound only to wishbone_slave_interface cites f_modem_irq_1/f_iir_prio_1/f_iir_1 modem-source/priority/pending behavior (CTS_PAD_I/DSR_PAD_I/RI_PAD_I/DCD_PAD_I change -> 4th Modem Status IRQ with INT_O, cleared by MSR read) but cannot drive modem_control_if inputs nor observe interrupt_output INT_O - incorrect scoreboard routing, Wishbone-only known_controls cannot verify cross-interface stimulus to INT_O.",
+    "t_modem_irq_chk_e2e kind stable_until_ack bound only to wishbone_slave_interface cites functional facts f_modem_irq_1/f_msr_delta_1/f_iir_1/f_iir_prio_1/f_ier_msi (MSI enable, MSR delta set on line change and reset on MSR read, IIR bit0 0-pending/1-none, 000 4th priority cleared by MSR read) but stable_until_ack only checks Wishbone stability until ack - does not check interrupt generation/priority/pending/clear values and does not route modem_control_if toggles or interrupt_output INT_O - missing functional checking and incorrect routing/race.",
+    "t_modem_traffic_cov_chk_pending kind stable_until_ack bound only to wishbone_slave_interface cites f_iir_pending_1/f_modem_src_1 (IIR bit0 0-pending/1-none, CTS/DSR/RI/DCD source cleared by Modem Status Register read) but verifies only stability - pending value, modem source, MSR-read clear unchecked, required MSI enable f_ier_msi/f_ier_b3 not cited, and modem_control_if/interrupt_output not routed - missing checking and incorrect scoreboard routing.",
+    "t_clk_cov_raw_cov is vacuous and mis-routed: point t_clk_cov_raw_pt uses field=data mask=0 shift=0 bin [0] which covers no bits, on agent wishbone_slave_interface with sample_kinds=[] sample_address=null. Cited facts t_clk_seq_f_clk_1/f_rst_1 define CLK 1-bit block clock->wb_clk_i and WB_RST_I 1-bit async reset->wb_rst_i, not wishbone data. No clock/reset sampling is implemented.",
+    "t_irq_baud_mon_cov_int_o data-lane mismatch: agent interrupt_output declares data_bits=8 bit_cycles=2, but quoted evidence bb4a41a76d61ea84 defines INT_O 1 Output (f_port_int_o_2). 8-bit data expectation for 1-bit interrupt output is unsupported; point mask=1 assumes 1-bit while agent claims 8-bit.",
+    "t_wb_init_cfg_cg_dlab_divisor cp_dlab uses wrong field: field=address mask=7 bins [0,1] as dlab_1_divisor vs [2,3] as dlab_0_normal. DLAB is LCR bit7 (545b87663fe24a31, f_dlab_bit/f_dlab_gate: divisor accessible when DLAB=1, normal 0-1 blocked when DLAB=1), not bus address. Addresses 0-1 are THR/IER when DLAB=0 and divisor when DLAB=1, so address alone cannot encode DLAB.",
+    "t_wb_init_cfg_cg_dlab_divisor cp_div_lsb/cp_div_msb indistinguishable and ungated: both use field=data mask=255 with sample_kinds=[] sample_address=null. Cannot distinguish LSB at address 0 (0365316a3a55b097/f_addr_divlsb) vs MSB at address 1 (ceaee4ac053b7c01/f_addr_divmsb), no DLAB=1 gating, and no MSB-first-then-LSB order checking required by d33e9b208f274ca6/f_init_divorder.",
+    "t_wb_init_cfg_rc_divisor_bytes cross is on same transaction: cp_lsb_val and cp_msb_val both field=data mask=255 on same wishbone transaction with sample_address=null/sample_kinds=[]. Cross rc_combined cannot represent combined divisor (LSB@0 + MSB@1) and has no DLAB=1 gating (e3bb4ab3d5de34ee/df7aa0fa2aba9181) nor MSB-first order (d33e9b208f274ca6) nor reset-value sampling for aa8bbb5974232019/f_init_divreset.",
+    "t_wb_reg_cov_rc_write illegal_addr_7 unsupported and DLAB alias ignored: bin illegal_addr_7 values [7] has no cited fact defining address 7 illegal; facts only define THR@0/IER@1/FCR@2/LCR@3/MCR@4/IIR@2/divisor@0-1. Bins reg0_W_THR/reg1_W_IER label address 0-1 as THR/IER with sample_address=null and no DLAB state, ignoring alias f_addr_divlsb/f_dlab_gate/f_dlab_block_1 where address 0-1 are divisor LSB/MSB when DLAB=1 and normal registers blocked.",
+    "t_divisor_cov_cg_dlab_divisor cp_dlab conflates data with control: field=data mask=128 shift=7 samples divisor data bit7 as DLAB. DLAB is LCR bit7 at address 3 selecting divisor vs normal (545b87663fe24a31/f_dlab_bit, df7aa0fa2aba9181/f_dlab_gating), not data[7] of divisor byte. cp_div_lsb/cp_div_msb both field=data mask=255 with sample_address=null cannot distinguish LSB@0 (0365316a3a55b097/f_lsb_addr) vs MSB@1 (ceaee4ac053b7c01/f_msb_addr) and have no LCR DLAB=1 gating.",
+    "hold_wb_sel_i unjustified tie-off: signal wb_sel_i tied to 0 with only f_wb_stb_i/f_wb_cyc_i/f_wb_ack_o cited, no SEL definition. Value 0 deselects all byte lanes, contradicting DATA_BUS_WIDTH_8 and t_wb_reg_cov_f_bus8_1 8-bit bus (9e70b5351f01d151) required for all wishbone sampling in this batch.",
+    "t_modem_traffic_cov_chk_fixed missing routing: kind=known_controls for f_iir_fixed_1 (Bits 4-5 Logic 0, Bits 6-7 Logic 1 per f20a572a090403ad) on agent wishbone_slave_interface with no sample address/kind. IIR is at bus address 2 read-only (b8ab81ea1f451d46/t_irq_id_cov_f_addr), so check without address-2 read gating cannot route to IIR vs other registers.",
+    "t_divisor_cov_rc_divisor_bytes lumps LSB/MSB/combined 16-bit divisor into single 8-bit data coverpoint cp_divisor_value with overlapping bins (0 in lsb_zero_0x00, msb_zero_0x00 and combined_zero_disables) and sample_address null: cannot distinguish bus address 0 vs 1 required by f_lsb_addr/f_msb_addr quotes 0365316a3a55b097/ceaee4ac053b7c01 and single-number/both-bytes f_div_single/f_div_both; missing address cross.",
+    "t_traffic_seq_cov_modem samples MCR loopback via modem_control_if data mask 16 shift 4 instead of Wishbone MCR: f_mcr_loopback defines loopback as MCR bit 4 and f_mcr_map defines DTR->DSR/RTS->CTS mapping, accessed via Wishbone not modem pins; wrong agent/routing. Mask 16 bit4 overlaps pins mask 63 bit4 so cross t_traffic_seq_cov_modem_x is not independent. sample_kinds [] never samples.",
+    "t_traffic_seq_cov_ier cites f_ier_lsi/f_ier_msi but bins none/rda/thre/all omit LSI-only 0x4 and MSI-only 0x8: missing checking for cited facts. sample_address 1 aliases IER (DLAB 0) with divisor MSB at address 1 per f_msb_addr/f_addr_divmsb without DLAB gating per f_lcr_dlab, and sample_kinds [] empty.",
+    "t_traffic_seq_cov_payload_wb at sample_address 0 cites f_lcr_dlab (1=divisor latches, 0=normal registers quote e8fa369a2f46195e) but has no DLAB condition/cross: address 0 is divisor LSB when DLAB=1 vs THR/RBR when DLAB=0, conflates lanes. sample_kinds [] misses write vs read.",
+    "t_traffic_seq_cov_payload_uart on uart_serial_data cites f_lcr_dlab which is Wishbone LCR bit7 selector, not serial property: incorrect fact/agent routing. sample_kinds [] empty.",
+    "t_wb_top_seq_cg_dlab_divisor extracts DLAB from divisor write data bit7 mask128 shift7 on data instead of LCR bit7: per e8fa369a2f46195e DLAB is LCR bit7, not divisor data bit7; incorrect data lane. Cites only f_addr_divlsb/f_addr_divmsb, DLAB expectation unsupported by cited facts.",
+    "t_modem_irq_cov_delta and t_modem_irq_cov_ier have sample_kinds [] empty so never sample: delta at correct address 6 per f_msr_addr_1 and IER bit3 per f_ier_msi never trigger, missing checking. t_modem_irq_cov_ier at sample_address 1 without DLAB gating conflates IER with divisor MSB at address 1.",
+    "hold_wb_sel_i ties wb_sel_i to 0 citing only f_wb_stb_i/f_wb_cyc_i/f_wb_ack_o which never mention SEL: no quoted evidence supports value 0, unjustified tie-off.",
+    "t_modem_irq_cov_iir samples at address 2 but cites only f_iir_prio_1/f_iir_1/f_modem_irq_1; none states IIR address. Address 2 requires f_iir_addr_1 'Interrupt Identification 2 8 R Get interrupt information' which is not cited, so sample_address 2 is unsupported.",
+    "t_modem_irq_cov_iir uses sample_kinds [] (any kind) at address 2 while quoted_evidence defines IIR as '2 8 R' read-only. Sampling must be restricted to reads (kind 1) as in t_modem_traffic_cov_cg; otherwise writes at address 2 sample FCR alias, not IIR.",
+    "t_modem_traffic_cov_cg point t_modem_traffic_cov_cp_traffic uses field 'kind' mask 7 shift 0 bins idle 0/tx_active 1/rx_active 2/tx_rx_active 3/traffic 4. No cited fact f_iir_addr_1/f_serial_link_1/f_modem_pads_1/f_modem_src_1/f_iir_pending_1/f_iir_fixed_1 defines a 'kind' encoding or TX/RX activity classification.",
+    "t_modem_traffic_cov_cg cross t_modem_traffic_cov_cross of IIR data with traffic kind is unsupported; no cited fact defines crossing IIR value 192/193 with TX/RX activity states.",
+    "t_modem_traffic_cov_cg point t_modem_traffic_cov_cp_modem bins 192 (0xC0)/193 (0xC1) encode IID bits[3:1]=000. Component does not cite f_iir_prio_1 '0 0 0 4th Modem Status CTS, DSR, RI or DCD' which alone defines 000 encoding; cited f_modem_src_1/f_iir_fixed_1/f_iir_pending_1 define source, bits[7:4]=1100 and bit0 pending but not IID 000.",
+    "quick_basic cites f_divisor_order/f_divisor_access/f_dlab_access/f_lcr_dlab/f_divisor_lsb_addr/f_divisor_msb_addr requiring MSB-first LSB-last with LSB write starting counter and DLAB 1 for divisor at addr 0/1 vs DLAB 0 normal, but sequences quick_basic_setup/write/read are vague 'Script-chosen' with no MSB-first LSB-last order or DLAB 1/0 gating to disambiguate THR/RBR vs DLL/DLM alias at 0/1.",
+    "quick_basic cites f_mcr_loopback/f_mcr_map 'loopback mode STX_PAD_O set to 1 transmitter shift internally connected to receiver' and 'DTR->DSR RTS->CTS Out1->RI Out2->DCD' yet stages combine quick_basic_write (WB THR) with quick_basic_send driving external srx_pad_i; in loopback receiver is internally driven so external RX drive races/is ignored, in normal mode loopback citations are inapplicable - contradictory stimulus and citation."
+  ],
+  "batches": [
+    {
+      "components": [
+        "t_wb_init_cfg_lcr",
+        "t_wb_init_cfg_fcr",
+        "t_divisor_cov_msb",
+        "t_traffic_seq_mcr",
+        "t_wb_init_cfg_div_msb",
+        "t_wb_init_cfg_div_lsb",
+        "t_wb_init_cfg_fcr_byte",
+        "t_wb_init_cfg_ier_byte"
+      ],
+      "input_chars": 22252,
+      "problems": [
+        "t_traffic_seq_mcr claims bus address 4 width 8: no cited fact defines MCR address. Cited f_mcr_loopback/f_mcr_dtr_rts/f_mcr_map describe bit 0/1 inverted DTR/RTS, bit 4 loopback with STX_PAD_O=1 and internal TX-to-RX connection, and DTR->DSR RTS->CTS Out1->RI Out2->DCD mapping only. No quote in batch gives address 4 for MCR, unlike LCR/FCR/Divisor which have explicit '3 8 RW'/'2 8 W'/'1 8 RW' quotes.",
+        "t_traffic_seq_mcr claims reset 0: no cited fact defines MCR reset value. Cited facts cover loopback behavior, DTR/RTS polarity and loopback mapping only, with no post-reset statement. No quote supports reset 0.",
+        "uart_serial_data sets bit_cycles 16 for serial timing: no cited fact supports 16. Cited f_srx_port/f_function/f_protocol/f_peer/f_category and quotes define 1-bit SRX/STX signals, RS232 serial cable function and modem peer only. Cited LCR format fact supports 8 data_bits/no parity/1 stop_bits, but no quote defines divisor-to-baud, 16x oversampling or BIT_CYCLES value.",
+        "hold_wb_sel_i ties wb_sel_i to 0: unjustified tie-off. Cited f_wb_stb_i/f_wb_cyc_i/f_wb_ack_o define only STB/CYC/ACK ports, with no definition of SEL, no select polarity/width requirement, and wishbone_slave_interface bindings do not include SEL. Value 0 is unsupported and as byte-enable would de-assert transfer on 8-bit DATA_BUS_WIDTH_8 build."
+      ],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_wb_init_cfg_lcr_dlab1",
+        "t_wb_init_cfg_lcr_dlab0",
+        "t_divisor_cov_mid_low",
+        "t_divisor_cov_mid_high",
+        "t_dlab_gate_chk_lcr_dlab1",
+        "t_dlab_gate_chk_lcr_dlab0",
+        "t_dlab_gate_chk_div_lsb",
+        "t_dlab_gate_chk_div_msb"
+      ],
+      "input_chars": 19307,
+      "problems": [],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_dlab_gate_chk_ier_pat",
+        "t_dlab_gate_chk_ier_pat2",
+        "t_traffic_seq_ier_byte",
+        "t_traffic_seq_payload",
+        "t_traffic_seq_mcr_byte",
+        "t_traffic_seq_uart_byte",
+        "t_traffic_seq_modem_lvl",
+        "t_uart_mon_div_lsb"
+      ],
+      "input_chars": 19424,
+      "problems": [],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_uart_mon_div_msb",
+        "t_uart_mon_lcr_dlab1",
+        "t_uart_mon_lcr_dlab0",
+        "t_uart_mon_uart_byte",
+        "t_wb_top_seq_addr",
+        "t_wb_top_seq_wdata",
+        "t_wb_top_seq_lcr_dlab0",
+        "t_addr_dlab_cov_lcr_dlab1"
+      ],
+      "input_chars": 19202,
+      "problems": [],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_addr_dlab_cov_lcr_dlab0",
+        "t_addr_dlab_cov_fcr_byte",
+        "t_addr_dlab_cov_mcr_byte",
+        "t_addr_dlab_cov_payload",
+        "t_ier_iir_pend_ier_en",
+        "t_ier_iir_pend_lcr_dlab0",
+        "t_modem_irq_ier_dis",
+        "t_modem_irq_ier_en"
+      ],
+      "input_chars": 18730,
+      "problems": [],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_modem_traffic_cov_ier_en",
+        "t_modem_traffic_cov_payload",
+        "t_modem_traffic_cov_uart_byte",
+        "t_modem_traffic_cov_modem_lvl",
+        "t_reset_state_seq_lcr_reset",
+        "t_wb_init_cfg_init_seq",
+        "t_wb_reg_cov_directed_seq",
+        "t_xz_check_seq_wb_idle"
+      ],
+      "input_chars": 31708,
+      "problems": [],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_xz_check_seq_uart_idle",
+        "t_xz_check_seq_modem_idle",
+        "t_divisor_cov_seq",
+        "t_dlab_gate_chk_seq",
+        "t_traffic_seq_wb_normal_seq",
+        "t_traffic_seq_uart_normal_seq",
+        "t_traffic_seq_modem_normal_seq",
+        "t_traffic_seq_wb_loopback_seq"
+      ],
+      "input_chars": 30790,
+      "problems": [],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_traffic_seq_modem_random_seq",
+        "t_traffic_seq_normal_virt",
+        "t_traffic_seq_loopback_virt",
+        "t_uart_mon_bringup_seq",
+        "t_uart_mon_uart_rx_seq",
+        "t_uart_mon_tx_observe_seq",
+        "t_uart_mon_virt_seq",
+        "t_addr_dlab_cov_seq"
+      ],
+      "input_chars": 27909,
+      "problems": [],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_modem_irq_wb_bringup_seq",
+        "t_modem_irq_modem_toggle_seq",
+        "t_modem_irq_wb_clear_seq",
+        "t_modem_irq_virt_seq",
+        "t_modem_traffic_cov_wb_bringup_seq",
+        "t_modem_traffic_cov_wb_idle_observe_seq",
+        "t_modem_traffic_cov_wb_traffic_observe_seq",
+        "t_modem_traffic_cov_uart_idle_seq"
+      ],
+      "input_chars": 23806,
+      "problems": [
+        "tie_off hold_wb_sel_i ties wb_sel_i to 0 with fact_ids f_wb_stb_i/f_wb_cyc_i/f_wb_ack_o which never define SEL; with DATA_BUS_WIDTH_8 tying byte-select low masks the data lane and breaks the wishbone transfers the sequences rely on",
+        "t_modem_irq_wb_bringup_seq programs LCR addr 3 data 131/3, divisor addr 1 data 0 and addr 0 data 1, FCR addr 2 data 0, MCR addr 4 data 0 mask 31 but cites only f_loopback_1/t_chip_reset_f_ier_disable/f_msr_addr_1; no cited fact supports DLAB=1 divisor gating at 0-1 per df7aa0fa2aba9181, LCR addr 3, FCR addr 2, or MCR addr 4",
+        "t_modem_irq_modem_toggle_seq custom addr 0 mask 15 data 1/2/4/8 assumes CTS=bit0 DSR=bit1 RI=bit2 DCD=bit3 lane mapping with no fact defining pad-to-bit order; sequence 1->2->4->8 clears prior pad while setting next, creating overlapping edges not isolated single toggles, violating f_msr_dcts_1/f_msr_ddsr_1/f_msr_ddcd_1 single-change and f_msr_teri_1 RI low-to-high edge without return to idle 0",
+        "t_modem_irq_wb_clear_seq read addr 6 data 0 mask 255 expects 0 immediately after toggles, contradicting f_msr_delta_1/0030b68f2198a44f/2684e06e36961371/806a30aa90b202b2/58bd054ca1b5e513 that delta bits are 1 on change; cites f_msr_delta_1+f_loopback_1 which do not define MSR addr 6 per efc58a8fb888742c, MCR addr 4, or LCR addr 3 data 3 DLAB 0 restore",
+        "t_modem_irq_virt_seq operation is only idle addr 0 mask 0 and spawns nothing despite purpose Virtual spawn only per agent sequences and extends t_traffic_seq_normal_virt; single wishbone_slave_interface agent cannot coordinate modem_control_if toggle and wb clear stages in order with no delays, and provides no INT_O observation for cited f_modem_irq_1/f_ier_enable",
+        "t_modem_traffic_cov_wb_bringup_seq op0 write addr 1 data 8 then op1 read addr 1 data 0 mask 255 expects 0, contradicting IER RW per 4ac88e8ccbead0c6 and f_ier_msi bit3 enabled value 8; op3 read addr 2 data 0 mask 255 expects 0 while cited f_iir_pending_1 fd9ff5e4a2edd0b4 requires idle no-pending bit0=1 so IIR !=0, and full-byte mask checks undefined IIR bits; IIR addr 2 has no cited address fact",
+        "t_modem_traffic_cov_wb_idle_observe_seq read addr 2 data 0 mask 255 and read addr 6 data 0 mask 255 expect 0 during idle; IIR idle baseline per f_iir_pending_1 is bit0=1 no interrupt pending so data 0 is wrong, and mask 255 checks 7 undefined bits beyond bit0",
+        "t_modem_traffic_cov_wb_traffic_observe_seq write addr 0 data 85 count 4 claims THR payload with no THR addr fact cited (cited f_iir_addr_1/f_msr_addr_1_2/f_serial_link_1/f_iir_pending_1 never define THR at 0 under DLAB 0, missing f_dlab_gate_1 df7aa0fa2aba9181); subsequent read addr 2 data 0 and read addr 6 data 0 expect 0 without checking pending vs no-pending per f_iir_pending_1 and MSR deltas per f_msr_delta_1 during TX/modem activity"
+      ],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_modem_traffic_cov_uart_rx_seq",
+        "t_modem_traffic_cov_modem_toggle_seq",
+        "t_modem_traffic_cov_modem_idle_seq",
+        "t_modem_traffic_cov_virt_seq",
+        "quick_basic_setup",
+        "quick_basic_write",
+        "quick_basic_send",
+        "quick_basic_read"
+      ],
+      "input_chars": 21549,
+      "problems": [
+        "quick_basic_send on agent uart_serial_data cites only WISHBONE/divisor/MCR facts f_mcr_loopback,f_mcr_map,f_lcr_dlab,f_divisor_access,f_divisor_order,f_divisor_lsb_addr,f_divisor_msb_addr,f_dlab_access with no serial fact f_serial_link_1/f_protocol/f_function: UART send protocol binding unsupported by cited facts",
+        "quick_basic_setup/quick_basic_write/quick_basic_send/quick_basic_read cite f_mcr_loopback and f_mcr_map but contain no MCR access at address 4, no Loopback bit4 programming and no DTR-DSR/RTS-CTS/Out1-RI/Out2-DCD observation: loopback expectation unsupported",
+        "quick_basic_write THR write at address 0 and quick_basic_read RBR read at address 0 and quick_basic_setup LSB write at address 0 use kind write/read with register_id null instead of register_write/register_read model (cf setup LCR t_wb_init_cfg_lcr and MSB t_divisor_cov_msb): DLAB-gated divisor versus THR/RBR alias checking missing and scoreboard routing incorrect, including setup LSB breaking MSB-first register_write consistency",
+        "quick_basic_read RBR read specifies data 0 mask 255 while paired quick_basic_send drives RX byte 165 (0xA5): expected data lane does not match driven serial byte, received-byte checking missing/incorrect",
+        "quick_basic_send send cycles 192 on shared uart_serial_data with bit_cycles 16,data_bits 8,parity none,stop_bits 1 mismatches 8N1 frame 10*16=160 clocks (192=12*16): serial configuration/timing unsupported; quick_basic_read idle uses address 0 mask 255 instead of mask 0 idle (cf t_modem_traffic_cov_modem_idle_seq mask 0): Wishbone idle drive unsupported and quick_basic_write/read assume DLAB 0 from separate setup with no LCR programming in-sequence: alias race divisor-LSB versus THR/RBR at address 0"
+      ],
+      "cached": true
+    },
+    {
+      "components": [
+        "quick_basic_transmit",
+        "quick_basic_receive",
+        "t_wb_mon_check_xz",
+        "t_wb_mon_check_known",
+        "t_reset_state_check_lcr_reset",
+        "t_wb_init_cfg_ier_check",
+        "t_xz_check_check_xz_wb",
+        "t_xz_check_check_known_wb"
+      ],
+      "input_chars": 23477,
+      "problems": [
+        "tie-off hold_wb_sel_i unjustified: ties wb_sel_i to 0. Quoted evidence b7564a2db7eae1d6/f_wb_sel_1 defines WB_SEL_I as Select signal input and f24136cf71bdfea7/t_wb_mon_f_wb_sel adds wb_sel_i with DATA_BUS_WIDTH_8 8-bit build (9e70b5351f01d151). sel=0 selects no byte lanes, contradicting active wishbone_slave_interface transfers expecting wb_ack_o. Cited fact_ids f_wb_stb_i/f_wb_cyc_i/f_wb_ack_o do not justify sel value and bindings omit sel instead of driving it to 1 during cycles.",
+        "scoreboard route quick_basic_transmit incorrect: expects wishbone_slave_interface write expected_address 0 to cause uart_serial_data tx gated only on LCR DLAB=0 (when address 3 mask 128 value 0). Cited f_mcr_loopback quote 0cd4ab0d340edb1f requires in loopback STX_PAD_O set to logic 1 with transmitter shift internally connected to receiver, plus f_mcr_map remap DTR->DSR RTS->CTS Out1->RI Out2->DCD. No MCR bit4==0 guard, so in loopback external TX expectation is false.",
+        "scoreboard route quick_basic_receive incorrect: expects uart_serial_data rx to cause wishbone_slave_interface read actual_address 0 gated only on LCR DLAB=0. In loopback per same f_mcr_loopback/f_mcr_map quotes receiver is sourced internally, external srx_pad_i does not feed RBR. Missing MCR normal-mode guard, symmetric to transmit.",
+        "register address unsupported for both quick_basic routes: expected_address 0 for THR/RBR with DLAB 0 has no quote. Cited facts prove only Divisor LSB at 0 (0365316a3a55b097) MSB at 1 (ceaee4ac053b7c01) accessed when LCR bit7=1 (2c4391ae772aa023,4904da1029f41059,e8fa369a2f46195e) and IER at 1 when DLAB 0 (9e4d6bf41f1d063e). No cited fact states THR/RBR at 0 width/access, so address 0 normal alias expectation is unsupported.",
+        "checks t_reset_state_check_lcr_reset and t_wb_init_cfg_ier_check use kind known_controls for value facts: f_lcr_reset Reset Value 00000011b (30c13e9cc16379ca) with f_lcr_format 8-bits no parity 1 stop (39461b92c09923ab), and f_ier_bit0/f_ier_en/f_ier_dis/f_ier_reserved/f_addr_ier/f_init_ier - IER at 1 width 8 RW DLAB 0, bit0 RW, 1-enabled 0-disabled, bits 7-4 reserved 0. known_controls only proves known/XZ, cannot verify 0x03/8N1, RW, enable values, reserved-zero, address or init enable; missing read-compare checking.",
+        "check t_xz_check_check_known_wb kind known_controls on wishbone cites internal reset-state facts t_clk_seq_f_reset_clear_1 FIFOs cleared (9a099da1ceccff95), t_chip_reset_f_shift_clear shift cleared (73ad3f15b8323a7a), t_chip_reset_f_div_zero Divisor 0 (aa8bbb5974232019), f_lcr_format, t_chip_reset_f_ier_disable all interrupts disabled (430266c8b8aef5cd) plus t_irq_baud_mon_f_reset_input. Wishbone control knownness cannot observe FIFO/shift/divisor/LCR/IER state; unsupported expectation and missing functional read/monitor checking. Related t_wb_mon_check_xz/known similarly cite t_wb_mon_f_bus_8 8-bit bus build which known_controls cannot verify and do not catch sel tied 0."
+      ],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_dlab_gate_chk_alias_class_check",
+        "t_traffic_seq_ier_chk",
+        "t_ier_iir_pend_chk_ier",
+        "t_ier_iir_pend_chk_reset",
+        "t_ier_iir_pend_chk_iir_mask",
+        "t_modem_irq_chk_iir",
+        "t_modem_irq_chk_e2e",
+        "t_modem_traffic_cov_chk_pending"
+      ],
+      "input_chars": 22434,
+      "problems": [
+        "t_modem_irq_chk_iir cites f_modem_irq_iir_bits_1 to expect IIR bits 6-7=1 and reset C1h but quote_reference a420c71d1c2bc7b2 is only \"Bits 4 and 5: Logic '0'.\" - bits 6-7=1 and reset C1h unsupported by cited quote (only supported by f_iir_one/f_iir_reset which are not cited).",
+        "t_modem_irq_chk_iir bound only to wishbone_slave_interface cites f_modem_irq_1/f_iir_prio_1/f_iir_1 modem-source/priority/pending behavior (CTS_PAD_I/DSR_PAD_I/RI_PAD_I/DCD_PAD_I change -> 4th Modem Status IRQ with INT_O, cleared by MSR read) but cannot drive modem_control_if inputs nor observe interrupt_output INT_O - incorrect scoreboard routing, Wishbone-only known_controls cannot verify cross-interface stimulus to INT_O.",
+        "t_modem_irq_chk_e2e kind stable_until_ack bound only to wishbone_slave_interface cites functional facts f_modem_irq_1/f_msr_delta_1/f_iir_1/f_iir_prio_1/f_ier_msi (MSI enable, MSR delta set on line change and reset on MSR read, IIR bit0 0-pending/1-none, 000 4th priority cleared by MSR read) but stable_until_ack only checks Wishbone stability until ack - does not check interrupt generation/priority/pending/clear values and does not route modem_control_if toggles or interrupt_output INT_O - missing functional checking and incorrect routing/race.",
+        "t_modem_traffic_cov_chk_pending kind stable_until_ack bound only to wishbone_slave_interface cites f_iir_pending_1/f_modem_src_1 (IIR bit0 0-pending/1-none, CTS/DSR/RI/DCD source cleared by Modem Status Register read) but verifies only stability - pending value, modem source, MSR-read clear unchecked, required MSI enable f_ier_msi/f_ier_b3 not cited, and modem_control_if/interrupt_output not routed - missing checking and incorrect scoreboard routing."
+      ],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_modem_traffic_cov_chk_fixed",
+        "t_clk_cov_raw_cov",
+        "t_irq_baud_mon_cov_int_o",
+        "t_irq_id_cov_cg_iir",
+        "t_wb_init_cfg_cg_dlab_divisor",
+        "t_wb_init_cfg_rc_divisor_bytes",
+        "t_wb_reg_cov_rc_write",
+        "t_divisor_cov_cg_dlab_divisor"
+      ],
+      "input_chars": 28843,
+      "problems": [
+        "t_clk_cov_raw_cov is vacuous and mis-routed: point t_clk_cov_raw_pt uses field=data mask=0 shift=0 bin [0] which covers no bits, on agent wishbone_slave_interface with sample_kinds=[] sample_address=null. Cited facts t_clk_seq_f_clk_1/f_rst_1 define CLK 1-bit block clock->wb_clk_i and WB_RST_I 1-bit async reset->wb_rst_i, not wishbone data. No clock/reset sampling is implemented.",
+        "t_irq_baud_mon_cov_int_o data-lane mismatch: agent interrupt_output declares data_bits=8 bit_cycles=2, but quoted evidence bb4a41a76d61ea84 defines INT_O 1 Output (f_port_int_o_2). 8-bit data expectation for 1-bit interrupt output is unsupported; point mask=1 assumes 1-bit while agent claims 8-bit.",
+        "t_wb_init_cfg_cg_dlab_divisor cp_dlab uses wrong field: field=address mask=7 bins [0,1] as dlab_1_divisor vs [2,3] as dlab_0_normal. DLAB is LCR bit7 (545b87663fe24a31, f_dlab_bit/f_dlab_gate: divisor accessible when DLAB=1, normal 0-1 blocked when DLAB=1), not bus address. Addresses 0-1 are THR/IER when DLAB=0 and divisor when DLAB=1, so address alone cannot encode DLAB.",
+        "t_wb_init_cfg_cg_dlab_divisor cp_div_lsb/cp_div_msb indistinguishable and ungated: both use field=data mask=255 with sample_kinds=[] sample_address=null. Cannot distinguish LSB at address 0 (0365316a3a55b097/f_addr_divlsb) vs MSB at address 1 (ceaee4ac053b7c01/f_addr_divmsb), no DLAB=1 gating, and no MSB-first-then-LSB order checking required by d33e9b208f274ca6/f_init_divorder.",
+        "t_wb_init_cfg_rc_divisor_bytes cross is on same transaction: cp_lsb_val and cp_msb_val both field=data mask=255 on same wishbone transaction with sample_address=null/sample_kinds=[]. Cross rc_combined cannot represent combined divisor (LSB@0 + MSB@1) and has no DLAB=1 gating (e3bb4ab3d5de34ee/df7aa0fa2aba9181) nor MSB-first order (d33e9b208f274ca6) nor reset-value sampling for aa8bbb5974232019/f_init_divreset.",
+        "t_wb_reg_cov_rc_write illegal_addr_7 unsupported and DLAB alias ignored: bin illegal_addr_7 values [7] has no cited fact defining address 7 illegal; facts only define THR@0/IER@1/FCR@2/LCR@3/MCR@4/IIR@2/divisor@0-1. Bins reg0_W_THR/reg1_W_IER label address 0-1 as THR/IER with sample_address=null and no DLAB state, ignoring alias f_addr_divlsb/f_dlab_gate/f_dlab_block_1 where address 0-1 are divisor LSB/MSB when DLAB=1 and normal registers blocked.",
+        "t_divisor_cov_cg_dlab_divisor cp_dlab conflates data with control: field=data mask=128 shift=7 samples divisor data bit7 as DLAB. DLAB is LCR bit7 at address 3 selecting divisor vs normal (545b87663fe24a31/f_dlab_bit, df7aa0fa2aba9181/f_dlab_gating), not data[7] of divisor byte. cp_div_lsb/cp_div_msb both field=data mask=255 with sample_address=null cannot distinguish LSB@0 (0365316a3a55b097/f_lsb_addr) vs MSB@1 (ceaee4ac053b7c01/f_msb_addr) and have no LCR DLAB=1 gating.",
+        "hold_wb_sel_i unjustified tie-off: signal wb_sel_i tied to 0 with only f_wb_stb_i/f_wb_cyc_i/f_wb_ack_o cited, no SEL definition. Value 0 deselects all byte lanes, contradicting DATA_BUS_WIDTH_8 and t_wb_reg_cov_f_bus8_1 8-bit bus (9e70b5351f01d151) required for all wishbone sampling in this batch.",
+        "t_modem_traffic_cov_chk_fixed missing routing: kind=known_controls for f_iir_fixed_1 (Bits 4-5 Logic 0, Bits 6-7 Logic 1 per f20a572a090403ad) on agent wishbone_slave_interface with no sample address/kind. IIR is at bus address 2 read-only (b8ab81ea1f451d46/t_irq_id_cov_f_addr), so check without address-2 read gating cannot route to IIR vs other registers."
+      ],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_divisor_cov_rc_divisor_bytes",
+        "t_traffic_seq_cov_modem",
+        "t_traffic_seq_cov_ier",
+        "t_traffic_seq_cov_payload_wb",
+        "t_traffic_seq_cov_payload_uart",
+        "t_wb_top_seq_cg_dlab_divisor",
+        "t_modem_irq_cov_delta",
+        "t_modem_irq_cov_ier"
+      ],
+      "input_chars": 24649,
+      "problems": [
+        "t_divisor_cov_rc_divisor_bytes lumps LSB/MSB/combined 16-bit divisor into single 8-bit data coverpoint cp_divisor_value with overlapping bins (0 in lsb_zero_0x00, msb_zero_0x00 and combined_zero_disables) and sample_address null: cannot distinguish bus address 0 vs 1 required by f_lsb_addr/f_msb_addr quotes 0365316a3a55b097/ceaee4ac053b7c01 and single-number/both-bytes f_div_single/f_div_both; missing address cross.",
+        "t_traffic_seq_cov_modem samples MCR loopback via modem_control_if data mask 16 shift 4 instead of Wishbone MCR: f_mcr_loopback defines loopback as MCR bit 4 and f_mcr_map defines DTR->DSR/RTS->CTS mapping, accessed via Wishbone not modem pins; wrong agent/routing. Mask 16 bit4 overlaps pins mask 63 bit4 so cross t_traffic_seq_cov_modem_x is not independent. sample_kinds [] never samples.",
+        "t_traffic_seq_cov_ier cites f_ier_lsi/f_ier_msi but bins none/rda/thre/all omit LSI-only 0x4 and MSI-only 0x8: missing checking for cited facts. sample_address 1 aliases IER (DLAB 0) with divisor MSB at address 1 per f_msb_addr/f_addr_divmsb without DLAB gating per f_lcr_dlab, and sample_kinds [] empty.",
+        "t_traffic_seq_cov_payload_wb at sample_address 0 cites f_lcr_dlab (1=divisor latches, 0=normal registers quote e8fa369a2f46195e) but has no DLAB condition/cross: address 0 is divisor LSB when DLAB=1 vs THR/RBR when DLAB=0, conflates lanes. sample_kinds [] misses write vs read.",
+        "t_traffic_seq_cov_payload_uart on uart_serial_data cites f_lcr_dlab which is Wishbone LCR bit7 selector, not serial property: incorrect fact/agent routing. sample_kinds [] empty.",
+        "t_wb_top_seq_cg_dlab_divisor extracts DLAB from divisor write data bit7 mask128 shift7 on data instead of LCR bit7: per e8fa369a2f46195e DLAB is LCR bit7, not divisor data bit7; incorrect data lane. Cites only f_addr_divlsb/f_addr_divmsb, DLAB expectation unsupported by cited facts.",
+        "t_modem_irq_cov_delta and t_modem_irq_cov_ier have sample_kinds [] empty so never sample: delta at correct address 6 per f_msr_addr_1 and IER bit3 per f_ier_msi never trigger, missing checking. t_modem_irq_cov_ier at sample_address 1 without DLAB gating conflates IER with divisor MSB at address 1.",
+        "hold_wb_sel_i ties wb_sel_i to 0 citing only f_wb_stb_i/f_wb_cyc_i/f_wb_ack_o which never mention SEL: no quoted evidence supports value 0, unjustified tie-off."
+      ],
+      "cached": true
+    },
+    {
+      "components": [
+        "t_modem_irq_cov_iir",
+        "t_modem_traffic_cov_cg",
+        "quick_basic"
+      ],
+      "input_chars": 20451,
+      "problems": [
+        "t_modem_irq_cov_iir samples at address 2 but cites only f_iir_prio_1/f_iir_1/f_modem_irq_1; none states IIR address. Address 2 requires f_iir_addr_1 'Interrupt Identification 2 8 R Get interrupt information' which is not cited, so sample_address 2 is unsupported.",
+        "t_modem_irq_cov_iir uses sample_kinds [] (any kind) at address 2 while quoted_evidence defines IIR as '2 8 R' read-only. Sampling must be restricted to reads (kind 1) as in t_modem_traffic_cov_cg; otherwise writes at address 2 sample FCR alias, not IIR.",
+        "t_modem_traffic_cov_cg point t_modem_traffic_cov_cp_traffic uses field 'kind' mask 7 shift 0 bins idle 0/tx_active 1/rx_active 2/tx_rx_active 3/traffic 4. No cited fact f_iir_addr_1/f_serial_link_1/f_modem_pads_1/f_modem_src_1/f_iir_pending_1/f_iir_fixed_1 defines a 'kind' encoding or TX/RX activity classification.",
+        "t_modem_traffic_cov_cg cross t_modem_traffic_cov_cross of IIR data with traffic kind is unsupported; no cited fact defines crossing IIR value 192/193 with TX/RX activity states.",
+        "t_modem_traffic_cov_cg point t_modem_traffic_cov_cp_modem bins 192 (0xC0)/193 (0xC1) encode IID bits[3:1]=000. Component does not cite f_iir_prio_1 '0 0 0 4th Modem Status CTS, DSR, RI or DCD' which alone defines 000 encoding; cited f_modem_src_1/f_iir_fixed_1/f_iir_pending_1 define source, bits[7:4]=1100 and bit0 pending but not IID 000.",
+        "quick_basic cites f_divisor_order/f_divisor_access/f_dlab_access/f_lcr_dlab/f_divisor_lsb_addr/f_divisor_msb_addr requiring MSB-first LSB-last with LSB write starting counter and DLAB 1 for divisor at addr 0/1 vs DLAB 0 normal, but sequences quick_basic_setup/write/read are vague 'Script-chosen' with no MSB-first LSB-last order or DLAB 1/0 gating to disambiguate THR/RBR vs DLL/DLM alias at 0/1.",
+        "quick_basic cites f_mcr_loopback/f_mcr_map 'loopback mode STX_PAD_O set to 1 transmitter shift internally connected to receiver' and 'DTR->DSR RTS->CTS Out1->RI Out2->DCD' yet stages combine quick_basic_write (WB THR) with quick_basic_send driving external srx_pad_i; in loopback receiver is internally driven so external RX drive races/is ignored, in normal mode loopback citations are inapplicable - contradictory stimulus and citation."
+      ],
+      "cached": false
+    }
+  ]
+}

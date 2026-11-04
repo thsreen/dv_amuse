@@ -1,0 +1,102 @@
+{
+  "sequencer_variables": [],
+  "registers": [],
+  "facts": [
+    {
+      "id": "f_init_1",
+      "statement": "Initialization programs Divisor Latches MSB first LSB next with LCR bit7 DLAB gating",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set the Divisor Latches, MSB first, LSB next.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_init_2",
+      "statement": "Baud rate equals Input Clock divided by Divisor divided by 16",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Remember that (Input Clock Speed)/(Divisor Latch value) = 16 x the communication\nbaud rate.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_arch_1",
+      "statement": "Core uses WISHBONE SoC bus with 8-bit data bus",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "It has an 8-bit data bus for compatibility reason.",
+      "plan_pointer": "/sections/4/strategy/agents/4"
+    },
+    {
+      "id": "f_iir_1",
+      "statement": "IIR bit0 0 means interrupt pending asserted with INT_O and 1 means no interrupt pending",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019. When it\u2019s \u20181\u2019 \u2013 no interrupt\nis pending.",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_modem_1",
+      "statement": "Modem Status interrupt source is CTS DSR RI or DCD change subject to IER enable",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 0 4 th Modem Status CTS, DSR, RI or DCD.",
+      "plan_pointer": "/sections/8/entries/10"
+    }
+  ],
+  "sequences": [],
+  "routes": [],
+  "checks": [],
+  "hooks": [],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "What is wb_rst_i polarity and required deassert to first write delay with clock period fixed per test?"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [],
+      "question": "What uart_serial_data data_bits parity stop_bits bit_cycles settings must agree with LCR programming and divisor baud for TX observe and RX drive?"
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [],
+      "question": "What documented loopback data path and modem remapping defines expected routing for loopback compare versus normal STX to SRX wiring?"
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [],
+      "question": "What are actual wb_adr_i pin values for THR RBR IER FCR LCR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling under DATA_BUS_WIDTH_8?"
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [],
+      "question": "What testbench drain_cycles and request_timeout_cycles operational limits detect deadlock livelock without assuming DUT timing?"
+    },
+    {
+      "step": "check_steps/2",
+      "component_ids": [],
+      "question": "What are actual wb_adr_i pin values for THR RBR IER FCR LCR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling under DATA_BUS_WIDTH_8?"
+    },
+    {
+      "step": "check_steps/3",
+      "component_ids": [],
+      "question": "What documented FIFO depth and ordering guarantees define expected end-to-end queues for loss duplication misorder beyond allowed overrun?"
+    },
+    {
+      "step": "check_steps/4",
+      "component_ids": [],
+      "question": "What symbolic divisor LSB MSB nonzero values plus LCR line-format values plus FIFO trigger level plus IER bits bound normal versus loopback bring-up?"
+    },
+    {
+      "step": "check_steps/5",
+      "component_ids": [],
+      "question": "What testbench drain_cycles and request_timeout_cycles operational limits detect deadlock livelock without assuming DUT timing?"
+    }
+  ],
+  "questions": [
+    "What documented FIFO depth and ordering guarantees define expected end-to-end queues for loss duplication misorder beyond allowed overrun?",
+    "What testbench drain_cycles and request_timeout_cycles operational limits detect deadlock livelock without assuming DUT timing?",
+    "What are actual wb_adr_i pin values for THR RBR IER FCR LCR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling under DATA_BUS_WIDTH_8?",
+    "What symbolic divisor LSB MSB nonzero values plus LCR line-format values plus FIFO trigger level plus IER bits bound normal versus loopback bring-up?",
+    "What uart_serial_data data_bits parity stop_bits bit_cycles settings must agree with LCR programming and divisor baud for TX observe and RX drive?",
+    "What is wb_rst_i polarity and required deassert to first write delay with clock period fixed per test?",
+    "What documented loopback data path and modem remapping defines expected routing for loopback compare versus normal STX to SRX wiring?"
+  ]
+}

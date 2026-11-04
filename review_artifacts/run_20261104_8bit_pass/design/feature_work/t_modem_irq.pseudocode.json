@@ -1,0 +1,137 @@
+{
+  "understanding": "Verify modem status interrupt where CTS DSR RI DCD toggles set MSR deltas cleared by MSR read and assert INT_O with IIR Modem Status only when IER bit3 enabled checked in modem agent and top scoreboard in normal mode with DLAB 0",
+  "preconditions": [
+    "Bind modem_control_if to cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i drive plus rts_pad_o dtr_pad_o observe and interrupt_output to int_o observe and wishbone_slave_interface to wb_adr_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_sel_i with wb_clk_i owned by clock and wb_rst_i owned by reset via common UVCs with polarity symbolic",
+    "Own every DUT input with uart_serial_data owning srx_pad_i tied idle for this feature and no floating inputs and all outputs observed only",
+    "Require normal operation MCR Loopback 0 with LCR DLAB 0 so modem registers accessible with MSR read at wb_adr_i pin value 6 width 8 read only and IER IIR pin values symbolic",
+    "Start from reset cleared FIFOs with all IER disabled then program divisor line FIFO base and IER bit3 per case 0 disabled versus 1 enabled"
+  ],
+  "stimulus_steps": [
+    "STAGE0_BRINGUP: wishbone_slave_interface WRITES divisor line FIFO base with LCR DLAB 0 and MCR Loopback 0 normal mode; WAIT reset release; BOUND by drain_cycles operational limit",
+    "STAGE1_DISABLED: wishbone_slave_interface WRITES IER bit3 0; FOR each line IN cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i: modem_control_if DRIVES single toggle via custom driver_body using modem_handshake_toggle test only infrastructure; wishbone_slave_interface READS MSR at pin 6; interrupt_output OBSERVES int_o via monitor_body",
+    "STAGE2_ENABLED: wishbone_slave_interface WRITES IER bit3 1; FOR each line IN cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i: modem_control_if DRIVES single toggle; wishbone_slave_interface READS MSR and IIR; interrupt_output OBSERVES int_o; per agent sequences drive only own interface and stages execute in order with concurrent wishbone modem interrupt observation",
+    "VIRTUAL_SPAWN_ONLY: virtual sequence SPAWNS listed per agent sequences with no VIFs or delays",
+    "STAGE3_CLEAR: wishbone_slave_interface READS MSR to clear deltas; WAIT drain_cycles; CLEANUP restores MCR Loopback 0 and LCR DLAB 0 with bus idle owned"
+  ],
+  "check_steps": [
+    "COMPARE MSR delta DCTS DDSR TERI DDCD set after corresponding cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i toggle and cleared after MSR read in modem agent and top scoreboard",
+    "COMPARE MSR status bits 4 to 7 complement of CTS DSR RI DCD in normal mode versus loopback remap excluded",
+    "COMPARE int_o negated when IER bit3 is 0 despite delta versus asserted when IER bit3 is 1 with IIR bit0 0 pending",
+    "COMPARE IIR bits 3 to 1 equals 000 4th Modem Status with reset control reading MSR and bit0 1 idle after clear respecting higher priority preemption",
+    "COMPARE top scoreboard end to end modem toggle to MSR to int_o to IIR with no loss duplication or misorder"
+  ],
+  "coverage_steps": [],
+  "completion": [
+    "Done when IER disabled case shows MSR delta without int_o plus IER enabled cases show MSR delta with int_o and IIR 000 for each of CTS DSR RI DCD each with at least one scoreboard COMPARE",
+    "Bound by TEST_TIMEOUT_CYCLES plus drain_cycles and request_timeout_cycles operational limits where timeout is testbench limit not DUT timing",
+    "Cleanup restores MCR Loopback 0 and LCR DLAB 0 with wishbone bus idle owned for handoff"
+  ],
+  "facts": [
+    {
+      "id": "f_modem_irq_1",
+      "statement": "CTS DSR RI or DCD change produces 4th Modem Status interrupt cleared by reading Modem status register",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 0 4 th Modem Status CTS, DSR, RI or DCD. Reading the Modem\nstatus register.",
+      "plan_pointer": "/sections/8/entries/10"
+    },
+    {
+      "id": "f_iir_pending_1",
+      "statement": "IIR bit0 0 means interrupt pending with INT_O asserted and 1 means no interrupt with INT_O negated",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019. When it\u2019s \u20181\u2019 \u2013 no interrupt\nis pending.",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_iir_prio_1",
+      "statement": "IIR reports Modem Status as 4th priority 000 below RLS RDA Timeout THRE with reset by MSR read",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 0 4 th Modem Status CTS, DSR, RI or DCD. Reading the Modem\nstatus register.",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_ier_bit3_1",
+      "statement": "IER bit3 enables Modem Status interrupt 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "3 RW Modem Status Interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_general_1",
+      "statement": "IER enables and disables UART interrupt generation subject to per bit enable",
+      "source_id": "CH-de51b2eafc",
+      "quote": "This register allows enabling and disabling interrupt generation by the UART.",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_msr_delta_1",
+      "statement": "MSR delta bits set to 1 on corresponding line change and reset on MSR read",
+      "source_id": "CH-0174a058ac",
+      "quote": "These bits are set to\n\u20181\u2019 when a change in corresponding line has been detected and they are reset when the\nregister is being read.",
+      "plan_pointer": "/registers/registers/10"
+    },
+    {
+      "id": "f_msr_dcts_1",
+      "statement": "MSR bit0 DCTS indicates CTS line changed state",
+      "source_id": "CH-0174a058ac",
+      "quote": "\u20181\u2019 \u2013 The CTS line has changed its state.",
+      "plan_pointer": "/registers/registers/10/fields/0"
+    },
+    {
+      "id": "f_msr_ddsr_1",
+      "statement": "MSR bit1 DDSR indicates DSR line changed state",
+      "source_id": "CH-0174a058ac",
+      "quote": " \u20181\u2019 \u2013 The DSR line has changed its state.",
+      "plan_pointer": "/registers/registers/10"
+    },
+    {
+      "id": "f_msr_teri_1",
+      "statement": "MSR bit2 TERI detects RI low to high trailing edge",
+      "source_id": "CH-0174a058ac",
+      "quote": "Trailing Edge of Ring Indicator  (TERI) detector. The RI line has\nchanged its state from low to high state.",
+      "plan_pointer": "/registers/registers/10"
+    },
+    {
+      "id": "f_msr_ddcd_1",
+      "statement": "MSR bit3 DDCD indicates DCD line changed state",
+      "source_id": "CH-0174a058ac",
+      "quote": " \u20181\u2019 \u2013 The DCD line has changed its state.",
+      "plan_pointer": "/registers/registers/10"
+    },
+    {
+      "id": "f_msr_addr_1",
+      "statement": "MSR is 8 bit read only at bus address 6",
+      "source_id": "CH-f88915355b",
+      "quote": "Modem Status 6 8 R Modem Status",
+      "plan_pointer": "/registers/registers/10"
+    },
+    {
+      "id": "f_reset_ier_1",
+      "statement": "After reset all interrupts disabled in IER",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "All interrupts are disabled in the Interrupt Enable Register.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_modem_func_1",
+      "statement": "Modem control handles RTS CTS DTR DSR RI DCD handshake",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/function"
+    },
+    {
+      "id": "f_loopback_1",
+      "statement": "MCR Loopback 0 is normal operation and 1 is loopback with STX held at 1",
+      "source_id": "CH-6abe65aeff",
+      "quote": " \u20180\u2019 \u2013 normal operation\n \u20181\u2019 \u2013 loopback mode. When in loopback mode, the Serial\nOutput Signal (STX_PAD_O) is set to logic \u20181\u2019.",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/function"
+    }
+  ],
+  "questions": [
+    "What are confirmed wb_adr_i pin values for IER and IIR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling and reset release to first access delay",
+    "What is wb_rst_i polarity and int_o active polarity for assertion versus negation correlation with IIR bit0",
+    "What are inactive drive levels for cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i and tie off for srx_pad_i and idle ownership of wishbone bus during modem toggles",
+    "What exact IIR bits 3 to 1 and bit0 encoding must be observed for isolated Modem Status 000 versus concurrent higher priority RLS RDA Timeout THRE including bits 7 to 4",
+    "What MCR Loopback 0 versus 1 handling applies for normal external modem observation and are external modem inputs ignored in loopback when STX is held at 1"
+  ],
+  "blockers": []
+}

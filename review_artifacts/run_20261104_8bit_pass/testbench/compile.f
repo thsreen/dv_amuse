@@ -1,0 +1,12 @@
+common_uvc/clock/clock_if.sv
+common_uvc/reset/reset_if.sv
+common_uvc/clock/clock_pkg.sv
+common_uvc/reset/reset_pkg.sv
+common_uvc/common/common_pkg.sv
+interfaces/interrupt_output_if.sv
+interfaces/uart_serial_data_if.sv
+interfaces/modem_control_if_if.sv
+interfaces/wishbone_slave_interface_if.sv
+uart_top_verification_pkg.sv
+checks/wishbone_slave_interface_assertions.sv
+verification_top.sv

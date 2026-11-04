@@ -1,0 +1,262 @@
+{
+  "work_dir": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d",
+  "generation_waves": [
+    [
+      "t_clk_seq"
+    ],
+    [
+      "t_chip_reset",
+      "t_clk_cov",
+      "t_irq_baud_mon",
+      "t_wb_mon"
+    ],
+    [
+      "t_irq_id_cov",
+      "t_reset_state",
+      "t_wb_init_cfg",
+      "t_wb_reg_cov",
+      "t_wb_scoreboard",
+      "t_xz_check"
+    ],
+    [
+      "t_divisor_cov",
+      "t_dlab_gate_chk",
+      "t_traffic_seq",
+      "t_uart_mon",
+      "t_wb_top_seq"
+    ],
+    [
+      "t_addr_dlab_cov",
+      "t_e2e_arch",
+      "t_ier_iir_pend",
+      "t_line_err_cov",
+      "t_lsr_status",
+      "t_modem_irq",
+      "t_top_virtual"
+    ],
+    [
+      "t_iir_prio_fixed",
+      "t_irq_err_chk",
+      "t_modem_traffic_cov"
+    ]
+  ],
+  "pseudocode_tasks": [
+    "t_clk_seq",
+    "t_chip_reset",
+    "t_clk_cov",
+    "t_irq_baud_mon",
+    "t_wb_mon",
+    "t_irq_id_cov",
+    "t_reset_state",
+    "t_wb_init_cfg",
+    "t_wb_reg_cov",
+    "t_wb_scoreboard",
+    "t_xz_check",
+    "t_divisor_cov",
+    "t_dlab_gate_chk",
+    "t_traffic_seq",
+    "t_uart_mon",
+    "t_wb_top_seq",
+    "t_addr_dlab_cov",
+    "t_e2e_arch",
+    "t_ier_iir_pend",
+    "t_line_err_cov",
+    "t_lsr_status",
+    "t_modem_irq",
+    "t_top_virtual",
+    "t_iir_prio_fixed",
+    "t_irq_err_chk",
+    "t_modem_traffic_cov"
+  ],
+  "completed_tasks": [
+    "t_clk_seq",
+    "t_chip_reset",
+    "t_clk_cov",
+    "t_irq_baud_mon",
+    "t_wb_mon",
+    "t_irq_id_cov",
+    "t_reset_state",
+    "t_wb_init_cfg",
+    "t_wb_reg_cov",
+    "t_wb_scoreboard",
+    "t_xz_check",
+    "t_divisor_cov",
+    "t_dlab_gate_chk",
+    "t_traffic_seq",
+    "t_uart_mon",
+    "t_wb_top_seq",
+    "t_addr_dlab_cov",
+    "t_e2e_arch",
+    "t_ier_iir_pend",
+    "t_modem_irq",
+    "t_modem_traffic_cov"
+  ],
+  "status": "COMPLETE_NEEDS_REVIEW",
+  "tasks": [
+    {
+      "id": "t_wb_init_cfg",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_wb_init_cfg.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_wb_init_cfg.pseudocode.json"
+    },
+    {
+      "id": "t_chip_reset",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_chip_reset.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_chip_reset.pseudocode.json"
+    },
+    {
+      "id": "t_traffic_seq",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_traffic_seq.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_traffic_seq.pseudocode.json"
+    },
+    {
+      "id": "t_wb_mon",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_wb_mon.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_wb_mon.pseudocode.json"
+    },
+    {
+      "id": "t_uart_mon",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_uart_mon.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_uart_mon.pseudocode.json"
+    },
+    {
+      "id": "t_irq_baud_mon",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_irq_baud_mon.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_irq_baud_mon.pseudocode.json"
+    },
+    {
+      "id": "t_dlab_gate_chk",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_dlab_gate_chk.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_dlab_gate_chk.pseudocode.json"
+    },
+    {
+      "id": "t_irq_err_chk",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_irq_err_chk.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_irq_err_chk.pseudocode.json"
+    },
+    {
+      "id": "t_top_virtual",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_top_virtual.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_top_virtual.pseudocode.json"
+    },
+    {
+      "id": "t_wb_top_seq",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_wb_top_seq.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_wb_top_seq.pseudocode.json"
+    },
+    {
+      "id": "t_clk_seq",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_clk_seq.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_clk_seq.pseudocode.json"
+    },
+    {
+      "id": "t_xz_check",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_xz_check.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_xz_check.pseudocode.json"
+    },
+    {
+      "id": "t_reset_state",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_reset_state.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_reset_state.pseudocode.json"
+    },
+    {
+      "id": "t_ier_iir_pend",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_ier_iir_pend.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_ier_iir_pend.pseudocode.json"
+    },
+    {
+      "id": "t_iir_prio_fixed",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_iir_prio_fixed.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_iir_prio_fixed.pseudocode.json"
+    },
+    {
+      "id": "t_lsr_status",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_lsr_status.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_lsr_status.pseudocode.json"
+    },
+    {
+      "id": "t_wb_scoreboard",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_wb_scoreboard.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_wb_scoreboard.pseudocode.json"
+    },
+    {
+      "id": "t_e2e_arch",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_e2e_arch.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_e2e_arch.pseudocode.json"
+    },
+    {
+      "id": "t_modem_irq",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_modem_irq.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_modem_irq.pseudocode.json"
+    },
+    {
+      "id": "t_wb_reg_cov",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_wb_reg_cov.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_wb_reg_cov.pseudocode.json"
+    },
+    {
+      "id": "t_divisor_cov",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_divisor_cov.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_divisor_cov.pseudocode.json"
+    },
+    {
+      "id": "t_irq_id_cov",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_irq_id_cov.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_irq_id_cov.pseudocode.json"
+    },
+    {
+      "id": "t_line_err_cov",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_line_err_cov.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_line_err_cov.pseudocode.json"
+    },
+    {
+      "id": "t_clk_cov",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_clk_cov.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_clk_cov.pseudocode.json"
+    },
+    {
+      "id": "t_addr_dlab_cov",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_addr_dlab_cov.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_addr_dlab_cov.pseudocode.json"
+    },
+    {
+      "id": "t_modem_traffic_cov",
+      "document": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_modem_traffic_cov.md",
+      "pseudocode": "/proj/work/silicon_copilot/dv_agent/runs/orch-20261104T145239Z-quick-testing-2026-11-04T1539459199960000/code_work/8f17bd5989f3ab8d/t_modem_traffic_cov.pseudocode.json"
+    }
+  ],
+  "review_status": "NEEDS_REVIEW",
+  "quality_policy": "actionable_source_backed_features_and_complete_collation",
+  "features": {
+    "passed": [
+      "t_clk_seq",
+      "t_chip_reset",
+      "t_clk_cov",
+      "t_irq_baud_mon",
+      "t_wb_mon",
+      "t_reset_state",
+      "t_wb_init_cfg",
+      "t_wb_reg_cov",
+      "t_xz_check",
+      "t_divisor_cov",
+      "t_dlab_gate_chk",
+      "t_traffic_seq",
+      "t_uart_mon",
+      "t_e2e_arch",
+      "t_ier_iir_pend",
+      "t_modem_irq",
+      "t_modem_traffic_cov"
+    ],
+    "deferred": [
+      "t_irq_id_cov",
+      "t_wb_scoreboard",
+      "t_wb_top_seq",
+      "t_addr_dlab_cov",
+      "t_line_err_cov",
+      "t_lsr_status",
+      "t_top_virtual",
+      "t_iir_prio_fixed",
+      "t_irq_err_chk"
+    ],
+    "deferred_items": 80
+  }
+}

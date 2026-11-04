@@ -1,0 +1,158 @@
+{
+  "understanding": "Verify IIR reports highest pending interrupt per documented 011/010/110/001/000 priority with source and reset actions and that IIR reads always show bits 7:6 as 11 and 5:4 as 00, building on IER enable-pending base.",
+  "preconditions": [
+    "dep_t_ier_iir_pend_done: IER enable programming and IIR bit0 pending correlation available [f_ier0,f_ier1,f_ier2,f_ier3,f_pending]",
+    "reset_entry_observed: FIFOs cleared and all interrupts disabled before enable programming [f_all_disabled]",
+    "ownership: wishbone_slave_interface drives IIR IER LSR MSR RBR THR accesses via symbolic addresses with IIR physical 2 documented [f_iir_addr]; uart_serial_data drives srx_pad_i and observes stx_pad_o; modem_control_if drives CTS DSR RI DCD toggles; interrupt_output passively observes int_o",
+    "clock_reset_common: clock period fixed per test and reset driven via common reset; polarity duration and deassert-to-first-write pending q_reset"
+  ],
+  "stimulus_steps": [
+    "WAIT reset deassertion plus bounded drain; SAMPLE IIR reset value C1h [f_iir_reset] with fixed bits [f_fixed54,f_fixed76]",
+    "FOR each IER enable combination under test DO program enables via wishbone writes [f_ier0,f_ier1,f_ier2,f_ier3]",
+    "FOR each single source in RLS RDA Timeout THRE Modem DO generate condition in assigned context: error_recovery for RLS [f_rls] normal_traffic with symbolic trigger level for RDA [f_rda] Timeout [f_timeout] THRE [f_thre] modem handshake toggle for Modem [f_modem]; SAMPLE IIR read completion [f_highest,f_iir_addr]",
+    "FOR multi-source priority DO assert higher plus lower pending together; SAMPLE IIR and expect highest per 1st RLS over 2nd RDA Timeout over 3rd THRE over 4th Modem [f_rls,f_rda,f_timeout,f_thre,f_modem,f_highest]",
+    "APPLY documented reset control per observed code: read LSR for 011 [f_rls] drain FIFO below trigger for 010 [f_rda] read RBR for 110 [f_timeout] write THR or read IIR for 001 [f_thre] read MSR for 000 [f_modem]; WAIT bounded drain then re-SAMPLE IIR to confirm clear",
+    "REPEAT IIR reads across init and all traffic sequences to exercise fixed-bits invariant [f_fixed54,f_fixed76]"
+  ],
+  "check_steps": [
+    "COMPARE IIR bit0 0 pending versus 1 none [f_pending] against IER enables [f_ier0,f_ier1,f_ier2,f_ier3] in top-level scoreboard",
+    "COMPARE IIR bits 3:1 against highest pending code per table 011 RLS 1st [f_rls] 010 RDA 2nd [f_rda] 110 Timeout 2nd [f_timeout] 001 THRE 3rd [f_thre] 000 Modem 4th [f_modem] with highest-pending linkage [f_highest]",
+    "COMPARE IIR bits 7:6==11 [f_fixed76] and 5:4==00 [f_fixed54] on every IIR read including reset C1h [f_iir_reset]; fail on mismatch as ast_IIR_fixed_bits",
+    "COMPARE int_o events from interrupt_output monitor against enabled pending expectation; fail on spurious missing or mis-prioritized"
+  ],
+  "coverage_steps": [
+    "SAMPLE cg_iir_interrupt cp_iir_pending pending_0 versus no_pending_1 on each IIR read completion via wishbone monitor analysis port [f_pending]",
+    "SAMPLE cp_iir_code code_011_rls code_010_rda code_110_timeout code_001_thre code_000_modem and illegal 100_101_111 on each IIR read [f_rls,f_rda,f_timeout,f_thre,f_modem]",
+    "SAMPLE cp_iir_fixed fixed_76_11 fixed_54_00 and illegal any_other on each IIR read; antecedent never triggered is failure [f_fixed54,f_fixed76]"
+  ],
+  "completion": [
+    "Done when reset C1h fixed-bits read plus single-source checks for all five codes and at least one multi-source highest-priority resolution with documented clear action each show scoreboard comparison",
+    "Bound by TEST_TIMEOUT_CYCLES plus drain_cycles flush as TESTBENCH operational limits not DUT timing; stages in order sequences within stage concurrent",
+    "Basic single-source functional test first then priority and fixed-bits invariant tests; each test observes at least one scoreboard comparison"
+  ],
+  "facts": [
+    {
+      "id": "f_pending",
+      "statement": "IIR bit0 0 means interrupt pending and 1 means no interrupt pending",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019. When it\u2019s \u20181\u2019 \u2013 no interrupt\nis pending.",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_highest",
+      "statement": "IIR reports current highest priority pending interrupt",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "The IIR enables the programmer to retrieve what is the current highest priority pending\ninterrupt.",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_rls",
+      "statement": "IIR 011 is 1st priority Receiver Line Status sourced by parity overrun framing or break cleared by reading Line Status Register",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 1 1 1 st Receiver Line\nStatus\nParity, Overrun or Framing\nerrors or Break Interrupt\nReading the Line\nStatus Register",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_rda",
+      "statement": "IIR 010 is 2nd priority Receiver Data available sourced by FIFO trigger reached cleared when FIFO drops below trigger",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 1 0 2 nd Receiver Data\navailable\nFIFO trigger level reached FIFO drops below\ntrigger level",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_timeout",
+      "statement": "IIR 110 is 2nd priority Timeout with at least 1 char idle 4 char times cleared by reading Receiver Buffer Register",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "1 1 0 2 nd Timeout\nIndication\nThere\u2019s at least 1 character\nin the FIFO but no character\nhas been input to the FIFO\nor read from it for the last 4\nChar times.\nReading from the\nFIFO (Receiver\nBuffer Register)",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_thre",
+      "statement": "IIR 001 is 3rd priority Transmitter Holding Register empty cleared by writing THR or reading IIR",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 1 3 rd Transmitter\nHolding\nRegister empty\nTransmitter Holding\nRegister Empty\nWriting to the\nTransmitter Holding\nRegister or reading\nIIR.",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_modem",
+      "statement": "IIR 000 is 4th priority Modem Status sourced by CTS DSR RI or DCD cleared by reading Modem status register",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 0 4 th Modem Status CTS, DSR, RI or DCD. Reading the Modem\nstatus register.",
+      "plan_pointer": "/registers/registers/6/fields/1"
+    },
+    {
+      "id": "f_fixed54",
+      "statement": "IIR bits 5 and 4 are logic 0",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 4 and 5: Logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/5"
+    },
+    {
+      "id": "f_fixed76",
+      "statement": "IIR bits 7 and 6 are logic 1 for compatibility",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 6 and 7: Logic \u20181\u2019 for compatibility reason.",
+      "plan_pointer": "/sections/8/entries/5"
+    },
+    {
+      "id": "f_iir_reset",
+      "statement": "IIR reset value is C1h",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Reset Value: C1h",
+      "plan_pointer": "/registers/registers/6"
+    },
+    {
+      "id": "f_iir_addr",
+      "statement": "Interrupt Identification register is address 2 width 8 access R",
+      "source_id": "CH-f88915355b",
+      "quote": "Interrupt Identification 2 8 R Get interrupt information",
+      "plan_pointer": "/registers/registers/6"
+    },
+    {
+      "id": "f_ier0",
+      "statement": "IER bit0 Received Data available 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "0 RW Received Data available interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier1",
+      "statement": "IER bit1 Transmitter Holding Register empty 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "1 RW Transmitter Holding Register empty interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier2",
+      "statement": "IER bit2 Receiver Line Status 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "2 RW Receiver Line Status Interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier3",
+      "statement": "IER bit3 Modem Status 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "3 RW Modem Status Interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_all_disabled",
+      "statement": "After reset all interrupts are disabled in IER",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "\u2022 All interrupts are disabled in the Interrupt Enable Register.",
+      "plan_pointer": "/sections/8/entries/1"
+    }
+  ],
+  "questions": [
+    "q_int_o_polarity: What is documented INT_O asserted versus negated level for correlating IIR bit0 0 pending versus 1 none?",
+    "q_reset_binding: What is wb_rst_i active polarity required reset duration in CLK cycles and deassert-to-first-write delay for IIR reset C1h and fixed-bits assertion disable?",
+    "q_bus_addr: What is explicit wb_adr_i pin value for IIR reads at documented address 2 and for IER LSR MSR RBR THR accesses DLAB gating and addr 7 handling for 8-bit FIFO-only use?",
+    "q_bus_drive: What are required wb_sel_i values owners tie-offs and inactive levels of wb_stb_i wb_cyc_i for 8-bit register reads and writes?",
+    "q_rls_stimulus: What documented programming creates parity overrun framing or break for deterministic RLS 011 stimulus without inventing serial settings?",
+    "q_timeout_measure: How is 4 Char times defined in clock baud divisor terms for deterministic Timeout 110 stimulus and clear by RBR read?",
+    "q_second_priority_tie: When RDA 010 and Timeout 110 both 2nd priority are simultaneously pending which code must IIR report as highest?",
+    "q_clear_observation: On which CLK edge after documented reset action must updated IIR be observable and does reading IIR to clear THRE perturb other pending codes?"
+  ],
+  "blockers": []
+}

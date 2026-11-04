@@ -1,0 +1,38 @@
+// QUICK TESTING ONLY: inferred auto approvals are not human approval or design sign-off.
+class t_modem_irq_modem_toggle_seq extends t_traffic_seq_modem_normal_seq;
+  `uvm_object_utils(t_modem_irq_modem_toggle_seq)
+
+  function new(string name="t_modem_irq_modem_toggle_seq"); super.new(name); endfunction
+  task body();
+    cg_item tr;
+    super.body();
+    repeat(1) begin
+      tr=cg_item::type_id::create("request");
+      start_item(tr);
+      tr.kind=5; tr.address=64'h0; tr.mask=64'hf; tr.cycles=2;
+      tr.data=64'h1;
+      finish_item(tr);
+    end
+    repeat(1) begin
+      tr=cg_item::type_id::create("request");
+      start_item(tr);
+      tr.kind=5; tr.address=64'h0; tr.mask=64'hf; tr.cycles=2;
+      tr.data=64'h2;
+      finish_item(tr);
+    end
+    repeat(1) begin
+      tr=cg_item::type_id::create("request");
+      start_item(tr);
+      tr.kind=5; tr.address=64'h0; tr.mask=64'hf; tr.cycles=2;
+      tr.data=64'h4;
+      finish_item(tr);
+    end
+    repeat(1) begin
+      tr=cg_item::type_id::create("request");
+      start_item(tr);
+      tr.kind=5; tr.address=64'h0; tr.mask=64'hf; tr.cycles=2;
+      tr.data=64'h8;
+      finish_item(tr);
+    end
+  endtask
+endclass

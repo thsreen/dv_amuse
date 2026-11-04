@@ -1,0 +1,133 @@
+{
+  "understanding": "Verify IER bits 0-3 enable Received-Data THRE Receiver-Line-Status Modem-Status with 0 disabled 1 enabled via readback, and IIR bit0 0 pending 1 none correlated with passive int_o when enabled.",
+  "preconditions": [
+    "Common reset driven then deasserted and observed on fixed-period clock; reset polarity and duration symbolic per q_reset [f_reset_disabled]",
+    "LCR DLAB==0 so addresses 0-1 access IER normal registers; IIR accessible [f_dlab_gate]",
+    "wishbone_slave_interface bound to wb_adr_i wb_dat_i wb_dat_o wb_we_i wb_stb_i wb_cyc_i wb_ack_o wb_sel_i with symbolic IER_ADDR==1 and address representation per q_addr",
+    "interrupt_output bound to int_o passive observe only, timestamped on fixed clock; asserted versus negated levels symbolic per q_int_o"
+  ],
+  "stimulus_steps": [
+    "INIT: APPLY common reset; READ IER at symbolic IER_ADDR via wishbone_slave_interface; READ IIR via wishbone_slave_interface; SAMPLE int_o via interrupt_output [f_ier_reset,f_iir_reset,f_reset_disabled]",
+    "ENSURE LCR DLAB==0 before any IER IIR access; if DLAB==1 THEN set DLAB==0 first [f_dlab_gate]",
+    "FOR each enable in 0x0 to 0xF with reserved 7-4==0: WRITE IER = enable via wishbone_slave_interface; READ IER back; READ IIR; SAMPLE int_o passively [f_ier_b0,f_ier_b1,f_ier_b2,f_ier_b3,f_ier_reserved]",
+    "IF dependency traffic creates documented source THEN WAIT for IIR bit0==0 pending else VERIFY IIR bit0==1 none; never drive int_o; per-agent drive only own interface [f_iir_pending]",
+    "CLEANUP: LEAVE DLAB==0 idle; WAIT drain_cycles flush; STOP on request_timeout_cycles operational limit"
+  ],
+  "check_steps": [
+    "COMPARE IER readback [f_ier_b0,f_ier_b1,f_ier_b2,f_ier_b3,f_ier_reserved]: IF (read & 0x0F) != written_enables THEN FAIL; IF (read & 0xF0) != 0 THEN FAIL",
+    "COMPARE reset values: IER == 00h [f_ier_reset,f_reset_disabled]; IIR == C1h [f_iir_reset] so bit0==1 none-pending",
+    "COMPARE IIR fixed mask on every IIR read: bits7_6==11 AND bits5_4==00 [f_iir_zero,f_iir_one]",
+    "COMPARE pending correlation in top scoreboard: SAMPLE IIR bit0 plus int_o level together; IF IIR.bit0==1 THEN EXPECT no-pending with int_o at symbolic NEGATED level; IF IIR.bit0==0 AND corresponding IER bit==1 THEN EXPECT pending with int_o at symbolic ASSERTED level [f_iir_pending]; FAIL on mismatch where enable==1; polarity levels remain symbolic per q_int_o",
+    "COMPARE interrupt_output monitor queue vs wishbone IIR poll queue filtered by origin; exclude configuration writes; never compare event with itself"
+  ],
+  "coverage_steps": [
+    "SAMPLE IER enable combinations 0000b-1111b seen on wishbone_slave_interface monitor; cover each bit 0/1 and all-combinations sweep",
+    "SAMPLE IIR bit0 pending 0 vs none 1 correlated with symbolic int_o level seen on interrupt_output subscriber",
+    "SAMPLE reset coverage: IER 00h and IIR C1h after common reset",
+    "SAMPLE IIR compatibility mask bits7_6==11 and bits5_4==00"
+  ],
+  "completion": [
+    "Done when reset entry plus all 16 IER enable combinations 0000b-1111b written/read via wishbone_slave_interface with at least one IER scoreboard comparison and at least one IIR-bit0 vs int_o scoreboard comparison observed",
+    "Bound by TEST_TIMEOUT_CYCLES plus drain_cycles flush as TESTBENCH operational limits, not DUT timing; stages execute in order, sequences within stage concurrent"
+  ],
+  "facts": [
+    {
+      "id": "f_ier_b0",
+      "statement": "IER bit0 Received Data available 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "0 RW Received Data available interrupt",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_b1",
+      "statement": "IER bit1 THRE empty 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "1 RW Transmitter Holding Register empty interrupt",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_b2",
+      "statement": "IER bit2 Receiver Line Status 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "2 RW Receiver Line Status Interrupt",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_b3",
+      "statement": "IER bit3 Modem Status 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "3 RW Modem Status Interrupt",
+      "plan_pointer": "/registers/registers/4/fields/3"
+    },
+    {
+      "id": "f_ier_reserved",
+      "statement": "IER bits 7-4 Reserved should be logic 0",
+      "source_id": "CH-de51b2eafc",
+      "quote": "7-4 RW Reserved. Should be logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_reset",
+      "statement": "IER reset value 00h all disabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "Reset Value: 00h",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_addr",
+      "statement": "IER is 8b RW at address 1 Enable Mask interrupts",
+      "source_id": "CH-f88915355b",
+      "quote": "Interrupt Enable 1 8 RW Enable/Mask interrupts",
+      "plan_pointer": "/registers/registers/4"
+    },
+    {
+      "id": "f_dlab_gate",
+      "statement": "Addresses 0-1 inaccessible when LCR bit7 DLAB is 1 so need DLAB 0",
+      "source_id": "CH-f88915355b",
+      "quote": "At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/registers/registers/4"
+    },
+    {
+      "id": "f_iir_pending",
+      "statement": "IIR bit0 0 means interrupt pending 1 means no interrupt pending",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019. When it\u2019s \u20181\u2019 \u2013 no interrupt",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_iir_zero",
+      "statement": "IIR bits 4 and 5 are logic 0",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 4 and 5: Logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_iir_one",
+      "statement": "IIR bits 6 and 7 are logic 1 for compatibility",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 6 and 7: Logic \u20181\u2019 for compatibility reason.",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_iir_reset",
+      "statement": "IIR reset C1h implying bit0 1 none pending",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Reset Value: C1h",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_reset_disabled",
+      "statement": "After reset all interrupts disabled in IER",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "All interrupts are disabled in the Interrupt Enable Register.",
+      "plan_pointer": "/sections/8/entries/1"
+    }
+  ],
+  "questions": [
+    "q_int_o: What is documented INT_O polarity and inactive level for correlating IIR bit0 0 pending versus 1 none with asserted versus negated INT_O?",
+    "q_reset: What is wb_rst_i active polarity, required reset duration in CLK cycles, and deassert-to-first-write delay for IER IIR checks?",
+    "q_addr: What is explicit wb_adr_i pin representation for IER address 1 and IIR reads and required handling of addr 7 illegal for 8-bit use?",
+    "q_bus_drive: What are required wb_sel_i values owners and tie-offs and inactive levels of wb_stb_i wb_cyc_i that must be driven for 8-bit FIFO-only register access?"
+  ],
+  "blockers": []
+}

@@ -1,0 +1,499 @@
+{
+  "tests": [
+    {
+      "id": "test_basic",
+      "stages": [
+        [
+          "t_xz_check_seq_wb_idle",
+          "t_xz_check_seq_uart_idle",
+          "t_xz_check_seq_modem_idle"
+        ],
+        [
+          "t_reset_state_seq_lcr_reset"
+        ],
+        [
+          "t_wb_init_cfg_init_seq"
+        ],
+        [
+          "t_dlab_gate_chk_seq"
+        ],
+        [
+          "t_wb_reg_cov_directed_seq"
+        ],
+        [
+          "t_traffic_seq_wb_normal_seq",
+          "t_traffic_seq_uart_normal_seq",
+          "t_traffic_seq_modem_normal_seq"
+        ],
+        [
+          "t_traffic_seq_wb_loopback_seq",
+          "t_traffic_seq_modem_random_seq"
+        ],
+        [
+          "t_traffic_seq_normal_virt"
+        ],
+        [
+          "t_traffic_seq_loopback_virt"
+        ]
+      ],
+      "sequencer_settings": [
+        {
+          "variable": "t_wb_init_cfg_div_msb",
+          "value": 0
+        },
+        {
+          "variable": "t_wb_init_cfg_div_lsb",
+          "value": 1
+        },
+        {
+          "variable": "t_wb_init_cfg_fcr_byte",
+          "value": 192
+        },
+        {
+          "variable": "t_wb_init_cfg_ier_byte",
+          "value": 0
+        },
+        {
+          "variable": "t_wb_init_cfg_lcr_dlab1",
+          "value": 131
+        },
+        {
+          "variable": "t_wb_init_cfg_lcr_dlab0",
+          "value": 3
+        },
+        {
+          "variable": "t_dlab_gate_chk_lcr_dlab1",
+          "value": 131
+        },
+        {
+          "variable": "t_dlab_gate_chk_lcr_dlab0",
+          "value": 3
+        },
+        {
+          "variable": "t_dlab_gate_chk_div_lsb",
+          "value": 52
+        },
+        {
+          "variable": "t_dlab_gate_chk_div_msb",
+          "value": 18
+        },
+        {
+          "variable": "t_dlab_gate_chk_ier_pat",
+          "value": 15
+        },
+        {
+          "variable": "t_traffic_seq_ier_byte",
+          "value": 0
+        },
+        {
+          "variable": "t_traffic_seq_payload",
+          "value": 85
+        },
+        {
+          "variable": "t_traffic_seq_mcr_byte",
+          "value": 16
+        },
+        {
+          "variable": "t_traffic_seq_uart_byte",
+          "value": 85
+        },
+        {
+          "variable": "t_traffic_seq_modem_lvl",
+          "value": 0
+        }
+      ],
+      "seed": 1,
+      "drain_cycles": 2000,
+      "minimum_comparisons": 4,
+      "fact_ids": [
+        "f_wb_addr_1",
+        "f_wb_sel_1",
+        "f_wb_data_1",
+        "f_wb_hs_1",
+        "f_lcr_format",
+        "f_clk_1",
+        "f_mcr_rst_1",
+        "f_lcr_addr",
+        "f_init_dlab1",
+        "f_init_dlab0",
+        "f_init_divorder",
+        "f_init_fifotrig",
+        "f_init_ier",
+        "f_addr_lcr",
+        "f_addr_divlsb",
+        "f_addr_divmsb",
+        "f_addr_ier",
+        "f_addr_fcr",
+        "f_dlab_gate",
+        "f_fcr_trigdef",
+        "f_ier_bit0",
+        "f_ier_en",
+        "f_ier_dis",
+        "f_ier_reserved",
+        "f_dlab_one",
+        "f_dlab_zero",
+        "f_dlab_set",
+        "f_restore",
+        "f_dll_addr",
+        "f_dlm_addr",
+        "f_div_order_2",
+        "f_div_two_bytes",
+        "f_alias_block",
+        "f_ier_enable",
+        "t_wb_reg_cov_f_rbr_1",
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_iir_1",
+        "t_wb_reg_cov_f_fcr_1",
+        "t_wb_reg_cov_f_lcr_1",
+        "t_wb_reg_cov_f_mcr_1",
+        "t_wb_reg_cov_f_lsr_1",
+        "t_wb_reg_cov_f_msr_1",
+        "t_wb_reg_cov_f_bus8_1",
+        "f_lcr_dlab",
+        "f_ier_rda",
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_mcr_dtr_rts"
+      ]
+    },
+    {
+      "id": "test_dlab_divisor",
+      "stages": [
+        [
+          "t_xz_check_seq_wb_idle",
+          "t_xz_check_seq_uart_idle",
+          "t_xz_check_seq_modem_idle"
+        ],
+        [
+          "t_wb_init_cfg_init_seq"
+        ],
+        [
+          "t_divisor_cov_seq"
+        ],
+        [
+          "t_dlab_gate_chk_seq"
+        ],
+        [
+          "t_addr_dlab_cov_seq"
+        ]
+      ],
+      "sequencer_settings": [
+        {
+          "variable": "t_wb_init_cfg_div_msb",
+          "value": 0
+        },
+        {
+          "variable": "t_wb_init_cfg_div_lsb",
+          "value": 1
+        },
+        {
+          "variable": "t_wb_init_cfg_fcr_byte",
+          "value": 192
+        },
+        {
+          "variable": "t_wb_init_cfg_ier_byte",
+          "value": 0
+        },
+        {
+          "variable": "t_wb_init_cfg_lcr_dlab1",
+          "value": 131
+        },
+        {
+          "variable": "t_wb_init_cfg_lcr_dlab0",
+          "value": 3
+        },
+        {
+          "variable": "t_divisor_cov_mid_low",
+          "value": 64
+        },
+        {
+          "variable": "t_divisor_cov_mid_high",
+          "value": 160
+        },
+        {
+          "variable": "t_dlab_gate_chk_lcr_dlab1",
+          "value": 131
+        },
+        {
+          "variable": "t_dlab_gate_chk_lcr_dlab0",
+          "value": 3
+        },
+        {
+          "variable": "t_dlab_gate_chk_div_lsb",
+          "value": 52
+        },
+        {
+          "variable": "t_dlab_gate_chk_div_msb",
+          "value": 18
+        },
+        {
+          "variable": "t_dlab_gate_chk_ier_pat",
+          "value": 15
+        },
+        {
+          "variable": "t_addr_dlab_cov_lcr_dlab1",
+          "value": 128
+        },
+        {
+          "variable": "t_addr_dlab_cov_lcr_dlab0",
+          "value": 0
+        },
+        {
+          "variable": "t_addr_dlab_cov_fcr_byte",
+          "value": 0
+        },
+        {
+          "variable": "t_addr_dlab_cov_mcr_byte",
+          "value": 0
+        },
+        {
+          "variable": "t_addr_dlab_cov_payload",
+          "value": 0
+        }
+      ],
+      "seed": 2,
+      "drain_cycles": 1000,
+      "minimum_comparisons": 2,
+      "fact_ids": [
+        "f_wb_addr_1",
+        "f_wb_sel_1",
+        "f_wb_data_1",
+        "f_wb_hs_1",
+        "f_lcr_format",
+        "f_clk_1",
+        "f_mcr_rst_1",
+        "f_init_dlab1",
+        "f_init_dlab0",
+        "f_init_divorder",
+        "f_addr_lcr",
+        "f_addr_divlsb",
+        "f_addr_divmsb",
+        "f_dlab_gate",
+        "f_lsb_addr",
+        "f_msb_addr",
+        "f_dlab_gating",
+        "f_dlab_bit",
+        "f_div_single",
+        "f_div_both",
+        "f_div_order",
+        "f_div_zero",
+        "f_dlab_restore",
+        "f_dlab_one",
+        "f_dlab_zero",
+        "f_div_two_bytes",
+        "f_div_order_2",
+        "f_alias_block",
+        "f_dlab_set",
+        "f_restore",
+        "f_ier_enable",
+        "f_ier_reserved",
+        "f_cross_alias",
+        "t_addr_dlab_cov_f_alias_blocked",
+        "t_addr_dlab_cov_f_addr7",
+        "t_wb_reg_cov_f_rbr_1",
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_lcr_1"
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "id": "t_dlab_gate_chk_route_dlm",
+      "expected_agent": "wishbone_slave_interface",
+      "expected_event": "write",
+      "actual_agent": "wishbone_slave_interface",
+      "actual_event": "read",
+      "expected_address": 1,
+      "actual_address": 1,
+      "when": [
+        {
+          "agent": "wishbone_slave_interface",
+          "address": 3,
+          "mask": 128,
+          "value": 128,
+          "initial_value": 3
+        }
+      ],
+      "mask": 255,
+      "fact_ids": [
+        "f_dlab_one",
+        "f_dlm_addr",
+        "f_div_order_2",
+        "f_div_two_bytes",
+        "f_dlab_set"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_route_ier",
+      "expected_agent": "wishbone_slave_interface",
+      "expected_event": "write",
+      "actual_agent": "wishbone_slave_interface",
+      "actual_event": "read",
+      "expected_address": 1,
+      "actual_address": 1,
+      "when": [
+        {
+          "agent": "wishbone_slave_interface",
+          "address": 3,
+          "mask": 128,
+          "value": 0,
+          "initial_value": 3
+        }
+      ],
+      "mask": 255,
+      "fact_ids": [
+        "f_dlab_zero",
+        "f_ier_enable",
+        "f_ier_reserved",
+        "f_restore"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_loopback_route",
+      "expected_agent": "wishbone_slave_interface",
+      "expected_event": "write",
+      "actual_agent": "wishbone_slave_interface",
+      "actual_event": "read",
+      "expected_address": 0,
+      "actual_address": 0,
+      "when": [],
+      "mask": 255,
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab"
+      ]
+    },
+    {
+      "id": "t_ier_iir_pend_route_iir_int",
+      "expected_agent": "wishbone_slave_interface",
+      "expected_event": "read",
+      "actual_agent": "interrupt_output",
+      "actual_event": "transaction",
+      "expected_address": 2,
+      "actual_address": null,
+      "when": [],
+      "mask": 1,
+      "fact_ids": [
+        "f_iir_pending"
+      ]
+    }
+  ],
+  "registers": [
+    {
+      "id": "t_divisor_cov_lsb",
+      "agent": "wishbone_slave_interface",
+      "address": 0,
+      "width": 8,
+      "access": "RW",
+      "reset": null,
+      "mask": 255,
+      "fact_ids": [
+        "f_lsb_addr",
+        "f_dlab_gating",
+        "f_div_single",
+        "f_div_zero"
+      ]
+    }
+  ],
+  "hooks": [
+    {
+      "id": "t_irq_baud_mon_mon_int_o",
+      "target": "interrupt_output",
+      "slot": "monitor.body",
+      "purpose": "Sample int_o each wb_clk_i edge without driving; emit timestamped edge event; clear pending and restart base on reset",
+      "fact_ids": [
+        "t_irq_baud_mon_f_core_interrupt",
+        "t_irq_baud_mon_f_clk_input",
+        "t_irq_baud_mon_f_reset_input"
+      ]
+    },
+    {
+      "id": "t_xz_check_hook_mon_modem",
+      "target": "modem_control_if",
+      "slot": "monitor.body",
+      "purpose": "Sample modem control pads for XZ",
+      "fact_ids": [
+        "f_mcr_rst_1"
+      ]
+    },
+    {
+      "id": "t_xz_check_hook_mon_int",
+      "target": "interrupt_output",
+      "slot": "monitor.body",
+      "purpose": "Sample INT_O for XZ and known-after-reset",
+      "fact_ids": [
+        "f_int_o_1"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_sb_hook",
+      "target": "t_traffic_seq_loopback_route",
+      "slot": "scoreboard.compare",
+      "purpose": "Compare loopback TX queue versus RX queue order without loss duplication",
+      "fact_ids": [
+        "f_mcr_loopback"
+      ]
+    },
+    {
+      "id": "t_ier_iir_pend_hook_mon_int",
+      "target": "interrupt_output",
+      "slot": "monitor.body",
+      "purpose": "Passively observe int_o levels timestamped for pending correlation never drive",
+      "fact_ids": [
+        "f_iir_pending"
+      ]
+    },
+    {
+      "id": "t_modem_irq_drv_modem",
+      "target": "modem_control_if",
+      "slot": "driver.body",
+      "purpose": "Drive single toggle via modem_handshake_toggle test only infrastructure",
+      "fact_ids": [
+        "f_function_1",
+        "f_msr_dcts_1"
+      ]
+    },
+    {
+      "id": "t_modem_irq_mon_modem",
+      "target": "modem_control_if",
+      "slot": "monitor.body",
+      "purpose": "Observe CTS DSR RI DCD toggles and RTS DTR for scoreboard",
+      "fact_ids": [
+        "f_function_1",
+        "f_msr_delta_1"
+      ]
+    },
+    {
+      "id": "t_modem_irq_mon_int",
+      "target": "interrupt_output",
+      "slot": "monitor.body",
+      "purpose": "Observe int_o assertion negation for interrupt scoreboard",
+      "fact_ids": [
+        "f_iir_1",
+        "f_modem_irq_1"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_hook_modem_drv",
+      "target": "modem_control_if",
+      "slot": "driver.body",
+      "purpose": "Drive CTS DSR RI DCD toggles for modem_000 stimulus via custom body",
+      "fact_ids": [
+        "f_modem_src_1",
+        "f_modem_pads_1"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_hook_modem_mon",
+      "target": "modem_control_if",
+      "slot": "monitor.body",
+      "purpose": "Observe modem_000 versus no_modem for coverage sampling via monitor body",
+      "fact_ids": [
+        "f_modem_src_1"
+      ]
+    }
+  ]
+}

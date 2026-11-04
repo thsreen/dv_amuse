@@ -1,0 +1,2450 @@
+{
+  "items": [
+    {
+      "id": "interrupt_output",
+      "kind": "agents",
+      "fact_ids": [
+        "f_port_int_o_2",
+        "f_dut_source"
+      ],
+      "plan_references": [
+        "/interfaces/groups/3/signals/0",
+        "/interfaces/groups/3/property_evidence/dut_role"
+      ],
+      "code_files": [
+        "interfaces/interrupt_output_if.sv",
+        "uvm/interrupt_output_cfg.svh",
+        "uvm/interrupt_output_monitor.svh",
+        "uvm/interrupt_output_agent.svh",
+        "uvm/cg_env.svh",
+        "tests/quick_basic.svh",
+        "uart_top_verification_pkg.sv",
+        "verification_top.sv",
+        "compile.f"
+      ]
+    },
+    {
+      "id": "uart_serial_data",
+      "kind": "agents",
+      "fact_ids": [
+        "f_srx_port",
+        "f_function",
+        "f_protocol",
+        "f_peer",
+        "f_category"
+      ],
+      "plan_references": [
+        "/interfaces/groups/4/signals/1",
+        "/interfaces/groups/4/property_evidence/function",
+        "/interfaces/groups/4/property_evidence/protocol",
+        "/interfaces/groups/4/property_evidence/connected_to",
+        "/interfaces/groups/4/property_evidence/category"
+      ],
+      "code_files": [
+        "interfaces/uart_serial_data_if.sv",
+        "uvm/uart_serial_data_cfg.svh",
+        "uvm/uart_serial_data_sequencer.svh",
+        "uvm/uart_serial_data_driver.svh",
+        "uvm/uart_serial_data_monitor.svh",
+        "uvm/uart_serial_data_agent.svh",
+        "uvm/cg_scoreboard.svh",
+        "uvm/cg_system_coverage.svh",
+        "uvm/cg_env.svh",
+        "sequences/t_traffic_seq_uart_normal_seq.svh",
+        "sequences/t_uart_mon_uart_rx_seq.svh",
+        "sequences/t_modem_traffic_cov_uart_rx_seq.svh",
+        "sequences/quick_basic_uart_serial_data_drain.svh",
+        "sequences/quick_basic_vseq.svh",
+        "tests/quick_basic.svh",
+        "uart_top_verification_pkg.sv",
+        "verification_top.sv",
+        "compile.f"
+      ]
+    },
+    {
+      "id": "modem_control_if",
+      "kind": "agents",
+      "fact_ids": [
+        "f_cts_pad_i",
+        "f_dsr_pad_i",
+        "f_ri_pad_i",
+        "f_function_1",
+        "f_connected_1"
+      ],
+      "plan_references": [
+        "/interfaces/groups/5/signals/2",
+        "/interfaces/groups/5/signals/3",
+        "/interfaces/groups/5/signals/4",
+        "/interfaces/groups/5/property_evidence/function",
+        "/interfaces/groups/5/property_evidence/connected_to"
+      ],
+      "code_files": [
+        "interfaces/modem_control_if_if.sv",
+        "uvm/modem_control_if_cfg.svh",
+        "uvm/modem_control_if_sequencer.svh",
+        "uvm/modem_control_if_driver.svh",
+        "uvm/modem_control_if_monitor.svh",
+        "uvm/modem_control_if_agent.svh",
+        "uvm/cg_env.svh",
+        "sequences/t_traffic_seq_modem_normal_seq.svh",
+        "sequences/t_traffic_seq_modem_random_seq.svh",
+        "sequences/t_modem_traffic_cov_modem_toggle_seq.svh",
+        "sequences/quick_basic_modem_control_if_drain.svh",
+        "sequences/quick_basic_vseq.svh",
+        "tests/quick_basic.svh",
+        "uart_top_verification_pkg.sv",
+        "verification_top.sv",
+        "compile.f"
+      ]
+    },
+    {
+      "id": "wishbone_slave_interface",
+      "kind": "agents",
+      "fact_ids": [
+        "f_wb_stb_i",
+        "f_wb_cyc_i",
+        "f_wb_ack_o"
+      ],
+      "plan_references": [
+        "/interfaces/groups/0/signals/5",
+        "/interfaces/groups/0/signals/6",
+        "/interfaces/groups/0/signals/7"
+      ],
+      "code_files": [
+        "uvm/cg_reg_access.svh",
+        "interfaces/wishbone_slave_interface_if.sv",
+        "uvm/wishbone_slave_interface_cfg.svh",
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "uvm/wishbone_slave_interface_driver.svh",
+        "uvm/wishbone_slave_interface_monitor.svh",
+        "uvm/wishbone_slave_interface_agent.svh",
+        "checks/wishbone_slave_interface_assertions.sv",
+        "uvm/cg_scoreboard.svh",
+        "uvm/cg_system_coverage.svh",
+        "uvm/cg_env.svh",
+        "sequences/t_wb_init_cfg_init_seq.svh",
+        "sequences/t_divisor_cov_seq.svh",
+        "sequences/t_dlab_gate_chk_seq.svh",
+        "sequences/t_traffic_seq_wb_normal_seq.svh",
+        "sequences/t_traffic_seq_wb_loopback_seq.svh",
+        "sequences/t_uart_mon_bringup_seq.svh",
+        "sequences/t_modem_traffic_cov_wb_traffic_observe_seq.svh",
+        "sequences/t_addr_dlab_cov_seq.svh",
+        "sequences/t_modem_traffic_cov_wb_bringup_seq.svh",
+        "sequences/quick_basic_wishbone_slave_interface_drain.svh",
+        "sequences/quick_basic_vseq.svh",
+        "tests/quick_basic.svh",
+        "uart_top_verification_pkg.sv",
+        "verification_top.sv",
+        "compile.f"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_lcr",
+      "kind": "registers",
+      "fact_ids": [
+        "f_addr_lcr",
+        "f_init_lcrfmt",
+        "f_init_dlab1",
+        "f_init_dlab0"
+      ],
+      "plan_references": [
+        "/sections/9/entries/1",
+        "/sections/10/entries/5",
+        "/sections/10/entries/5",
+        "/sections/10/entries/5"
+      ],
+      "code_files": [
+        "uvm/cg_reg_access.svh",
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "uvm/cg_scoreboard.svh",
+        "sequences/t_wb_init_cfg_init_seq.svh",
+        "sequences/t_modem_irq_wb_clear_seq.svh",
+        "sequences/quick_basic_setup.svh",
+        "sequences/t_divisor_cov_seq.svh",
+        "sequences/t_dlab_gate_chk_seq.svh",
+        "sequences/t_uart_mon_bringup_seq.svh",
+        "sequences/t_modem_irq_wb_bringup_seq.svh",
+        "sequences/t_addr_dlab_cov_seq.svh"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_fcr",
+      "kind": "registers",
+      "fact_ids": [
+        "f_addr_fcr",
+        "f_fcr_trigdef",
+        "f_fcr_trig14",
+        "f_fcr_clear"
+      ],
+      "plan_references": [
+        "/sections/9/entries/1",
+        "/sections/12/entries/1",
+        "/sections/12/entries/1",
+        "/sections/12/entries/1"
+      ],
+      "code_files": [
+        "uvm/cg_reg_access.svh",
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "uvm/cg_scoreboard.svh",
+        "sequences/t_wb_init_cfg_init_seq.svh",
+        "sequences/t_modem_irq_wb_bringup_seq.svh",
+        "sequences/t_addr_dlab_cov_seq.svh"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_msb",
+      "kind": "registers",
+      "fact_ids": [
+        "f_msb_addr",
+        "f_dlab_gating",
+        "f_div_single",
+        "f_div_both"
+      ],
+      "plan_references": [
+        "/registers/registers/3",
+        "/registers/registers/0",
+        "/sections/1/entries/8",
+        "/sections/1/entries/8"
+      ],
+      "code_files": [
+        "uvm/cg_reg_access.svh",
+        "uvm/cg_scoreboard.svh",
+        "sequences/quick_basic_setup.svh",
+        "sequences/t_divisor_cov_seq.svh",
+        "sequences/t_dlab_gate_chk_seq.svh",
+        "sequences/t_uart_mon_bringup_seq.svh",
+        "sequences/t_modem_irq_wb_bringup_seq.svh"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_mcr",
+      "kind": "registers",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_dtr_rts",
+        "f_mcr_map"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5"
+      ],
+      "code_files": [
+        "uvm/cg_reg_access.svh",
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "uvm/cg_scoreboard.svh",
+        "sequences/t_modem_irq_wb_clear_seq.svh",
+        "sequences/t_traffic_seq_wb_loopback_seq.svh",
+        "sequences/t_modem_irq_wb_bringup_seq.svh",
+        "sequences/t_addr_dlab_cov_seq.svh"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_div_msb",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_init_divorder",
+        "f_addr_divmsb",
+        "f_init_divreset",
+        "t_wb_mon_f_bus_8"
+      ],
+      "plan_references": [
+        "/sections/10/entries/5",
+        "/sections/9/entries/1",
+        "/sections/10/entries/5",
+        "/sections/10/entries/5"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_wb_init_cfg_init_seq.svh"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_div_lsb",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_init_divorder",
+        "f_addr_divlsb",
+        "f_init_divreset",
+        "t_wb_mon_f_bus_8"
+      ],
+      "plan_references": [
+        "/sections/10/entries/5",
+        "/sections/9/entries/1",
+        "/sections/10/entries/5",
+        "/sections/10/entries/5"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_wb_init_cfg_init_seq.svh"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_fcr_byte",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_fcr_trigdef",
+        "f_fcr_trig14",
+        "f_fcr_clear",
+        "f_addr_fcr"
+      ],
+      "plan_references": [
+        "/sections/12/entries/1",
+        "/sections/12/entries/1",
+        "/sections/12/entries/1",
+        "/sections/9/entries/1"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_wb_init_cfg_init_seq.svh"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_ier_byte",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_ier_bit0",
+        "f_ier_en",
+        "f_ier_dis",
+        "f_ier_reserved",
+        "f_init_ier"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/10/entries/5"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_wb_init_cfg_init_seq.svh"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_lcr_dlab1",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_init_dlab1",
+        "f_init_lcrfmt",
+        "f_addr_lcr"
+      ],
+      "plan_references": [
+        "/sections/10/entries/5",
+        "/sections/10/entries/5",
+        "/sections/9/entries/1"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_wb_init_cfg_init_seq.svh"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_lcr_dlab0",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_init_dlab0",
+        "f_init_lcrfmt",
+        "f_addr_lcr"
+      ],
+      "plan_references": [
+        "/sections/10/entries/5",
+        "/sections/10/entries/5",
+        "/sections/9/entries/1"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_wb_init_cfg_init_seq.svh"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_mid_low",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_lsb_addr",
+        "f_msb_addr",
+        "f_div_single",
+        "f_div_both"
+      ],
+      "plan_references": [
+        "/registers/registers/0",
+        "/registers/registers/3",
+        "/sections/1/entries/8",
+        "/sections/1/entries/8"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_divisor_cov_seq.svh"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_mid_high",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_lsb_addr",
+        "f_msb_addr",
+        "f_div_single",
+        "f_div_both"
+      ],
+      "plan_references": [
+        "/registers/registers/0",
+        "/registers/registers/3",
+        "/sections/1/entries/8",
+        "/sections/1/entries/8"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_divisor_cov_seq.svh"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_lcr_dlab1",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_dlab_one",
+        "f_dlab_set",
+        "f_lcr_addr",
+        "f_lcr_reset"
+      ],
+      "plan_references": [
+        "/registers/registers/7/fields/6",
+        "/sections/1/entries/9",
+        "/registers/registers/7",
+        "/registers/registers/7"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_dlab_gate_chk_seq.svh"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_lcr_dlab0",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_dlab_zero",
+        "f_restore",
+        "f_lcr_addr",
+        "f_lcr_reset"
+      ],
+      "plan_references": [
+        "/registers/registers/7/fields/6",
+        "/sections/1/entries/9",
+        "/registers/registers/7",
+        "/registers/registers/7"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_dlab_gate_chk_seq.svh"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_div_lsb",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_div_two_bytes",
+        "f_div_order_2",
+        "f_dll_addr"
+      ],
+      "plan_references": [
+        "/registers/registers/13",
+        "/sections/1/entries/9",
+        "/sections/9/entries/5"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_dlab_gate_chk_seq.svh"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_div_msb",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_div_two_bytes",
+        "f_div_order_2",
+        "f_dlm_addr"
+      ],
+      "plan_references": [
+        "/registers/registers/13",
+        "/sections/1/entries/9",
+        "/sections/9/entries/5"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_dlab_gate_chk_seq.svh"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_ier_pat",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_ier_enable",
+        "f_ier_reserved",
+        "f_dlab_zero"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/registers/registers/7/fields/6"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_dlab_gate_chk_seq.svh"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_ier_pat2",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_ier_enable",
+        "f_ier_reserved",
+        "f_dlab_zero"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/registers/registers/7/fields/6"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_dlab_gate_chk_seq.svh"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_ier_byte",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_ier_rda",
+        "f_ier_thre",
+        "f_ier_lsi",
+        "f_ier_msi"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_payload",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_lcr_dlab"
+      ],
+      "plan_references": [
+        "/sections/12/entries/5"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_traffic_seq_wb_normal_seq.svh",
+        "sequences/t_traffic_seq_wb_loopback_seq.svh"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_mcr_byte",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_mcr_loopback"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_uart_byte",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_lcr_dlab"
+      ],
+      "plan_references": [
+        "/sections/12/entries/5"
+      ],
+      "code_files": [
+        "uvm/uart_serial_data_sequencer.svh",
+        "sequences/t_traffic_seq_uart_normal_seq.svh"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_modem_lvl",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_mcr_map",
+        "f_mcr_dtr_rts"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5"
+      ],
+      "code_files": [
+        "uvm/modem_control_if_sequencer.svh",
+        "sequences/t_traffic_seq_modem_normal_seq.svh",
+        "sequences/t_traffic_seq_modem_random_seq.svh"
+      ]
+    },
+    {
+      "id": "t_uart_mon_div_lsb",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_divisor_lsb_addr",
+        "f_divisor_order",
+        "f_divisor_reset"
+      ],
+      "plan_references": [
+        "/sections/9/entries/9",
+        "/registers/registers/13",
+        "/registers/registers/13"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_uart_mon_bringup_seq.svh"
+      ]
+    },
+    {
+      "id": "t_uart_mon_div_msb",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_divisor_msb_addr",
+        "f_divisor_order",
+        "f_divisor_width"
+      ],
+      "plan_references": [
+        "/sections/9/entries/9",
+        "/registers/registers/13",
+        "/registers/registers/13"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_uart_mon_bringup_seq.svh"
+      ]
+    },
+    {
+      "id": "t_uart_mon_lcr_dlab1",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_divisor_access",
+        "f_dlab_access"
+      ],
+      "plan_references": [
+        "/registers/registers/13",
+        "/sections/9/entries/9"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_uart_mon_bringup_seq.svh"
+      ]
+    },
+    {
+      "id": "t_uart_mon_lcr_dlab0",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_divisor_access",
+        "f_dlab_access"
+      ],
+      "plan_references": [
+        "/registers/registers/13",
+        "/sections/9/entries/9"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_uart_mon_bringup_seq.svh"
+      ]
+    },
+    {
+      "id": "t_uart_mon_uart_byte",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_function",
+        "f_divisor_baud"
+      ],
+      "plan_references": [
+        "/interfaces/groups/4/property_evidence/function",
+        "/registers/registers/13"
+      ],
+      "code_files": [
+        "uvm/uart_serial_data_sequencer.svh",
+        "sequences/t_uart_mon_uart_rx_seq.svh"
+      ]
+    },
+    {
+      "id": "t_wb_top_seq_addr",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "t_wb_reg_cov_f_rbr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_lcr_1",
+        "f_mcr_lsr_msr_addr456"
+      ],
+      "plan_references": [
+        "/registers/registers/1",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/0"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh"
+      ]
+    },
+    {
+      "id": "t_wb_top_seq_wdata",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_lcr_1",
+        "f_addr_divlsb"
+      ],
+      "plan_references": [
+        "/registers/registers/2",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/1"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh"
+      ]
+    },
+    {
+      "id": "t_wb_top_seq_lcr_dlab0",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "t_wb_reg_cov_f_lcr_1",
+        "f_dlab_disable_access",
+        "f_lcr_format"
+      ],
+      "plan_references": [
+        "/sections/9/entries/8",
+        "/sections/8/entries/1",
+        "/sections/8/entries/1"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh"
+      ]
+    },
+    {
+      "id": "t_addr_dlab_cov_lcr_dlab1",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_cross_alias",
+        "t_wb_reg_cov_f_lcr_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/5",
+        "/sections/9/entries/8"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_addr_dlab_cov_seq.svh"
+      ]
+    },
+    {
+      "id": "t_addr_dlab_cov_lcr_dlab0",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "t_wb_reg_cov_f_lcr_1",
+        "t_addr_dlab_cov_f_alias_blocked"
+      ],
+      "plan_references": [
+        "/sections/9/entries/8",
+        "/sections/9/entries/5"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_addr_dlab_cov_seq.svh"
+      ]
+    },
+    {
+      "id": "t_addr_dlab_cov_fcr_byte",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "t_wb_reg_cov_f_fcr_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/8"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_addr_dlab_cov_seq.svh"
+      ]
+    },
+    {
+      "id": "t_addr_dlab_cov_mcr_byte",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "t_wb_reg_cov_f_mcr_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/8"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_addr_dlab_cov_seq.svh"
+      ]
+    },
+    {
+      "id": "t_addr_dlab_cov_payload",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_addr_dlab_cov_f_addr7"
+      ],
+      "plan_references": [
+        "/registers/registers/2",
+        "/sections/9/entries/8",
+        "/sections/9/entries/0"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_addr_dlab_cov_seq.svh"
+      ]
+    },
+    {
+      "id": "t_ier_iir_pend_ier_en",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_ier_bit0",
+        "f_ier_b1",
+        "f_ier_b2",
+        "f_ier_b3",
+        "f_ier_reserved"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/registers/registers/4/fields/3",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh"
+      ]
+    },
+    {
+      "id": "t_ier_iir_pend_lcr_dlab0",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_dlab_gate_2"
+      ],
+      "plan_references": [
+        "/registers/registers/4"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh"
+      ]
+    },
+    {
+      "id": "t_modem_irq_ier_dis",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_ier_msi",
+        "t_chip_reset_f_ier_disable"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/1"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh"
+      ]
+    },
+    {
+      "id": "t_modem_irq_ier_en",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_ier_msi",
+        "f_ier_enable"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_ier_en",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_ier_msi",
+        "f_ier_addr_1"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/9/entries/5"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_modem_traffic_cov_wb_bringup_seq.svh"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_payload",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_serial_link_1"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/overview/0"
+      ],
+      "code_files": [
+        "uvm/wishbone_slave_interface_sequencer.svh",
+        "sequences/t_modem_traffic_cov_wb_traffic_observe_seq.svh"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_uart_byte",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_serial_link_1"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/overview/0"
+      ],
+      "code_files": [
+        "uvm/uart_serial_data_sequencer.svh",
+        "sequences/t_modem_traffic_cov_uart_rx_seq.svh"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_modem_lvl",
+      "kind": "sequencer_variables",
+      "fact_ids": [
+        "f_modem_src_1",
+        "f_modem_pads_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/7",
+        "/sections/4/strategy/agents/3"
+      ],
+      "code_files": [
+        "uvm/modem_control_if_sequencer.svh",
+        "sequences/t_modem_traffic_cov_modem_toggle_seq.svh"
+      ]
+    },
+    {
+      "id": "t_reset_state_seq_lcr_reset",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_lcr_addr"
+      ],
+      "plan_references": [
+        "/registers/registers/7"
+      ],
+      "code_files": [
+        "sequences/t_reset_state_seq_lcr_reset.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_init_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_init_dlab1",
+        "f_init_divorder",
+        "f_init_dlab0",
+        "f_init_fifotrig",
+        "f_init_ier",
+        "f_addr_lcr",
+        "f_addr_divlsb",
+        "f_addr_divmsb",
+        "f_addr_ier",
+        "f_addr_fcr",
+        "f_dlab_gate",
+        "t_wb_mon_f_bus_8",
+        "f_fcr_trigdef",
+        "f_fcr_trig14",
+        "f_fcr_clear",
+        "f_ier_bit0",
+        "f_ier_en",
+        "f_ier_dis",
+        "f_ier_reserved"
+      ],
+      "plan_references": [
+        "/sections/10/entries/5",
+        "/sections/10/entries/5",
+        "/sections/10/entries/5",
+        "/sections/10/entries/5",
+        "/sections/10/entries/5",
+        "/sections/9/entries/1",
+        "/sections/9/entries/1",
+        "/sections/9/entries/1",
+        "/sections/9/entries/1",
+        "/sections/9/entries/1",
+        "/sections/9/entries/1",
+        "/sections/10/entries/5",
+        "/sections/12/entries/1",
+        "/sections/12/entries/1",
+        "/sections/12/entries/1",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "sequences/t_wb_init_cfg_init_seq.svh",
+        "sequences/t_wb_reg_cov_directed_seq.svh",
+        "sequences/t_divisor_cov_seq.svh",
+        "sequences/t_dlab_gate_chk_seq.svh",
+        "sequences/t_traffic_seq_wb_normal_seq.svh",
+        "sequences/t_traffic_seq_wb_loopback_seq.svh",
+        "sequences/t_uart_mon_bringup_seq.svh",
+        "sequences/t_modem_irq_wb_bringup_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_wb_reg_cov_directed_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "t_wb_reg_cov_f_rbr_1",
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_iir_1",
+        "t_wb_reg_cov_f_fcr_1",
+        "t_wb_reg_cov_f_lcr_1",
+        "t_wb_reg_cov_f_mcr_1",
+        "t_wb_reg_cov_f_lsr_1",
+        "t_wb_reg_cov_f_msr_1",
+        "t_wb_reg_cov_f_dlab_block_1",
+        "t_wb_reg_cov_f_dlab_gate_1",
+        "f_addr_divlsb",
+        "t_wb_reg_cov_f_bus8_1"
+      ],
+      "plan_references": [
+        "/registers/registers/1",
+        "/registers/registers/2",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/1",
+        "/sections/9/entries/1",
+        "/sections/4/strategy/agents/0"
+      ],
+      "code_files": [
+        "sequences/t_wb_reg_cov_directed_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_xz_check_seq_wb_idle",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_wb_addr_1",
+        "f_wb_sel_1",
+        "f_wb_data_1",
+        "f_wb_hs_1"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/2",
+        "/sections/4/strategy/agents/2",
+        "/sections/4/strategy/agents/2",
+        "/sections/4/strategy/agents/2"
+      ],
+      "code_files": [
+        "sequences/t_xz_check_seq_wb_idle.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_xz_check_seq_uart_idle",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_lcr_format",
+        "f_clk_1"
+      ],
+      "plan_references": [
+        "/sections/8/entries/1",
+        "/sections/4/strategy/agents/2"
+      ],
+      "code_files": [
+        "sequences/t_xz_check_seq_uart_idle.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_xz_check_seq_modem_idle",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_mcr_rst_1",
+        "f_clk_1"
+      ],
+      "plan_references": [
+        "/registers/registers/8/fields/0",
+        "/sections/4/strategy/agents/2"
+      ],
+      "code_files": [
+        "sequences/t_xz_check_seq_modem_idle.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_dlab_gating",
+        "f_dlab_bit",
+        "f_dlab_restore",
+        "f_lsb_addr",
+        "f_msb_addr",
+        "f_div_order",
+        "f_div_single",
+        "f_div_both",
+        "f_div_zero"
+      ],
+      "plan_references": [
+        "/registers/registers/0",
+        "/registers/registers/7/fields/6",
+        "/sections/1/entries/8",
+        "/registers/registers/0",
+        "/registers/registers/3",
+        "/sections/1/entries/8",
+        "/sections/1/entries/8",
+        "/sections/1/entries/8",
+        "/sections/1/entries/8"
+      ],
+      "code_files": [
+        "sequences/t_divisor_cov_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_dlab_one",
+        "f_dlab_zero",
+        "f_dlab_set",
+        "f_restore",
+        "f_dll_addr",
+        "f_dlm_addr",
+        "f_div_order_2",
+        "f_div_two_bytes",
+        "f_alias_block",
+        "f_lcr_addr",
+        "f_ier_enable",
+        "f_ier_reserved"
+      ],
+      "plan_references": [
+        "/registers/registers/7/fields/6",
+        "/registers/registers/7/fields/6",
+        "/sections/1/entries/9",
+        "/sections/1/entries/9",
+        "/sections/9/entries/5",
+        "/sections/9/entries/5",
+        "/sections/1/entries/9",
+        "/registers/registers/13",
+        "/registers/registers/1",
+        "/registers/registers/7",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "sequences/t_dlab_gate_chk_seq.svh",
+        "sequences/t_addr_dlab_cov_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_wb_normal_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_lcr_dlab",
+        "f_ier_rda"
+      ],
+      "plan_references": [
+        "/sections/12/entries/5",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "sequences/t_traffic_seq_wb_normal_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_uart_normal_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_lcr_dlab"
+      ],
+      "plan_references": [
+        "/sections/12/entries/5"
+      ],
+      "code_files": [
+        "sequences/t_traffic_seq_uart_normal_seq.svh",
+        "sequences/t_modem_traffic_cov_uart_rx_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_modem_normal_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_mcr_map",
+        "f_mcr_dtr_rts"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5"
+      ],
+      "code_files": [
+        "sequences/t_traffic_seq_modem_normal_seq.svh",
+        "sequences/t_modem_irq_modem_toggle_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_wb_loopback_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5",
+        "/sections/12/entries/5"
+      ],
+      "code_files": [
+        "sequences/t_traffic_seq_wb_loopback_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_modem_random_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5"
+      ],
+      "code_files": [
+        "sequences/t_traffic_seq_modem_random_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_normal_virt",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_lcr_dlab",
+        "f_ier_rda"
+      ],
+      "plan_references": [
+        "/sections/12/entries/5",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "sequences/t_traffic_seq_normal_virt.svh",
+        "sequences/t_modem_irq_virt_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_loopback_virt",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5"
+      ],
+      "code_files": [
+        "sequences/t_traffic_seq_loopback_virt.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_uart_mon_bringup_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_divisor_access",
+        "f_divisor_order",
+        "f_divisor_lsb_addr",
+        "f_divisor_msb_addr",
+        "f_dlab_access"
+      ],
+      "plan_references": [
+        "/registers/registers/13",
+        "/registers/registers/13",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9"
+      ],
+      "code_files": [
+        "sequences/t_uart_mon_bringup_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_uart_mon_uart_rx_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_function",
+        "f_divisor_baud",
+        "f_divisor_reset"
+      ],
+      "plan_references": [
+        "/interfaces/groups/4/property_evidence/function",
+        "/registers/registers/13",
+        "/registers/registers/13"
+      ],
+      "code_files": [
+        "sequences/t_uart_mon_uart_rx_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_uart_mon_tx_observe_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_function",
+        "f_divisor_baud"
+      ],
+      "plan_references": [
+        "/interfaces/groups/4/property_evidence/function",
+        "/registers/registers/13"
+      ],
+      "code_files": [
+        "sequences/t_uart_mon_tx_observe_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_uart_mon_virt_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_divisor_order",
+        "f_divisor_baud"
+      ],
+      "plan_references": [
+        "/registers/registers/13",
+        "/registers/registers/13"
+      ],
+      "code_files": [
+        "sequences/t_uart_mon_virt_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_addr_dlab_cov_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "t_addr_dlab_cov_f_alias_blocked",
+        "f_cross_alias",
+        "f_lsb_addr",
+        "f_msb_addr",
+        "t_wb_reg_cov_f_rbr_1",
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_lcr_1",
+        "t_wb_reg_cov_f_iir_1",
+        "t_wb_reg_cov_f_fcr_1",
+        "t_wb_reg_cov_f_mcr_1",
+        "t_wb_reg_cov_f_lsr_1",
+        "t_wb_reg_cov_f_msr_1",
+        "t_addr_dlab_cov_f_addr7"
+      ],
+      "plan_references": [
+        "/sections/9/entries/5",
+        "/sections/9/entries/5",
+        "/registers/registers/0",
+        "/registers/registers/3",
+        "/registers/registers/1",
+        "/registers/registers/2",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/0"
+      ],
+      "code_files": [
+        "sequences/t_addr_dlab_cov_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_irq_wb_bringup_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_loopback_1",
+        "t_chip_reset_f_ier_disable",
+        "f_msr_addr_1"
+      ],
+      "plan_references": [
+        "/interfaces/groups/5/property_evidence/function",
+        "/sections/8/entries/1",
+        "/registers/registers/10"
+      ],
+      "code_files": [
+        "sequences/t_modem_irq_wb_bringup_seq.svh",
+        "sequences/t_modem_traffic_cov_wb_bringup_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_irq_modem_toggle_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_function_1",
+        "f_msr_dcts_1",
+        "f_msr_ddsr_1",
+        "f_msr_teri_1",
+        "f_msr_ddcd_1"
+      ],
+      "plan_references": [
+        "/interfaces/groups/5/property_evidence/function",
+        "/registers/registers/10/fields/0",
+        "/registers/registers/10",
+        "/registers/registers/10",
+        "/registers/registers/10"
+      ],
+      "code_files": [
+        "sequences/t_modem_irq_modem_toggle_seq.svh",
+        "sequences/t_modem_traffic_cov_modem_toggle_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_irq_wb_clear_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_msr_delta_1",
+        "f_loopback_1"
+      ],
+      "plan_references": [
+        "/registers/registers/10",
+        "/interfaces/groups/5/property_evidence/function"
+      ],
+      "code_files": [
+        "sequences/t_modem_irq_wb_clear_seq.svh",
+        "sequences/t_modem_traffic_cov_wb_idle_observe_seq.svh",
+        "sequences/t_modem_traffic_cov_wb_traffic_observe_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_irq_virt_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_modem_irq_1",
+        "f_ier_enable"
+      ],
+      "plan_references": [
+        "/sections/8/entries/10",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "sequences/t_modem_irq_virt_seq.svh",
+        "sequences/t_modem_traffic_cov_virt_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_wb_bringup_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_ier_msi",
+        "f_ier_addr_1",
+        "f_iir_pending_1",
+        "f_dlab_gate_1"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/9/entries/5",
+        "/sections/9/entries/2",
+        "/sections/9/entries/5"
+      ],
+      "code_files": [
+        "sequences/t_modem_traffic_cov_wb_bringup_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_wb_idle_observe_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_iir_addr_1",
+        "f_msr_addr_1_2",
+        "f_iir_pending_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/5",
+        "/sections/9/entries/5",
+        "/sections/9/entries/2"
+      ],
+      "code_files": [
+        "sequences/t_modem_traffic_cov_wb_idle_observe_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_wb_traffic_observe_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_iir_addr_1",
+        "f_msr_addr_1_2",
+        "f_serial_link_1",
+        "f_iir_pending_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/5",
+        "/sections/9/entries/5",
+        "/sections/4/strategy/overview/0",
+        "/sections/9/entries/2"
+      ],
+      "code_files": [
+        "sequences/t_modem_traffic_cov_wb_traffic_observe_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_uart_idle_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_serial_link_1"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/overview/0"
+      ],
+      "code_files": [
+        "sequences/t_modem_traffic_cov_uart_idle_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_uart_rx_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_serial_link_1"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/overview/0"
+      ],
+      "code_files": [
+        "sequences/t_modem_traffic_cov_uart_rx_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_modem_toggle_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_modem_src_1",
+        "f_modem_pads_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/7",
+        "/sections/4/strategy/agents/3"
+      ],
+      "code_files": [
+        "sequences/t_modem_traffic_cov_modem_toggle_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_modem_idle_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_modem_src_1",
+        "f_iir_pending_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/7",
+        "/sections/9/entries/2"
+      ],
+      "code_files": [
+        "sequences/t_modem_traffic_cov_modem_idle_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_virt_seq",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_modem_src_1",
+        "f_serial_link_1",
+        "f_iir_pending_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/7",
+        "/sections/4/strategy/overview/0",
+        "/sections/9/entries/2"
+      ],
+      "code_files": [
+        "sequences/t_modem_traffic_cov_virt_seq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "quick_basic_setup",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab",
+        "f_divisor_access",
+        "f_divisor_order",
+        "f_divisor_lsb_addr",
+        "f_divisor_msb_addr",
+        "f_dlab_access"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5",
+        "/sections/12/entries/5",
+        "/registers/registers/13",
+        "/registers/registers/13",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9"
+      ],
+      "code_files": [
+        "sequences/quick_basic_setup.svh",
+        "sequences/quick_basic_vseq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "quick_basic_write",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab",
+        "f_divisor_access",
+        "f_divisor_order",
+        "f_divisor_lsb_addr",
+        "f_divisor_msb_addr",
+        "f_dlab_access"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5",
+        "/sections/12/entries/5",
+        "/registers/registers/13",
+        "/registers/registers/13",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9"
+      ],
+      "code_files": [
+        "sequences/quick_basic_write.svh",
+        "sequences/quick_basic_vseq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "quick_basic_send",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab",
+        "f_divisor_access",
+        "f_divisor_order",
+        "f_divisor_lsb_addr",
+        "f_divisor_msb_addr",
+        "f_dlab_access"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5",
+        "/sections/12/entries/5",
+        "/registers/registers/13",
+        "/registers/registers/13",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9"
+      ],
+      "code_files": [
+        "sequences/quick_basic_send.svh",
+        "sequences/quick_basic_vseq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "quick_basic_read",
+      "kind": "sequences",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab",
+        "f_divisor_access",
+        "f_divisor_order",
+        "f_divisor_lsb_addr",
+        "f_divisor_msb_addr",
+        "f_dlab_access"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5",
+        "/sections/12/entries/5",
+        "/registers/registers/13",
+        "/registers/registers/13",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9"
+      ],
+      "code_files": [
+        "sequences/quick_basic_read.svh",
+        "sequences/quick_basic_vseq.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "quick_basic_transmit",
+      "kind": "routes",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab",
+        "f_divisor_access",
+        "f_divisor_order",
+        "f_divisor_lsb_addr",
+        "f_divisor_msb_addr",
+        "f_dlab_access"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5",
+        "/sections/12/entries/5",
+        "/registers/registers/13",
+        "/registers/registers/13",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9"
+      ],
+      "code_files": [
+        "uvm/cg_scoreboard.svh",
+        "uvm/cg_system_coverage.svh"
+      ]
+    },
+    {
+      "id": "quick_basic_receive",
+      "kind": "routes",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab",
+        "f_divisor_access",
+        "f_divisor_order",
+        "f_divisor_lsb_addr",
+        "f_divisor_msb_addr",
+        "f_dlab_access"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5",
+        "/sections/12/entries/5",
+        "/registers/registers/13",
+        "/registers/registers/13",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9"
+      ],
+      "code_files": [
+        "uvm/cg_scoreboard.svh",
+        "uvm/cg_system_coverage.svh"
+      ]
+    },
+    {
+      "id": "t_wb_mon_check_xz",
+      "kind": "checks",
+      "fact_ids": [
+        "t_wb_mon_f_wb_sel",
+        "t_wb_mon_f_bus_8"
+      ],
+      "plan_references": [
+        "/sections/8/entries/0",
+        "/sections/10/entries/5"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_wb_mon_check_known",
+      "kind": "checks",
+      "fact_ids": [
+        "t_wb_mon_f_wb_sel",
+        "t_wb_mon_f_bus_8"
+      ],
+      "plan_references": [
+        "/sections/8/entries/0",
+        "/sections/10/entries/5"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_reset_state_check_lcr_reset",
+      "kind": "checks",
+      "fact_ids": [
+        "f_lcr_reset",
+        "f_lcr_format"
+      ],
+      "plan_references": [
+        "/registers/registers/7",
+        "/sections/8/entries/1"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_ier_check",
+      "kind": "checks",
+      "fact_ids": [
+        "f_ier_bit0",
+        "f_ier_en",
+        "f_ier_dis",
+        "f_ier_reserved",
+        "f_addr_ier",
+        "f_init_ier"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/9/entries/1",
+        "/sections/10/entries/5"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_xz_check_check_xz_wb",
+      "kind": "checks",
+      "fact_ids": [
+        "f_wb_addr_1",
+        "f_wb_sel_1",
+        "f_wb_data_1",
+        "f_wb_hs_1"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/2",
+        "/sections/4/strategy/agents/2",
+        "/sections/4/strategy/agents/2",
+        "/sections/4/strategy/agents/2"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_xz_check_check_known_wb",
+      "kind": "checks",
+      "fact_ids": [
+        "t_irq_baud_mon_f_reset_input",
+        "f_wb_data_1",
+        "f_wb_hs_1",
+        "t_clk_seq_f_reset_clear_1",
+        "t_chip_reset_f_shift_clear",
+        "t_chip_reset_f_div_zero",
+        "f_lcr_format",
+        "t_chip_reset_f_ier_disable"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/2",
+        "/sections/4/strategy/agents/2",
+        "/sections/4/strategy/agents/2",
+        "/sections/8/entries/1",
+        "/sections/8/entries/1",
+        "/sections/8/entries/1",
+        "/sections/8/entries/1",
+        "/sections/8/entries/1"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_alias_class_check",
+      "kind": "checks",
+      "fact_ids": [
+        "f_alias_block",
+        "f_dlab_one",
+        "f_dlab_zero",
+        "f_dll_addr",
+        "f_dlm_addr",
+        "t_wb_reg_cov_f_rbr_1",
+        "f_cross_alias"
+      ],
+      "plan_references": [
+        "/registers/registers/1",
+        "/registers/registers/7/fields/6",
+        "/registers/registers/7/fields/6",
+        "/sections/9/entries/5",
+        "/sections/9/entries/5",
+        "/registers/registers/1",
+        "/sections/9/entries/5"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_ier_chk",
+      "kind": "checks",
+      "fact_ids": [
+        "f_ier_rda",
+        "f_ier_thre",
+        "f_ier_lsi",
+        "f_ier_msi"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_ier_iir_pend_chk_ier",
+      "kind": "checks",
+      "fact_ids": [
+        "f_ier_bit0",
+        "f_ier_b1",
+        "f_ier_b2",
+        "f_ier_b3",
+        "f_ier_reserved"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/registers/registers/4/fields/3",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_ier_iir_pend_chk_reset",
+      "kind": "checks",
+      "fact_ids": [
+        "f_ier_reset",
+        "f_iir_reset",
+        "t_chip_reset_f_ier_disable"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/3",
+        "/sections/8/entries/1"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_ier_iir_pend_chk_iir_mask",
+      "kind": "checks",
+      "fact_ids": [
+        "f_iir_zero",
+        "f_iir_one"
+      ],
+      "plan_references": [
+        "/sections/8/entries/3",
+        "/sections/8/entries/3"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_modem_irq_chk_iir",
+      "kind": "checks",
+      "fact_ids": [
+        "f_iir_prio_1",
+        "f_modem_irq_1",
+        "f_iir_1",
+        "f_modem_irq_iir_bits_1"
+      ],
+      "plan_references": [
+        "/sections/8/entries/4",
+        "/sections/8/entries/10",
+        "/sections/8/entries/3",
+        "/sections/8/entries/4"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_modem_irq_chk_e2e",
+      "kind": "checks",
+      "fact_ids": [
+        "f_modem_irq_1",
+        "f_msr_delta_1",
+        "f_iir_1",
+        "f_iir_prio_1",
+        "f_ier_msi"
+      ],
+      "plan_references": [
+        "/sections/8/entries/10",
+        "/registers/registers/10",
+        "/sections/8/entries/3",
+        "/sections/8/entries/4",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_chk_pending",
+      "kind": "checks",
+      "fact_ids": [
+        "f_iir_pending_1",
+        "f_modem_src_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/2",
+        "/sections/9/entries/7"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_chk_fixed",
+      "kind": "checks",
+      "fact_ids": [
+        "f_iir_fixed_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/2"
+      ],
+      "code_files": [
+        "checks/wishbone_slave_interface_assertions.sv"
+      ]
+    },
+    {
+      "id": "quick_basic",
+      "kind": "tests",
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab",
+        "f_divisor_access",
+        "f_divisor_order",
+        "f_divisor_lsb_addr",
+        "f_divisor_msb_addr",
+        "f_dlab_access"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5",
+        "/sections/12/entries/5",
+        "/registers/registers/13",
+        "/registers/registers/13",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9",
+        "/sections/9/entries/9"
+      ],
+      "code_files": [
+        "uvm/cg_scoreboard.svh",
+        "uvm/cg_system_coverage.svh",
+        "sequences/quick_basic_setup.svh",
+        "sequences/quick_basic_write.svh",
+        "sequences/quick_basic_send.svh",
+        "sequences/quick_basic_read.svh",
+        "sequences/quick_basic_uart_serial_data_drain.svh",
+        "sequences/quick_basic_modem_control_if_drain.svh",
+        "sequences/quick_basic_wishbone_slave_interface_drain.svh",
+        "sequences/quick_basic_vseq.svh",
+        "tests/quick_basic.svh",
+        "uart_top_verification_pkg.sv",
+        "verification_top.sv"
+      ]
+    },
+    {
+      "id": "t_clk_cov_raw_cov",
+      "kind": "coverage",
+      "fact_ids": [
+        "t_clk_seq_f_clk_1",
+        "t_clk_seq_f_rst_1"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/1",
+        "/sections/4/strategy/agents/1"
+      ],
+      "code_files": [
+        "uvm/t_clk_cov_raw_cov_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_irq_baud_mon_cov_int_o",
+      "kind": "coverage",
+      "fact_ids": [
+        "t_irq_baud_mon_f_core_interrupt",
+        "t_irq_baud_mon_f_clk_input"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/3",
+        "/sections/4/strategy/agents/2"
+      ],
+      "code_files": [
+        "uvm/t_irq_baud_mon_cov_int_o_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_irq_id_cov_cg_iir",
+      "kind": "coverage",
+      "fact_ids": [
+        "t_irq_id_cov_f_pending",
+        "t_irq_id_cov_f_highest",
+        "t_irq_id_cov_f_rls",
+        "t_irq_id_cov_f_rda",
+        "t_irq_id_cov_f_timeout",
+        "t_irq_id_cov_f_thre",
+        "t_irq_id_cov_f_modem",
+        "t_irq_id_cov_f_fixed45",
+        "t_irq_id_cov_f_fixed67",
+        "t_irq_id_cov_f_reset",
+        "t_irq_id_cov_f_addr",
+        "t_irq_id_cov_f_cg"
+      ],
+      "plan_references": [
+        "/registers/registers/6/fields/0",
+        "/sections/8/entries/4",
+        "/registers/registers/6/fields/1",
+        "/registers/registers/6/fields/1",
+        "/registers/registers/6/fields/1",
+        "/registers/registers/6/fields/1",
+        "/registers/registers/6/fields/1",
+        "/sections/8/entries/5",
+        "/sections/8/entries/5",
+        "/registers/registers/6",
+        "/registers/registers/6",
+        "/sections/9/entries/2"
+      ],
+      "code_files": [
+        "uvm/t_irq_id_cov_cg_iir_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_cg_dlab_divisor",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_dlab_gate",
+        "f_addr_divlsb",
+        "f_addr_divmsb",
+        "f_init_divorder"
+      ],
+      "plan_references": [
+        "/sections/9/entries/1",
+        "/sections/9/entries/1",
+        "/sections/9/entries/1",
+        "/sections/10/entries/5"
+      ],
+      "code_files": [
+        "uvm/t_wb_init_cfg_cg_dlab_divisor_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_wb_init_cfg_rc_divisor_bytes",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_init_divorder",
+        "f_dlab_gate",
+        "f_init_divreset"
+      ],
+      "plan_references": [
+        "/sections/10/entries/5",
+        "/sections/9/entries/1",
+        "/sections/10/entries/5"
+      ],
+      "code_files": [
+        "uvm/t_wb_init_cfg_rc_divisor_bytes_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_wb_reg_cov_rc_write",
+      "kind": "coverage",
+      "fact_ids": [
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_fcr_1",
+        "t_wb_reg_cov_f_lcr_1",
+        "t_wb_reg_cov_f_mcr_1",
+        "t_wb_reg_cov_f_dlab_block_1",
+        "t_wb_reg_cov_f_dlab_gate_1",
+        "f_addr_divlsb",
+        "t_wb_reg_cov_f_bus8_1"
+      ],
+      "plan_references": [
+        "/registers/registers/2",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/8",
+        "/sections/9/entries/1",
+        "/sections/9/entries/1",
+        "/sections/4/strategy/agents/0"
+      ],
+      "code_files": [
+        "uvm/t_wb_reg_cov_rc_write_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_cg_dlab_divisor",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_dlab_gating",
+        "f_dlab_bit",
+        "f_lsb_addr",
+        "f_msb_addr"
+      ],
+      "plan_references": [
+        "/registers/registers/0",
+        "/registers/registers/7/fields/6",
+        "/registers/registers/0",
+        "/registers/registers/3"
+      ],
+      "code_files": [
+        "uvm/t_divisor_cov_cg_dlab_divisor_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_divisor_cov_rc_divisor_bytes",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_div_single",
+        "f_div_both",
+        "f_div_zero",
+        "f_lsb_addr",
+        "f_msb_addr"
+      ],
+      "plan_references": [
+        "/sections/1/entries/8",
+        "/sections/1/entries/8",
+        "/sections/1/entries/8",
+        "/registers/registers/0",
+        "/registers/registers/3"
+      ],
+      "code_files": [
+        "uvm/t_divisor_cov_rc_divisor_bytes_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_modem",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_mcr_map",
+        "f_mcr_loopback",
+        "f_mcr_dtr_rts"
+      ],
+      "plan_references": [
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5",
+        "/sections/4/strategy/agents/5"
+      ],
+      "code_files": [
+        "uvm/t_traffic_seq_cov_modem_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_ier",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_ier_rda",
+        "f_ier_thre",
+        "f_ier_lsi",
+        "f_ier_msi"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "uvm/t_traffic_seq_cov_ier_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_payload_wb",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_lcr_dlab"
+      ],
+      "plan_references": [
+        "/sections/12/entries/5"
+      ],
+      "code_files": [
+        "uvm/t_traffic_seq_cov_payload_wb_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_payload_uart",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_lcr_dlab"
+      ],
+      "plan_references": [
+        "/sections/12/entries/5"
+      ],
+      "code_files": [
+        "uvm/t_traffic_seq_cov_payload_uart_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_wb_top_seq_cg_dlab_divisor",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_addr_divlsb",
+        "f_addr_divmsb"
+      ],
+      "plan_references": [
+        "/sections/9/entries/1",
+        "/sections/9/entries/1"
+      ],
+      "code_files": [
+        "uvm/t_wb_top_seq_cg_dlab_divisor_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_irq_cov_delta",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_msr_delta_1",
+        "f_msr_dcts_1",
+        "f_msr_ddsr_1",
+        "f_msr_teri_1",
+        "f_msr_ddcd_1",
+        "f_msr_addr_1"
+      ],
+      "plan_references": [
+        "/registers/registers/10",
+        "/registers/registers/10/fields/0",
+        "/registers/registers/10",
+        "/registers/registers/10",
+        "/registers/registers/10",
+        "/registers/registers/10"
+      ],
+      "code_files": [
+        "uvm/t_modem_irq_cov_delta_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_irq_cov_ier",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_ier_msi",
+        "f_ier_enable"
+      ],
+      "plan_references": [
+        "/sections/8/entries/2",
+        "/sections/8/entries/2"
+      ],
+      "code_files": [
+        "uvm/t_modem_irq_cov_ier_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_irq_cov_iir",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_iir_prio_1",
+        "f_iir_1",
+        "f_modem_irq_1"
+      ],
+      "plan_references": [
+        "/sections/8/entries/4",
+        "/sections/8/entries/3",
+        "/sections/8/entries/10"
+      ],
+      "code_files": [
+        "uvm/t_modem_irq_cov_iir_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    },
+    {
+      "id": "t_modem_traffic_cov_cg",
+      "kind": "coverage",
+      "fact_ids": [
+        "f_iir_addr_1",
+        "f_serial_link_1",
+        "f_modem_pads_1",
+        "f_modem_src_1",
+        "f_iir_pending_1",
+        "f_iir_fixed_1"
+      ],
+      "plan_references": [
+        "/sections/9/entries/5",
+        "/sections/4/strategy/overview/0",
+        "/sections/4/strategy/agents/3",
+        "/sections/9/entries/7",
+        "/sections/9/entries/2",
+        "/sections/9/entries/2"
+      ],
+      "code_files": [
+        "uvm/t_modem_traffic_cov_cg_coverage.svh",
+        "uvm/cg_env.svh",
+        "uart_top_verification_pkg.sv"
+      ]
+    }
+  ]
+}

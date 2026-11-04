@@ -1,0 +1,390 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_addr_dlab_cov_lcr_dlab1",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 128,
+      "fact_ids": [
+        "f_cross_alias",
+        "t_wb_reg_cov_f_lcr_1"
+      ]
+    },
+    {
+      "id": "t_addr_dlab_cov_lcr_dlab0",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "t_wb_reg_cov_f_lcr_1",
+        "t_addr_dlab_cov_f_alias_blocked"
+      ]
+    },
+    {
+      "id": "t_addr_dlab_cov_fcr_byte",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "t_wb_reg_cov_f_fcr_1"
+      ]
+    },
+    {
+      "id": "t_addr_dlab_cov_mcr_byte",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "t_wb_reg_cov_f_mcr_1"
+      ]
+    },
+    {
+      "id": "t_addr_dlab_cov_payload",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_addr_dlab_cov_f_addr7"
+      ]
+    }
+  ],
+  "registers": [],
+  "facts": [
+    {
+      "id": "t_addr_dlab_cov_f_alias_blocked",
+      "statement": "Normal registers at addresses 0-1 are inaccessible when DLAB is 1 defining divisor versus normal aliasing.",
+      "source_id": "CH-f88915355b",
+      "quote": "At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "t_addr_dlab_cov_f_addr7",
+      "statement": "Pin address 7 is illegal with no documented 8-bit register beyond address 6.",
+      "source_id": "CH-f88915355b",
+      "quote": "Modem Status 6 8 R Modem Status",
+      "plan_pointer": "/sections/9/entries/0"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "t_addr_dlab_cov_seq",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Cover address by DLAB cross 0-1 alias plus 2-6 normal plus illegal 7 sampled on ACK via extension of DLAB gate base",
+      "operations": [
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 128,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_fcr",
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 3,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_traffic_seq_mcr",
+          "address": 4,
+          "data": 0,
+          "mask": 31,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 5,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 6,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 7,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "write",
+          "register_id": null,
+          "address": 7,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_fcr",
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 3,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_traffic_seq_mcr",
+          "address": 4,
+          "data": 0,
+          "mask": 31,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 5,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 6,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 7,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "write",
+          "register_id": null,
+          "address": 7,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "t_addr_dlab_cov_f_alias_blocked",
+        "f_cross_alias",
+        "f_lsb_addr",
+        "f_msb_addr",
+        "t_wb_reg_cov_f_rbr_1",
+        "t_wb_reg_cov_f_thr_1",
+        "t_wb_reg_cov_f_ier_1",
+        "t_wb_reg_cov_f_lcr_1",
+        "t_wb_reg_cov_f_iir_1",
+        "t_wb_reg_cov_f_fcr_1",
+        "t_wb_reg_cov_f_mcr_1",
+        "t_wb_reg_cov_f_lsr_1",
+        "t_wb_reg_cov_f_msr_1",
+        "t_addr_dlab_cov_f_addr7"
+      ],
+      "extends": "t_dlab_gate_chk_seq",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "data",
+          "variable": "t_addr_dlab_cov_lcr_dlab1"
+        },
+        {
+          "operation": 1,
+          "field": "data",
+          "variable": "t_addr_dlab_cov_fcr_byte"
+        },
+        {
+          "operation": 4,
+          "field": "data",
+          "variable": "t_addr_dlab_cov_mcr_byte"
+        },
+        {
+          "operation": 8,
+          "field": "data",
+          "variable": "t_addr_dlab_cov_payload"
+        },
+        {
+          "operation": 9,
+          "field": "data",
+          "variable": "t_addr_dlab_cov_lcr_dlab0"
+        },
+        {
+          "operation": 10,
+          "field": "data",
+          "variable": "t_addr_dlab_cov_fcr_byte"
+        },
+        {
+          "operation": 13,
+          "field": "data",
+          "variable": "t_addr_dlab_cov_mcr_byte"
+        },
+        {
+          "operation": 17,
+          "field": "data",
+          "variable": "t_addr_dlab_cov_payload"
+        },
+        {
+          "operation": 18,
+          "field": "data",
+          "variable": "t_addr_dlab_cov_lcr_dlab0"
+        }
+      ]
+    }
+  ],
+  "routes": [],
+  "checks": [],
+  "hooks": [],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [
+        "t_addr_dlab_cov_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [
+        "t_addr_dlab_cov_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [
+        "t_addr_dlab_cov_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [
+        "t_addr_dlab_cov_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [
+        "t_addr_dlab_cov_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/5",
+      "component_ids": [
+        "t_addr_dlab_cov_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [],
+      "question": "Deferred: coverage t_addr_dlab_cov_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_addr_dlab_cov_hook_cov does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [],
+      "question": "Deferred: coverage t_addr_dlab_cov_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_addr_dlab_cov_hook_cov does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [],
+      "question": "Deferred: coverage t_addr_dlab_cov_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_addr_dlab_cov_hook_cov does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/3",
+      "component_ids": [],
+      "question": "Deferred: coverage t_addr_dlab_cov_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events; hook t_addr_dlab_cov_hook_cov does not fit the testbench: Agent hook requires an agent target"
+    }
+  ],
+  "questions": [
+    "What is active polarity of wb_rst_i required reset duration clock sampling edge for ACK reconstruction and must monitor flush in-flight versus flag reset-during-transfer as error?",
+    "What are documented WISHBONE handshake semantics: stability of wb_adr_i wb_we_i wb_sel_i wb_stb_i wb_cyc_i during transfer wb_ack_o single versus multi-cycle window wb_dat_o validity on reads and back-to-back handling?",
+    "What are wb_sel_i legal values in DATA_BUS_WIDTH_8 build is address representation pin values 0-6 versus offsets and what is handling of illegal pin address 7 and mismatched DLAB access at 0-1 with ACK and read data alias versus blocked?",
+    "What is expected read data for address 0 FIFO alias during gating given side-effect behavior should addr0 be coverage-only without data COMPARE and what masks apply to IER reserved bits and LCR bits 6-0 when programming DLAB?",
+    "Deferred (quick testing): coverage t_addr_dlab_cov_cg_cross_addr_dlab does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): hook t_addr_dlab_cov_hook_cov does not fit the testbench: Agent hook requires an agent target"
+  ]
+}

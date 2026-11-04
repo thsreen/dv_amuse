@@ -1,0 +1,187 @@
+{
+  "understanding": "Directed init_config_sequence on wishbone_slave_interface_agent after chip_reset: set LCR DLAB 1, program Divisor MSB first LSB next, clear DLAB 0, then program FIFO trigger and IER enables using only documented addresses order and enable polarity with symbolic bring-up values.",
+  "preconditions": [
+    "chip_reset done before any config: wb_clk_i stable at P_fixed owned by clock UVC and reset on wb_rst_i deasserted owned by reset UVC; polarity and cycles per t_chip_reset not inferred [f_init_divreset]",
+    "wishbone_slave_interface_agent active master owns wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i wb_sel_i and observes wb_dat_o wb_ack_o; addresses are 3-bit pin values 0-3 [f_addr_lcr,f_addr_divlsb,f_addr_divmsb,f_addr_ier,f_addr_fcr]; 8-bit data [f_bus8]; other DUT inputs idle-owned: srx_pad_i by uart_serial_data cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i by modem_control_if",
+    "post-reset state: Divisor 0 FIFOs cleared IER disabled LCR 8N1 [f_init_divreset,f_init_lcrfmt,f_init_ier]; symbolic knobs DIV_MSB_SYM DIV_LSB_SYM TRIGGER_SYM IER_EN_SYM unresolved pending questions"
+  ],
+  "stimulus_steps": [
+    "WAIT for chip_reset done with wb_clk_i stable; IF TEST_TIMEOUT_CYCLES THEN abort",
+    "WRITE LCR DLAB=1 via wishbone_register_access: wb_adr_i=3b011 wb_dat_i={LCR_HOLD_SYM[6:0],1b1} [f_init_dlab1,f_addr_lcr]; WAIT wb_ack_o",
+    "WRITE Divisor MSB first: wb_adr_i=3b001 wb_dat_i=DIV_MSB_SYM [f_init_divorder,f_addr_divmsb,f_dlab_gate]; WAIT wb_ack_o",
+    "WRITE Divisor LSB next: wb_adr_i=3b000 wb_dat_i=DIV_LSB_SYM [f_init_divorder,f_addr_divlsb]; WAIT wb_ack_o",
+    "WRITE LCR DLAB=0: wb_adr_i=3b011 wb_dat_i={LCR_HOLD_SYM[6:0],1b0} [f_init_dlab0,f_addr_lcr]; WAIT wb_ack_o",
+    "WRITE FCR trigger: wb_adr_i=3b010 wb_dat_i={TRIGGER_SYM[1:0],4b0000,2b00} with trigger per [f_fcr_trigdef,f_fcr_trig14] and clears 0 per [f_fcr_clear] [f_addr_fcr,f_init_fifotrig]; WAIT wb_ack_o",
+    "WRITE IER enables with DLAB=0: wb_adr_i=3b001 wb_dat_i={4b0000,IER_EN_SYM[3:0]} reserved 0 [f_addr_ier,f_ier_bit0,f_ier_en,f_ier_dis,f_ier_reserved,f_init_ier]; WAIT wb_ack_o"
+  ],
+  "check_steps": [
+    "READ IER via wishbone_register_access at wb_adr_i=3b001 with DLAB=0 then COMPARE dat_o[3:0] to IER_EN_SYM and COMPARE dat_o[7:4]==4b0000; FAIL on mismatch [f_ier_bit0,f_ier_en,f_ier_dis,f_ier_reserved]",
+    "No READ check on FCR address: FCR is W-only so trigger is not observable by read-back; observability pending question [f_fcr_trigdef]"
+  ],
+  "coverage_steps": [
+    "SAMPLE cg_dlab_divisor via dedicated subscriber on wishbone monitor analysis port on each divisor-byte write completion: cp_dlab cp_div_lsb cp_div_msb [f_dlab_gate,f_addr_divlsb,f_addr_divmsb]",
+    "SAMPLE rc_divisor_bytes on same event for lsb_zero/mid/max msb_zero/mid/max combined values with ignore_bins access_with_DLAB_0 excluded [f_init_divorder]"
+  ],
+  "completion": [
+    "Done when LCR-DLAB1 plus MSB-first plus LSB-next plus LCR-DLAB0 plus FCR-trigger plus IER-enable writes all ACKed and IER read-back COMPARE passes and divisor coverage SAMPLED",
+    "Bound by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing; cleanup leaves DLAB=0 with wishbone bus idle-owned for traffic handoff"
+  ],
+  "facts": [
+    {
+      "id": "f_init_dlab1",
+      "statement": "LCR bit7 set to 1 allows access to Divisor Latches",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set bit 7 to \u20181\u2019",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_dlab0",
+      "statement": "LCR bit7 cleared to 0 disables Divisor Latch access and returns to normal registers",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set bit 7 of LCR to \u20180\u2019 to disable access to Divisor Latches.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_divorder",
+      "statement": "Divisor programming order is MSB first then LSB next",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set the Divisor Latches, MSB first, LSB next.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_divreset",
+      "statement": "Post-reset Divisor Latch value is 0",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Divisor Latch register is set to 0.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_fifotrig",
+      "statement": "Initialization requires setting FIFO trigger level after DLAB cleared",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set the FIFO trigger level.",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_ier",
+      "statement": "Initialization requires enabling desired interrupts via Interrupt Enable Register",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Enable desired interrupts by setting appropriate bits in the Interrupt Enable",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_init_lcrfmt",
+      "statement": "Post-reset LCR is 8 bits data no parity 1 stop bit",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Line Control Register is set to communication of 8 bits of data, no parity, 1",
+      "plan_pointer": "/sections/10/entries/5"
+    },
+    {
+      "id": "f_dlab_gate",
+      "statement": "When DLAB is 1 normal registers at addresses 0-1 cannot be accessed",
+      "source_id": "CH-f88915355b",
+      "quote": "At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_addr_lcr",
+      "statement": "LCR is at bus address 3 width 8 access RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Line Control Register 3 8 RW Control connection",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_addr_divlsb",
+      "statement": "Divisor LSB is at bus address 0 width 8 access RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 1 (LSB) 0 8 RW The LSB of the divisor",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_addr_divmsb",
+      "statement": "Divisor MSB is at bus address 1 width 8 access RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 2 1 8 RW The MSB of the divisor",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_addr_ier",
+      "statement": "IER is at bus address 1 width 8 access RW when DLAB is 0",
+      "source_id": "CH-f88915355b",
+      "quote": "Interrupt Enable 1 8 RW Enable/Mask interrupts",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_addr_fcr",
+      "statement": "FCR is at bus address 2 width 8 access W",
+      "source_id": "CH-f88915355b",
+      "quote": "FIFO Control 2 8 W Control FIFO options",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_fcr_trigdef",
+      "statement": "FCR bits 7-6 define Receiver FIFO interrupt trigger level",
+      "source_id": "CH-dfb1048908",
+      "quote": "Define the Receiver FIFO Interrupt trigger level",
+      "plan_pointer": "/sections/12/entries/1"
+    },
+    {
+      "id": "f_fcr_trig14",
+      "statement": "FCR trigger encoding 11 selects 14 bytes",
+      "source_id": "CH-dfb1048908",
+      "quote": "\u201811\u2019 \u2013 14 bytes",
+      "plan_pointer": "/sections/12/entries/1"
+    },
+    {
+      "id": "f_fcr_clear",
+      "statement": "FCR bit1 write 1 clears Receiver FIFO so init drives it 0 unless clearing",
+      "source_id": "CH-dfb1048908",
+      "quote": "Writing a \u20181\u2019 to bit 1 clears the Receiver FIFO",
+      "plan_pointer": "/sections/12/entries/1"
+    },
+    {
+      "id": "f_ier_bit0",
+      "statement": "IER bit0 is Received Data available interrupt RW",
+      "source_id": "CH-de51b2eafc",
+      "quote": "0 RW Received Data available interrupt",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_en",
+      "statement": "IER enable value 1 means enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "\u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_dis",
+      "statement": "IER enable value 0 means disabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "\u20180\u2019 \u2013 disabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_reserved",
+      "statement": "IER bits 7-4 reserved should be 0",
+      "source_id": "CH-de51b2eafc",
+      "quote": "7-4 RW Reserved. Should be logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_bus8",
+      "statement": "Integration uses 8-bit data bus build",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "It has an 8-bit data bus for compatibility reason.",
+      "plan_pointer": "/sections/10/entries/5"
+    }
+  ],
+  "questions": [
+    "What symbolic divisor LSB/MSB values form legal nonzero divisor for bring-up and is divisor 0 illegal beyond reset value 0 and MSB-first LSB-next order?",
+    "What specific FCR trigger selection 00-1B 01-4B 10-8B 11-14B is required for bring-up given 14 bytes only recommended if system responds fast enough?",
+    "What specific IER bits 3-0 enables are desired for bring-up versus later traffic?",
+    "What LCR bits 6-0 line parameters must accompany DLAB 1 then DLAB 0 during init?",
+    "How is FCR trigger observed when all listed bits are write-only or ignored and what is post-reset trigger level?",
+    "What documented deassert-to-first-write delay is required after wb_rst_i before init_config_sequence?"
+  ],
+  "blockers": []
+}

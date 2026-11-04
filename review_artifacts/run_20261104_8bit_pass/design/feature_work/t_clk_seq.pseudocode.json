@@ -1,0 +1,67 @@
+{
+  "understanding": "Fixed-period clock stimulus drives RTL wb_clk_i spec CLK with one symbolic period P_fixed per test started before reset and held through traffic with observed-edge sampling for band boundary stratum once documented WISHBONE points bands defined",
+  "preconditions": [
+    "RTL wb_clk_i bound to spec CLK available to drive with fixed period P_fixed per test [f_clk_1]",
+    "RTL wb_rst_i bound to spec WB_RST_I available to assert before configuration [f_rst_1]",
+    "Symbolic period P_fixed selected before reset; no value invented where documented bands unresolved",
+    "Other DUT inputs held idle by respective owners; reset polarity unresolved pending question"
+  ],
+  "stimulus_steps": [
+    "SELECT symbolic P_fixed for this test; IF documented bands undefined THEN keep P_fixed symbolic without inventing bounds",
+    "START continuous tone on wb_clk_i with period P_fixed before reset assertion [f_clk_1]",
+    "ASSERT reset via wb_rst_i; WAIT reset duration scaled to P_fixed; DEASSERT reset before any configuration [f_rst_1]",
+    "HOLD P_fixed constant through traffic; FORBID period change and jitter injection during operation",
+    "IF different period required THEN change only between tests before reset and traffic",
+    "CLEANUP hold clock stable to end of test"
+  ],
+  "check_steps": [],
+  "coverage_steps": [
+    "SAMPLE observed wb_clk_i edges via passive monitor and MEASURE sampled period [f_clk_1]",
+    "RECORD symbolic sampled band and boundary flag at documented point plus seed stratum low mid high once bands defined; FORBID inventing bounds or sampling gaps",
+    "FOR each test COVER one sampled band boundary stratum combination; state finite sample does not claim exhaustive coverage"
+  ],
+  "completion": [
+    "Clock started before reset with period P_fixed and held fixed through traffic",
+    "Reset asserted via wb_rst_i and deasserted before configuration with duration scaled to P_fixed",
+    "Observed-edge sampling recorded for this test sampled point where bands defined",
+    "Terminate on traffic done or TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+  ],
+  "facts": [
+    {
+      "id": "f_clk_1",
+      "statement": "Spec CLK is 1-bit input block clock mapped to RTL wb_clk_i",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input Block\u2019s clock input",
+      "plan_pointer": "/sections/4/strategy/agents/1"
+    },
+    {
+      "id": "f_rst_1",
+      "statement": "Spec WB_RST_I is 1-bit input asynchronous reset mapped to RTL wb_rst_i",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_RST_I 1 Input Asynchronous Reset",
+      "plan_pointer": "/sections/4/strategy/agents/1"
+    },
+    {
+      "id": "f_reset_clear_1",
+      "statement": "Upon reset the receiver and transmitter FIFOs are cleared",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter FIFOs are cleared.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_baud_1",
+      "statement": "Input Clock Speed divided by Divisor Latch value equals 16 times communication baud rate",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "(Input Clock Speed)/(Divisor Latch value) = 16 x the communication\nbaud rate.",
+      "plan_pointer": "/sections/8/entries/1"
+    }
+  ],
+  "questions": [
+    "What are documented CLK period bands and Max Min Resolution meanings for 3.6864 for 115200 bps and 1258Mhz for 1200 bps points?",
+    "What is nominal CLK frequency and period to use as P_fixed?",
+    "What are minimum and maximum operating CLK frequencies periods plus duty-cycle and jitter tolerance?",
+    "Is dynamic period change during operation permitted or must period stay fixed per test changed only between tests before reset and traffic?",
+    "What is active level polarity of wb_rst_i and required reset duration in CLK cycles for scaling to P_fixed?"
+  ],
+  "blockers": []
+}

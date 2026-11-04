@@ -1,0 +1,149 @@
+{
+  "understanding": "WISHBONE top sequence on wishbone_slave_interface_agent drives controlled register reads and writes within documented addresses 0-6 with DLAB gating, reusing init DLAB base; clock fixed per test, coverage sampled on completion.",
+  "preconditions": [
+    "Chip reset completed with FIFOs cleared and reset values applied [f_reset_div_zero] [f_reset_lcr_8n1] [f_reset_ier_disabled], clock period fixed per test before traffic",
+    "init_config_sequence completed with MSB-first divisor programming then DLAB cleared to 0 for normal-register handoff [f_div_order_msb_first] [f_dlab_disable_access] [f_dlab_enable_access]",
+    "wishbone_slave_interface_agent owns DUT inputs wb_adr_i wb_dat_i wb_we_i wb_stb_i wb_cyc_i and observes wb_dat_o wb_ack_o on clock edges; bus idle before start"
+  ],
+  "stimulus_steps": [
+    "WAIT for init handoff with tracked DLAB=0 and wishbone bus idle",
+    "FOR each directed bring-up slot in documented order: drive one access via wishbone_slave_interface_agent only using wb_adr_i for pin address value, wb_we_i for documented direction, wb_dat_i for symbolic write byte; WAIT for wb_ack_o completion on observed clock edges before next start [f_rbr_addr0] [f_thr_addr0] [f_ier_addr1] [f_iir_fcr_addr2] [f_lcr_addr3] [f_mcr_lsr_msr_addr456]",
+    "IF tracked DLAB==0 THEN constrain addr to 0 to 6 normal mapping with documented R/W/RW per address [f_rbr_addr0] [f_thr_addr0] [f_ier_addr1] [f_iir_fcr_addr2] [f_lcr_addr3] [f_mcr_lsr_msr_addr456]; ELSE IF tracked DLAB==1 THEN constrain addr to 0 divisor LSB and 1 divisor MSB RW only [f_dll_lsb] [f_dlm_msb] [f_dlab_gate_divisor] [f_dlab_gate_normal_blocked]",
+    "FOR N controlled transactions under reproducible seed with volume and idle knobs as testbench operational limits: randomize symbolic addr, symbolic data byte class, and read-vs-write within documented access types and current DLAB gating; update tracked DLAB on LCR bit7 writes respecting MSB-first then LSB-next divisor order [f_div_order_msb_first] [f_dlab_enable_access] [f_dlab_disable_access]; drive back-to-back or idle gaps without changing clock period",
+    "On LCR write changing DLAB: IF new DLAB==1 THEN next divisor accesses use addr 0 LSB and addr 1 MSB; IF new DLAB==0 THEN return to normal 0-6 mapping [f_dlab_gate_divisor] [f_dlab_gate_normal_blocked] [f_dll_lsb] [f_dlm_msb]",
+    "Cleanup: drive LCR write to clear DLAB to 0, WAIT for completion, leave wishbone bus idle-owned for traffic handoff [f_dlab_disable_access]"
+  ],
+  "check_steps": [],
+  "coverage_steps": [
+    "SAMPLE cg_wb_reg_access for addr 0-6 with read/write direction and byte data class on each completion via wishbone monitor analysis port [f_ier_addr1] [f_mcr_lsr_msr_addr456]",
+    "SAMPLE rc_wb_regs for reg0 RBR vs THR, reg1 IER, reg2 IIR vs FCR, reg3 LCR, reg4 MCR, reg5 LSR, reg6 MSR with addr7 illegal and DLAB-mismatch ignore via monitor [f_rbr_addr0] [f_thr_addr0] [f_ier_addr1] [f_iir_fcr_addr2] [f_lcr_addr3]",
+    "SAMPLE cg_cross_addr_dlab for addr0/addr1 alias vs addr2-6 normal crossed with DLAB on each completion via monitor [f_dlab_gate_divisor] [f_dlab_gate_normal_blocked] [f_dll_lsb] [f_dlm_msb]",
+    "SAMPLE cg_dlab_divisor for DLAB state with LSB and MSB byte values including zero and maximum on divisor completions via monitor [f_dll_lsb] [f_dlm_msb]"
+  ],
+  "completion": [
+    "Done when directed slots plus N controlled transactions all completed with monitor-sampled coverage and DLAB=0 idle cleanup",
+    "Bound by TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+  ],
+  "facts": [
+    {
+      "id": "f_rbr_addr0",
+      "statement": "Receiver Buffer at WISHBONE address 0 is 8-bit read-only Receiver FIFO output.",
+      "source_id": "CH-f88915355b",
+      "quote": "Receiver Buffer 0 8 R Receiver FIFO output",
+      "plan_pointer": "/registers/registers/1"
+    },
+    {
+      "id": "f_thr_addr0",
+      "statement": "Transmitter Holding Register at WISHBONE address 0 is 8-bit write-only Transmit FIFO input.",
+      "source_id": "CH-f88915355b",
+      "quote": "0 8 W Transmit FIFO input",
+      "plan_pointer": "/registers/registers/2"
+    },
+    {
+      "id": "f_dlab_gate_divisor",
+      "statement": "Divisor latch registers are accessible when LCR bit 7 DLAB is set to 1.",
+      "source_id": "CH-f88915355b",
+      "quote": "The registers can be accessed when the 7th (DLAB) bit of the Line Control Register is set",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "f_dlab_gate_normal_blocked",
+      "statement": "Normal registers at addresses 0-1 cannot be accessed when LCR bit 7 DLAB is set to 1.",
+      "source_id": "CH-f88915355b",
+      "quote": "At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "f_dll_lsb",
+      "statement": "Divisor Latch LSB at WISHBONE address 0 is 8-bit RW.",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 1 (LSB) 0 8 RW The LSB of the divisor",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_dlm_msb",
+      "statement": "Divisor Latch MSB at WISHBONE address 1 is 8-bit RW.",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 2 1 8 RW The MSB of the divisor",
+      "plan_pointer": "/sections/9/entries/1"
+    },
+    {
+      "id": "f_ier_addr1",
+      "statement": "Interrupt Enable register at WISHBONE address 1 is 8-bit RW.",
+      "source_id": "CH-f88915355b",
+      "quote": "Interrupt Enable 1 8 RW Enable/Mask interrupts",
+      "plan_pointer": "/sections/9/entries/8"
+    },
+    {
+      "id": "f_iir_fcr_addr2",
+      "statement": "At WISHBONE address 2 Interrupt Identification is read-only and FIFO Control is write-only.",
+      "source_id": "CH-f88915355b",
+      "quote": "Interrupt Identification 2 8 R Get interrupt information\nFIFO Control 2 8 W Control FIFO options",
+      "plan_pointer": "/sections/9/entries/8"
+    },
+    {
+      "id": "f_lcr_addr3",
+      "statement": "Line Control Register at WISHBONE address 3 is 8-bit RW for connection control.",
+      "source_id": "CH-f88915355b",
+      "quote": "Line Control Register 3 8 RW Control connection",
+      "plan_pointer": "/sections/9/entries/8"
+    },
+    {
+      "id": "f_mcr_lsr_msr_addr456",
+      "statement": "Modem Control at address 4 is write-only, Line Status at address 5 is read-only, Modem Status at address 6 is read-only.",
+      "source_id": "CH-f88915355b",
+      "quote": "Modem Control 4 8 W Controls modem\nLine Status 5 8 R Status information\nModem Status 6 8 R Modem Status",
+      "plan_pointer": "/sections/9/entries/0"
+    },
+    {
+      "id": "f_div_order_msb_first",
+      "statement": "Divisor programming order is MSB first then LSB next.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set the Divisor Latches, MSB first, LSB next.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_dlab_enable_access",
+      "statement": "Setting LCR bit 7 to 1 allows access to Divisor Latches.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set bit 7 to \u20181\u2019\nto allow access to the Divisor Latches.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_dlab_disable_access",
+      "statement": "Clearing LCR bit 7 to 0 disables Divisor Latch access and returns to normal registers.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "Set bit 7 of LCR to \u20180\u2019 to disable access to Divisor Latches.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_reset_div_zero",
+      "statement": "After reset Divisor Latch register is 0.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Divisor Latch register is set to 0.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_reset_lcr_8n1",
+      "statement": "After reset LCR is 8 bits data no parity 1 stop bit.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Line Control Register is set to communication of 8 bits of data, no parity, 1\nstop bit.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_reset_ier_disabled",
+      "statement": "After reset all interrupts are disabled in Interrupt Enable Register.",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "All interrupts are disabled in the Interrupt Enable Register.",
+      "plan_pointer": "/sections/8/entries/1"
+    }
+  ],
+  "questions": [
+    "What are documented legal masks and access types per WISHBONE address for random constraints?",
+    "What is wb_rst_i polarity and required deassert-to-first-write delay after reset before init and top traffic?",
+    "What are required wb_sel_i values, owners and tie-offs for 8-bit FIFO-only use, and inactive levels of wb_stb_i and wb_cyc_i that must be driven?",
+    "What are documented legal data values/masks per writable register (IER enables, LCR line bits, FCR trigger, MCR, THR, divisor LSB/MSB including whether divisor 0 is illegal) for constrained random?",
+    "What is explicit bus address representation for wb_adr_i pin values (3-bit vs 5-bit) and required handling of addr 7 which is illegal for 8-bit use?"
+  ],
+  "blockers": []
+}

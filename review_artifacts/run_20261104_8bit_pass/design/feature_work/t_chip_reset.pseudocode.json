@@ -1,0 +1,82 @@
+{
+  "understanding": "Chip reset bring-up starts stable fixed-period clock on wb_clk_i before asserting asynchronous reset on wb_rst_i as first step before any configuration, tracking duration to symbolic P_fixed; quick-test-only active-high 10-cycle hold is testbench choice not documented DUT requirement.",
+  "preconditions": [
+    "Symbolic period P_fixed selected for this test and held fixed with no dynamic switching during reset",
+    "Physical bindings CLK to wb_clk_i and WB_RST_I to wb_rst_i available for drive and monitor",
+    "No register configuration or traffic started; wishbone_slave_interface uart_serial_data modem_control_if hold DUT inputs idle and interrupt_output only observed during reset",
+    "Monitors sample wb_rst_i and wb_clk_i edges for reset duration tracking to P_fixed"
+  ],
+  "stimulus_steps": [
+    "START clock on wb_clk_i with period P_fixed before reset and HOLD fixed through reset",
+    "WAIT for stable clock edges for testbench stabilization limit",
+    "ASSERT reset on wb_rst_i to quick-test-only active level for quick-test-only hold of 10 clock cycles scaled to P_fixed; levels and cycles are testbench choice not documented DUT timing",
+    "SAMPLE reset assertion and clock edges on monitors to track reset duration to P_fixed",
+    "DEASSERT reset on wb_rst_i to complementary inactive level",
+    "WAIT for post-reset stabilization on clock edges before any configuration then CLEANUP to configuration stage",
+    "IF reset not completed within TEST_TIMEOUT_CYCLES operational limit THEN abort bring-up; timeout is testbench limit not DUT timing"
+  ],
+  "check_steps": [],
+  "coverage_steps": [],
+  "completion": [
+    "Reset asserted then deasserted on wb_rst_i before any register configuration with duration tracked to symbolic P_fixed",
+    "Clock on wb_clk_i started before reset with period P_fixed and held fixed through reset",
+    "Terminate on reset done or TEST_TIMEOUT_CYCLES operational limit; timeout is testbench limit not DUT timing"
+  ],
+  "facts": [
+    {
+      "id": "f_reset_async",
+      "statement": "WB_RST_I is asynchronous reset input for UART core",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "WB_RST_I 1 Input Asynchronous Reset",
+      "plan_pointer": "/interfaces/groups/2/property_evidence/function"
+    },
+    {
+      "id": "f_clk_input",
+      "statement": "CLK is block clock input for UART core logic",
+      "source_id": "CH-63ad4d61a5",
+      "quote": "CLK 1 Input Block\u2019s clock input",
+      "plan_pointer": "/sections/4/strategy/agents/1"
+    },
+    {
+      "id": "f_fifo_clear",
+      "statement": "After reset receiver and transmitter FIFOs are cleared",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter FIFOs are cleared.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_shift_clear",
+      "statement": "After reset receiver and transmitter shift registers are cleared",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The receiver and transmitter shift registers are cleared",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_div_zero",
+      "statement": "After reset Divisor Latch register is set to 0",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Divisor Latch register is set to 0.",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_lcr_default",
+      "statement": "After reset Line Control Register is 8 bits no parity 1 stop bit",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "The Line Control Register is set to communication of 8 bits of data, no parity, 1",
+      "plan_pointer": "/sections/8/entries/1"
+    },
+    {
+      "id": "f_ier_disable",
+      "statement": "After reset all interrupts are disabled in Interrupt Enable Register",
+      "source_id": "CH-1e2324cfc3",
+      "quote": "All interrupts are disabled in the Interrupt Enable Register.",
+      "plan_pointer": "/sections/8/entries/1"
+    }
+  ],
+  "questions": [
+    "What is documented active level polarity and inactive level of WB_RST_I on wb_rst_i? Excerpt states only Asynchronous Reset with no polarity.",
+    "What is documented minimum assert duration in clock cycles for WB_RST_I and required deassert to configuration delay before init_config_sequence?",
+    "What is documented nominal CLK period P_fixed and permitted operating range when clocks excerpt lists only labels 3.6864 for 115200 bps and 1258Mhz for 1200 bps with Max Min Resolution unresolved?"
+  ],
+  "blockers": []
+}

@@ -1,0 +1,686 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_traffic_seq_ier_byte",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "f_ier_rda",
+        "f_ier_thre",
+        "f_ier_lsi",
+        "f_ier_msi"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_payload",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "f_lcr_dlab"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_mcr_byte",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 16,
+      "fact_ids": [
+        "f_mcr_loopback"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_uart_byte",
+      "agent": "uart_serial_data",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "f_lcr_dlab"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_modem_lvl",
+      "agent": "modem_control_if",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "f_mcr_map",
+        "f_mcr_dtr_rts"
+      ]
+    }
+  ],
+  "registers": [
+    {
+      "id": "t_traffic_seq_mcr",
+      "agent": "wishbone_slave_interface",
+      "address": 4,
+      "width": 8,
+      "access": "WO",
+      "reset": 0,
+      "mask": 31,
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_dtr_rts",
+        "f_mcr_map"
+      ]
+    }
+  ],
+  "facts": [
+    {
+      "id": "f_ier_rda",
+      "statement": "IER bit 0 enables Received Data available interrupt with 0 disabled and 1 enabled.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "0 RW Received Data available interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_thre",
+      "statement": "IER bit 1 enables Transmitter Holding Register empty interrupt with 0 disabled and 1 enabled.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "1 RW Transmitter Holding Register empty interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_lsi",
+      "statement": "IER bit 2 enables Receiver Line Status interrupt with 0 disabled and 1 enabled.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "2 RW Receiver Line Status Interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_msi",
+      "statement": "IER bit 3 enables Modem Status interrupt with 0 disabled and 1 enabled.",
+      "source_id": "CH-de51b2eafc",
+      "quote": "3 RW Modem Status Interrupt\n \u20180\u2019 \u2013 disabled\n \u20181\u2019 \u2013 enabled",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_mcr_loopback",
+      "statement": "MCR bit 4 selects normal versus loopback with STX_PAD_O set to 1 and transmitter shift internally connected to receiver shift in loopback.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "4 W Loopback mode\n \u20180\u2019 \u2013 normal operation\n \u20181\u2019 \u2013 loopback mode. When in loopback mode, the Serial\nOutput Signal (STX_PAD_O) is set to logic \u20181\u2019. The signal of the\ntransmitter shift register is internally connected to the input of the\nreceiver shift register.",
+      "plan_pointer": "/sections/4/strategy/agents/5"
+    },
+    {
+      "id": "f_mcr_map",
+      "statement": "In loopback DTR connects to DSR and RTS to CTS and Out1 to RI and Out2 to DCD.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The following connections are made:\nDTR \u00ce  DSR\nRTS \u00ce CTS\nOut1 \u00ce RI\nOut2 \u00ce DCD",
+      "plan_pointer": "/sections/4/strategy/agents/5"
+    },
+    {
+      "id": "f_mcr_dtr_rts",
+      "statement": "MCR bits 0 and 1 control DTR and RTS levels with inverted polarity.",
+      "source_id": "CH-6abe65aeff",
+      "quote": "0 W Data Terminal Ready (DTR) signal control\n \u20180\u2019 \u2013 DTR is \u20181\u2019\n \u20181\u2019 \u2013 DTR is \u20180\u2019\n1 W Request To Send (RTS) signal control\n \u20180\u2019 \u2013 RTS is \u20181\u2019\n \u20181\u2019 \u2013 RTS is \u20180\u2019",
+      "plan_pointer": "/sections/4/strategy/agents/5"
+    },
+    {
+      "id": "f_lcr_dlab",
+      "statement": "LCR bit 7 selects divisor latches when 1 and normal registers when 0.",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "7 RW Divisor Latch Access bit.\n \u20181\u2019 \u2013 The divisor latches can be accessed\n \u20180\u2019 \u2013 The normal registers are accessed",
+      "plan_pointer": "/sections/12/entries/5"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "t_traffic_seq_wb_normal_seq",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Directed normal WISHBONE THR writes and RBR reads reusing init base with DLAB 0",
+      "operations": [
+        {
+          "kind": "write",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_lcr_dlab",
+        "f_ier_rda"
+      ],
+      "extends": "t_wb_init_cfg_init_seq",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "data",
+          "variable": "t_traffic_seq_payload"
+        }
+      ]
+    },
+    {
+      "id": "t_traffic_seq_uart_normal_seq",
+      "agent": "uart_serial_data",
+      "purpose": "Drive symbolic RX frames matching LCR and observe TX",
+      "operations": [
+        {
+          "kind": "send",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 255,
+          "cycles": 16,
+          "count": 1
+        },
+        {
+          "kind": "idle",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 0,
+          "cycles": 16,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_lcr_dlab"
+      ],
+      "extends": null,
+      "controls": [
+        {
+          "operation": 0,
+          "field": "data",
+          "variable": "t_traffic_seq_uart_byte"
+        }
+      ]
+    },
+    {
+      "id": "t_traffic_seq_modem_normal_seq",
+      "agent": "modem_control_if",
+      "purpose": "Directed handshake toggles and loopback remap observe",
+      "operations": [
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 15,
+          "cycles": 2,
+          "count": 1
+        },
+        {
+          "kind": "idle",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 0,
+          "cycles": 2,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_mcr_map",
+        "f_mcr_dtr_rts"
+      ],
+      "extends": null,
+      "controls": [
+        {
+          "operation": 0,
+          "field": "data",
+          "variable": "t_traffic_seq_modem_lvl"
+        }
+      ]
+    },
+    {
+      "id": "t_traffic_seq_wb_loopback_seq",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Program MCR Loopback 1 then directed THR writes and RBR reads for internal transfer",
+      "operations": [
+        {
+          "kind": "register_write",
+          "register_id": "t_traffic_seq_mcr",
+          "address": 4,
+          "data": 16,
+          "mask": 31,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "write",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab"
+      ],
+      "extends": "t_wb_init_cfg_init_seq",
+      "controls": [
+        {
+          "operation": 1,
+          "field": "data",
+          "variable": "t_traffic_seq_payload"
+        }
+      ]
+    },
+    {
+      "id": "t_traffic_seq_modem_random_seq",
+      "agent": "modem_control_if",
+      "purpose": "Random handshake timing constrained to internal transfer when Loopback 1 else external",
+      "operations": [
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 15,
+          "cycles": 2,
+          "count": 4
+        }
+      ],
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map"
+      ],
+      "extends": null,
+      "controls": [
+        {
+          "operation": 0,
+          "field": "data",
+          "variable": "t_traffic_seq_modem_lvl"
+        }
+      ]
+    },
+    {
+      "id": "t_traffic_seq_normal_virt",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Virtual normal_traffic_sequence spawning payload plus RX plus modem toggles under interrupt observe only",
+      "operations": [
+        {
+          "kind": "idle",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 0,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_lcr_dlab",
+        "f_ier_rda"
+      ],
+      "extends": null,
+      "controls": []
+    },
+    {
+      "id": "t_traffic_seq_loopback_virt",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Virtual loopback_traffic_sequence spawning loopback programming plus internal transfer observe only",
+      "operations": [
+        {
+          "kind": "idle",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 0,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map"
+      ],
+      "extends": null,
+      "controls": []
+    }
+  ],
+  "routes": [
+    {
+      "id": "t_traffic_seq_loopback_route",
+      "expected_agent": "wishbone_slave_interface",
+      "expected_event": "write",
+      "actual_agent": "wishbone_slave_interface",
+      "actual_event": "read",
+      "expected_address": 0,
+      "actual_address": 0,
+      "when": [],
+      "mask": 255,
+      "fact_ids": [
+        "f_mcr_loopback",
+        "f_mcr_map",
+        "f_lcr_dlab"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "t_traffic_seq_ier_chk",
+      "agent": "wishbone_slave_interface",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_ier_rda",
+        "f_ier_thre",
+        "f_ier_lsi",
+        "f_ier_msi"
+      ]
+    }
+  ],
+  "hooks": [
+    {
+      "id": "t_traffic_seq_sb_hook",
+      "target": "t_traffic_seq_loopback_route",
+      "slot": "scoreboard.compare",
+      "purpose": "Compare loopback TX queue versus RX queue order without loss duplication",
+      "fact_ids": [
+        "f_mcr_loopback"
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "id": "t_traffic_seq_cov_modem",
+      "agent": "modem_control_if",
+      "points": [
+        {
+          "name": "t_traffic_seq_cov_modem_pins",
+          "field": "data",
+          "mask": 63,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "all_low",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "all_high",
+              "values": [
+                63
+              ]
+            },
+            {
+              "name": "mid",
+              "values": [
+                21,
+                42
+              ]
+            }
+          ]
+        },
+        {
+          "name": "t_traffic_seq_cov_modem_lb",
+          "field": "data",
+          "mask": 16,
+          "shift": 4,
+          "bins": [
+            {
+              "name": "normal",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "loopback",
+              "values": [
+                1
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [
+        {
+          "name": "t_traffic_seq_cov_modem_x",
+          "points": [
+            "t_traffic_seq_cov_modem_pins",
+            "t_traffic_seq_cov_modem_lb"
+          ]
+        }
+      ],
+      "sample_kinds": [],
+      "sample_address": null,
+      "fact_ids": [
+        "f_mcr_map",
+        "f_mcr_loopback",
+        "f_mcr_dtr_rts"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_ier",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "t_traffic_seq_cov_ier_bits",
+          "field": "data",
+          "mask": 15,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "none",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "rda",
+              "values": [
+                1
+              ]
+            },
+            {
+              "name": "thre",
+              "values": [
+                2
+              ]
+            },
+            {
+              "name": "all",
+              "values": [
+                15
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [],
+      "sample_address": 1,
+      "fact_ids": [
+        "f_ier_rda",
+        "f_ier_thre",
+        "f_ier_lsi",
+        "f_ier_msi"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_payload_wb",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "t_traffic_seq_cov_wb_data",
+          "field": "data",
+          "mask": 255,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "all_zeros",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "all_ones",
+              "values": [
+                255
+              ]
+            },
+            {
+              "name": "mid",
+              "values": [
+                85,
+                170
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [],
+      "sample_address": 0,
+      "fact_ids": [
+        "f_lcr_dlab"
+      ]
+    },
+    {
+      "id": "t_traffic_seq_cov_payload_uart",
+      "agent": "uart_serial_data",
+      "points": [
+        {
+          "name": "t_traffic_seq_cov_uart_data",
+          "field": "data",
+          "mask": 255,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "all_zeros",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "all_ones",
+              "values": [
+                255
+              ]
+            },
+            {
+              "name": "mid",
+              "values": [
+                85,
+                170
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [],
+      "sample_address": null,
+      "fact_ids": [
+        "f_lcr_dlab"
+      ]
+    }
+  ],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [
+        "t_traffic_seq_normal_virt"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [
+        "t_traffic_seq_wb_normal_seq",
+        "t_traffic_seq_uart_normal_seq",
+        "t_traffic_seq_modem_normal_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [
+        "t_traffic_seq_loopback_virt",
+        "t_traffic_seq_wb_loopback_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [
+        "t_traffic_seq_modem_random_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [
+        "t_traffic_seq_loopback_route"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [],
+      "question": "Deferred: check t_traffic_seq_stx_hold_chk is a built-in bus check on uart_serial_data, which is not a bus agent"
+    },
+    {
+      "step": "check_steps/2",
+      "component_ids": [
+        "t_traffic_seq_ier_chk"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [
+        "t_traffic_seq_cov_modem"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [
+        "t_traffic_seq_cov_ier"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [
+        "t_traffic_seq_cov_payload_wb",
+        "t_traffic_seq_cov_payload_uart"
+      ],
+      "question": ""
+    }
+  ],
+  "questions": [
+    "What are actual wb_adr_i pin values for THR RBR IER MCR FCR LCR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling and reset release to first write delay?",
+    "What symbolic divisor LSB MSB nonzero values plus LCR line-format values and FIFO trigger level and IER bits 3-0 combination bound normal versus loopback bring-up and traffic?",
+    "What uart_serial_data data_bits parity stop_bits bit_cycles settings must agree with LCR programming and divisor baud for TX observe and RX drive?",
+    "What Out1 Out2 control applies in normal operation outside loopback and what exact loopback data path beyond documented TX-shift to RX-shift plus DTR to DSR RTS to CTS Out1 to RI Out2 to DCD with STX held at 1 must be compared?",
+    "What documented interrupt observe mapping binds Received Data THRE Line Status Modem Status to normal versus loopback traffic and what overrun parity framing Data Ready order preservation without loss duplication applies?",
+    "Deferred (quick testing): check t_traffic_seq_stx_hold_chk is a built-in bus check on uart_serial_data, which is not a bus agent",
+    "Deferred (quick testing): sequence t_traffic_seq_wb_random_seq does not fit the testbench: Random data and explicit sequencer data control conflict",
+    "Deferred (quick testing): sequence t_traffic_seq_uart_random_seq does not fit the testbench: Random data and explicit sequencer data control conflict",
+    "Deferred (quick testing): hook t_traffic_seq_cov_modem_hook does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_traffic_seq_cov_ier_hook does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_traffic_seq_cov_wb_hook does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_traffic_seq_cov_uart_hook does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_traffic_seq_modem_drv_hook does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_traffic_seq_modem_mon_hook does not fit the testbench: Agent hook requires an agent target"
+  ]
+}

@@ -1,0 +1,536 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_dlab_gate_chk_lcr_dlab1",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 131,
+      "fact_ids": [
+        "f_dlab_one",
+        "f_dlab_set",
+        "f_lcr_addr",
+        "f_lcr_reset"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_lcr_dlab0",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 3,
+      "fact_ids": [
+        "f_dlab_zero",
+        "f_restore",
+        "f_lcr_addr",
+        "f_lcr_reset"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_div_lsb",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 52,
+      "fact_ids": [
+        "f_div_two_bytes",
+        "f_div_order_2",
+        "f_dll_addr"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_div_msb",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 18,
+      "fact_ids": [
+        "f_div_two_bytes",
+        "f_div_order_2",
+        "f_dlm_addr"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_ier_pat",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 15,
+      "fact_ids": [
+        "f_ier_enable",
+        "f_ier_reserved",
+        "f_dlab_zero"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_ier_pat2",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 5,
+      "fact_ids": [
+        "f_ier_enable",
+        "f_ier_reserved",
+        "f_dlab_zero"
+      ]
+    }
+  ],
+  "registers": [],
+  "facts": [
+    {
+      "id": "f_dlab_one",
+      "statement": "LCR bit 7 equals 1 means divisor latches can be accessed",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "\u20181\u2019 \u2013 The divisor latches can be accessed",
+      "plan_pointer": "/registers/registers/7/fields/6"
+    },
+    {
+      "id": "f_dlab_zero",
+      "statement": "LCR bit 7 equals 0 means normal registers are accessed",
+      "source_id": "CH-bc7559f2ec",
+      "quote": "\u20180\u2019 \u2013 The normal registers are accessed",
+      "plan_pointer": "/registers/registers/7/fields/6"
+    },
+    {
+      "id": "f_div_two_bytes",
+      "statement": "Divisor is two bytes forming one 16-bit register",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The 2 bytes form one 16-bit register, which is",
+      "plan_pointer": "/registers/registers/13"
+    },
+    {
+      "id": "f_div_order_2",
+      "statement": "Divisor order is MSB first LSB last with counter starting on LSB write",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "write the MSB first and the LSB last.",
+      "plan_pointer": "/sections/1/entries/9"
+    },
+    {
+      "id": "f_alias_block",
+      "statement": "When DLAB is 1 the registers at addresses 0-1 cannot be accessed as normal",
+      "source_id": "CH-f88915355b",
+      "quote": "At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/registers/registers/1"
+    },
+    {
+      "id": "f_dlab_set",
+      "statement": "Divisor latches are accessed by setting LCR bit 7 to 1",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "The divisor latches can be accessed by setting the 7th bit of LCR to \u20181\u2019.",
+      "plan_pointer": "/sections/1/entries/9"
+    },
+    {
+      "id": "f_restore",
+      "statement": "Restoring bit to 0 restores access to other registers at same addresses",
+      "source_id": "CH-06bad6ffcd",
+      "quote": "restore this bit to \u20180\u2019 after setting the divisor latches in order to restore access to the other",
+      "plan_pointer": "/sections/1/entries/9"
+    },
+    {
+      "id": "f_dll_addr",
+      "statement": "Divisor LSB byte is at pin address 0 RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 1 (LSB) 0 8 RW The LSB of the divisor",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "f_dlm_addr",
+      "statement": "Divisor MSB byte is at pin address 1 RW",
+      "source_id": "CH-f88915355b",
+      "quote": "Divisor Latch Byte 2 1 8 RW The MSB of the divisor",
+      "plan_pointer": "/sections/9/entries/5"
+    },
+    {
+      "id": "f_ier_enable",
+      "statement": "IER allows enabling and disabling interrupt generation",
+      "source_id": "CH-de51b2eafc",
+      "quote": "This register allows enabling and disabling interrupt generation by the UART.",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_cross_alias",
+      "statement": "Divisor versus normal aliasing at 0-1 is gated by DLAB",
+      "source_id": "CH-f88915355b",
+      "quote": "The registers can be accessed when the 7th (DLAB) bit of the Line Control Register is set",
+      "plan_pointer": "/sections/9/entries/5"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "t_dlab_gate_chk_seq",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Verify DLAB gating divisor versus normal alias at pin 0-1 with MSB-first programming and toggle reads",
+      "operations": [
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 131,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_msb",
+          "address": 1,
+          "data": 18,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_lsb",
+          "address": 0,
+          "data": 52,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 3,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "write",
+          "register_id": null,
+          "address": 1,
+          "data": 15,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 131,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 3,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "write",
+          "register_id": null,
+          "address": 1,
+          "data": 5,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_dlab_one",
+        "f_dlab_zero",
+        "f_dlab_set",
+        "f_restore",
+        "f_dll_addr",
+        "f_dlm_addr",
+        "f_div_order_2",
+        "f_div_two_bytes",
+        "f_alias_block",
+        "f_lcr_addr",
+        "f_ier_enable",
+        "f_ier_reserved"
+      ],
+      "extends": "t_wb_init_cfg_init_seq",
+      "controls": [
+        {
+          "operation": 0,
+          "field": "data",
+          "variable": "t_dlab_gate_chk_lcr_dlab1"
+        },
+        {
+          "operation": 1,
+          "field": "data",
+          "variable": "t_dlab_gate_chk_div_msb"
+        },
+        {
+          "operation": 2,
+          "field": "data",
+          "variable": "t_dlab_gate_chk_div_lsb"
+        },
+        {
+          "operation": 5,
+          "field": "data",
+          "variable": "t_dlab_gate_chk_lcr_dlab0"
+        },
+        {
+          "operation": 6,
+          "field": "data",
+          "variable": "t_dlab_gate_chk_ier_pat"
+        },
+        {
+          "operation": 8,
+          "field": "data",
+          "variable": "t_dlab_gate_chk_lcr_dlab1"
+        },
+        {
+          "operation": 10,
+          "field": "data",
+          "variable": "t_dlab_gate_chk_lcr_dlab0"
+        },
+        {
+          "operation": 12,
+          "field": "data",
+          "variable": "t_dlab_gate_chk_ier_pat2"
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "id": "t_dlab_gate_chk_route_dlm",
+      "expected_agent": "wishbone_slave_interface",
+      "expected_event": "write",
+      "actual_agent": "wishbone_slave_interface",
+      "actual_event": "read",
+      "expected_address": 1,
+      "actual_address": 1,
+      "when": [
+        {
+          "agent": "wishbone_slave_interface",
+          "address": 3,
+          "mask": 128,
+          "value": 128,
+          "initial_value": 3
+        }
+      ],
+      "mask": 255,
+      "fact_ids": [
+        "f_dlab_one",
+        "f_dlm_addr",
+        "f_div_order_2",
+        "f_div_two_bytes",
+        "f_dlab_set"
+      ]
+    },
+    {
+      "id": "t_dlab_gate_chk_route_ier",
+      "expected_agent": "wishbone_slave_interface",
+      "expected_event": "write",
+      "actual_agent": "wishbone_slave_interface",
+      "actual_event": "read",
+      "expected_address": 1,
+      "actual_address": 1,
+      "when": [
+        {
+          "agent": "wishbone_slave_interface",
+          "address": 3,
+          "mask": 128,
+          "value": 0,
+          "initial_value": 3
+        }
+      ],
+      "mask": 255,
+      "fact_ids": [
+        "f_dlab_zero",
+        "f_ier_enable",
+        "f_ier_reserved",
+        "f_restore"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "t_dlab_gate_chk_alias_class_check",
+      "agent": "wishbone_slave_interface",
+      "kind": "stable_until_ack",
+      "fact_ids": [
+        "f_alias_block",
+        "f_dlab_one",
+        "f_dlab_zero",
+        "f_dll_addr",
+        "f_dlm_addr",
+        "t_wb_reg_cov_f_rbr_1",
+        "f_cross_alias"
+      ]
+    }
+  ],
+  "hooks": [],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "What is active level polarity of wb_rst_i, required reset duration in clock cycles, and must monitor flush in-flight versus flag reset-during-transfer as error, and what is clock sampling edge for ACK reconstruction given fixed period per test?"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [
+        "t_dlab_gate_chk_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [
+        "t_dlab_gate_chk_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [
+        "t_dlab_gate_chk_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [
+        "t_dlab_gate_chk_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/5",
+      "component_ids": [
+        "t_dlab_gate_chk_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/6",
+      "component_ids": [
+        "t_dlab_gate_chk_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/7",
+      "component_ids": [
+        "t_dlab_gate_chk_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [
+        "t_dlab_gate_chk_route_dlm"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [
+        "t_dlab_gate_chk_route_ier"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/2",
+      "component_ids": [
+        "t_dlab_gate_chk_route_dlm",
+        "t_dlab_gate_chk_route_ier",
+        "t_dlab_gate_chk_alias_class_check"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/3",
+      "component_ids": [
+        "t_dlab_gate_chk_alias_class_check"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/4",
+      "component_ids": [],
+      "question": "What are documented WISHBONE handshake semantics for reconstruction: stability of wb_adr_i wb_we_i wb_sel_i wb_stb_i wb_cyc_i during transfer, wb_ack_o single versus multi-cycle window, wb_dat_o validity on reads, and back-to-back handling?"
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [],
+      "question": "Deferred: coverage t_dlab_gate_chk_cov_cross does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_dlab_gate_chk_cov_div does not fit the testbench: Coverage filter incompatible with monitored events; hook t_dlab_gate_chk_cov_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_dlab_gate_chk_cov_hook_div does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [],
+      "question": "Deferred: coverage t_dlab_gate_chk_cov_cross does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_dlab_gate_chk_cov_div does not fit the testbench: Coverage filter incompatible with monitored events; hook t_dlab_gate_chk_cov_hook_cross does not fit the testbench: Agent hook requires an agent target; hook t_dlab_gate_chk_cov_hook_div does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [
+        "t_dlab_gate_chk_alias_class_check"
+      ],
+      "question": ""
+    }
+  ],
+  "questions": [
+    "What is documented normal versus divisor alias map at pin addresses 0-1 under DLAB 0 versus 1, confirming normal addr0 RBR_R versus THR_W and addr1 IER_RW versus divisor LSB_RW at 0 MSB_RW at 1, and is mismatched access an alias return versus blocked or ignored with what ACK and read data?",
+    "What is active level polarity of wb_rst_i, required reset duration in clock cycles, and must monitor flush in-flight versus flag reset-during-transfer as error, and what is clock sampling edge for ACK reconstruction given fixed period per test?",
+    "What are documented WISHBONE handshake semantics for reconstruction: stability of wb_adr_i wb_we_i wb_sel_i wb_stb_i wb_cyc_i during transfer, wb_ack_o single versus multi-cycle window, wb_dat_o validity on reads, and back-to-back handling?",
+    "What is documented wb_sel_i legal values in DATA_BUS_WIDTH_8 build, address representation as pin values 0-6 versus offsets, and handling of illegal pin address 7?",
+    "What symbolic divisor LSB and MSB values form legal nonzero divisor for bring-up, is divisor zero illegal beyond reset disabling serial I/O, and is MSB-first LSB-last order mandatory given counter starts on LSB write?",
+    "What LCR bits 6-0 line parameters must accompany DLAB 1 then 0 during gating check, and what comparison masks apply to IER reserved bits 7-4 versus enables 3-0?",
+    "What is expected read data for address 0 FIFO alias during gating given side-effect behavior, and should address 0 be coverage-only without data COMPARE with simple RW mirror limited to address 1 IER versus DLM?",
+    "Deferred (quick testing): coverage t_dlab_gate_chk_cov_cross does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): coverage t_dlab_gate_chk_cov_div does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): hook t_dlab_gate_chk_cov_hook_cross does not fit the testbench: Agent hook requires an agent target",
+    "Deferred (quick testing): hook t_dlab_gate_chk_cov_hook_div does not fit the testbench: Agent hook requires an agent target"
+  ]
+}

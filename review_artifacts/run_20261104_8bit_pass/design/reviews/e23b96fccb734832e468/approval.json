@@ -1,0 +1,25 @@
+{
+  "request_id": "e23b96fccb734832e468",
+  "request_hash": "3131b84d4dfc232f21284695fd6658e8514400fb72b210b467320868c0d3c6a5",
+  "nonce": "4409c4deed550ab01332892bd6a13c6d",
+  "status": "TEST_AUTO_APPROVED",
+  "test_only": true,
+  "actor": "quick-testing-inference-evaluator",
+  "channel": "quick_testing",
+  "reference": "quick-testing:e23b96fccb734832e468",
+  "approved_at": "2026-11-04T15:40:45.212225+00:00",
+  "bindings": {
+    "reset": "wb_rst_i",
+    "reset_active": "high",
+    "reset_cycles": 10
+  },
+  "reason": "Port list shows single reset wb_rst_i and excerpt only says Asynchronous Reset with no polarity. Wishbone/OpenCores uart16550 convention and plain _rst_i naming both indicate active-high, so bind wb_rst_i high.",
+  "assumptions": [
+    "Guessed for quick test only: reset_active is high based on general Wishbone/OpenCores convention that RST_I is active-high; rejected alternative active-low.",
+    "Outside knowledge: naming convention that active-low would normally be wb_rst_n_i / rst_n / reset_n, while plain wb_rst_i implies active-high; rejected treating bare rst as active-low.",
+    "Guessed for quick test only: reset is wb_rst_i as the sole 1-bit reset in the supplied port list with no competing reset; rejected no-reset or other port.",
+    "Guessed for quick test only: reset_cycles 10 as plausible testbench hold length since spec gives no value; rejected very short 0-2 cycle hold as risky for async reset."
+  ],
+  "reply": "I set wb_rst_i as asserted high for 10 cycles because the Wishbone convention and the plain rst name without an n suffix normally mean active-high. The cited spec line only says Asynchronous Reset so I had to guess the polarity for this run. I am unsure if this variant inverts the reset, so if bring-up leaves the DUT in reset I would recheck the level first.",
+  "model": "muse-spark-1.3"
+}

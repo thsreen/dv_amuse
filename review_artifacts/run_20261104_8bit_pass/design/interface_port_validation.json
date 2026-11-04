@@ -1,0 +1,17 @@
+{
+  "validator": "independent_port_audit",
+  "status": "PASS",
+  "spec_hash": "a0ffd4df905180d0e31fedfd03312a6efdc7dcf2f3388d30da4fa78d97fcc198",
+  "rtl_hash": "2ab01c62b63ade871a3147d4e3c660c500f2b7f1e50b2515c2866d1ee5ced2bd",
+  "report_hash": "5b2a34760fff2cb7ace52f386f5bcd6f2f418a9cba2eb497b7fa0ced285a739d",
+  "issues": [],
+  "checks": [
+    "inventory completeness",
+    "one-to-one identity",
+    "DUT directions",
+    "independent width evaluation",
+    "review scope and snapshots",
+    "source and provenance preservation",
+    "relationship consistency"
+  ]
+}

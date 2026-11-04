@@ -1,0 +1,36 @@
+{
+  "request_id": "1bad84dc8cba324a89e3",
+  "request_hash": "d57c804bd99fac03cd92b211eaefef47030f035dc1170b3274179755748f0e94",
+  "nonce": "7ca6da19f1c74e20d7d07e50c1392dc6",
+  "status": "TEST_AUTO_APPROVED",
+  "test_only": true,
+  "actor": "quick-testing-inference-evaluator",
+  "channel": "quick_testing",
+  "reference": "quick-testing:1bad84dc8cba324a89e3",
+  "approved_at": "2026-11-04T15:40:19.889796+00:00",
+  "bindings": {
+    "inactive_spec_ports": {
+      "BAUD_O": "Documented conditional output is disabled in the selected RTL configuration."
+    },
+    "mappings": {
+      "CLK": "wb_clk_i",
+      "WB_ADDR_I": "wb_adr_i",
+      "WB_DAT_I": "wb_dat_i",
+      "WB_DAT_O": "wb_dat_o"
+    },
+    "width_choices": {
+      "WB_ADDR_I": 3,
+      "WB_DAT_I": 8,
+      "WB_DAT_O": 8
+    }
+  },
+  "reason": "Directions and widths align after selecting configured variants: CLK 1-bit to wb_clk_i, WB_ADDR_I 3-bit to wb_adr_i, WB_DAT_I/O 8-bit to wb_dat_i/o, with BAUD_O explicitly inactive per its conditional define and RTL absence.",
+  "assumptions": [
+    "Guessed choice: CLK maps to wb_clk_i despite name difference; I rejected leaving CLK unmapped because wb_clk_i is the sole 1-bit clock candidate and architecture expects logical-to-physical aliasing.",
+    "Outside-knowledge assumption: WB_ADDR_I maps to wb_adr_i via common WISHBONE ADR/ADDR abbreviation convention; I rejected leaving it unmapped because width 3 and input direction match the candidate.",
+    "Outside-knowledge assumption: width_choices WB_ADDR_I=3 and WB_DAT_I=8 and WB_DAT_O=8 selected to match RTL inventory widths wb_adr_i 3 and wb_dat_i/o 8; I rejected the 5 and 32 alternatives because they do not match the configured RTL.",
+    "Guessed choice: BAUD_O is inactive because UART_HAS_BAUDRATE_OUTPUT is not defined in this DATA_BUS_WIDTH_8 build and it is absent from RTL; I rejected synthesizing a port because conditional absence requires an inactive configuration reason."
+  ],
+  "reply": "I mapped CLK to wb_clk_i and WB_ADDR_I to wb_adr_i and both data signals to their 8-bit wb counterparts because directions and selected widths line up with the RTL inventory. I chose 3 for the address and 8 for the data widths to match the configured 3-bit address and 8-bit data bus, and I marked BAUD_O inactive since its define is off and it has no RTL pin. I am unsure about the exact clock naming history since CLK and wb_clk_i differ beyond case, but the single candidate makes this the only plausible wiring for simulation.",
+  "model": "muse-spark-1.3"
+}

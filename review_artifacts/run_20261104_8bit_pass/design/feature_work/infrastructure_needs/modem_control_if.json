@@ -1,0 +1,81 @@
+{
+  "level": "full_agent",
+  "reason": "Bidirectional modem handshake requires active driving of four DUT inputs and observation of two DUT outputs to external modem peer; scaffold_only, utility_config, and passive_agent cannot provide stimulus. This architecture choice is inferred and needs review.",
+  "responsibilities": [
+    "drive_cts_pad_i",
+    "drive_dsr_pad_i",
+    "drive_ri_pad_i",
+    "drive_dcd_pad_i",
+    "observe_rts_pad_o",
+    "observe_dtr_pad_o"
+  ],
+  "coverage": false,
+  "facts": [
+    {
+      "id": "port_rts_pad_o",
+      "statement": "The specification defines RTS_PAD_O as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "RTS_PAD_O 1 Output Request To Send",
+      "plan_pointer": "/interfaces/groups/5/signals/0"
+    },
+    {
+      "id": "port_dtr_pad_o",
+      "statement": "The specification defines DTR_PAD_O as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DTR_PAD_O 1 Output Data Terminal Ready",
+      "plan_pointer": "/interfaces/groups/5/signals/1"
+    },
+    {
+      "id": "port_cts_pad_i",
+      "statement": "The specification defines CTS_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "CTS_PAD_I 1 Input Clear To Send",
+      "plan_pointer": "/interfaces/groups/5/signals/2"
+    },
+    {
+      "id": "port_dsr_pad_i",
+      "statement": "The specification defines DSR_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DSR_PAD_I 1 Input Data Set Ready",
+      "plan_pointer": "/interfaces/groups/5/signals/3"
+    },
+    {
+      "id": "port_ri_pad_i",
+      "statement": "The specification defines RI_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "RI_PAD_I 1 Input Ring Indicator",
+      "plan_pointer": "/interfaces/groups/5/signals/4"
+    },
+    {
+      "id": "port_dcd_pad_i",
+      "statement": "The specification defines DCD_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DCD_PAD_I 1 Input Data Carrier Detect",
+      "plan_pointer": "/interfaces/groups/5/signals/5"
+    },
+    {
+      "id": "f_function_1",
+      "statement": "Modem control register transfers control signals to modem connected to UART",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/function"
+    },
+    {
+      "id": "f_connected_1",
+      "statement": "Modem control interface connects to modem",
+      "source_id": "CH-6abe65aeff",
+      "quote": "The modem control register allows transferring control signals to a modem connected to\nthe UART.",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/connected_to"
+    },
+    {
+      "id": "f_peer_1",
+      "statement": "Modem control peer is external off-chip device",
+      "source_id": "CH-98be4510fb",
+      "quote": "2.3 External (off-chip) connections",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/peer_type"
+    }
+  ],
+  "questions": [],
+  "review_status": "NEEDS_REVIEW",
+  "provenance": "INFERRED_IMPLEMENTATION_CHOICE"
+}

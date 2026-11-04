@@ -1,0 +1,30 @@
+{
+  "sources": ["uart_top.v"],
+  "direction_reference": "DUT",
+  "parameters": [
+    {"name": "UART_DATA_WIDTH"   , "width": 8},
+    {"name": "UART_ADDR_WIDTH"   , "width": 3}
+  ],
+  "ports": [
+    {"direction": "input"    , "width": 1   , "name": "wb_clk_i"},
+    {"direction": "input"    , "width": 1   , "name": "wb_rst_i"},
+    {"direction": "input"    , "width": 3   , "name": "wb_adr_i"},
+    {"direction": "input"    , "width": 8   , "name": "wb_dat_i"},
+    {"direction": "output"   , "width": 8   , "name": "wb_dat_o"},
+    {"direction": "input"    , "width": 1   , "name": "wb_we_i"},
+    {"direction": "input"    , "width": 1   , "name": "wb_stb_i"},
+    {"direction": "input"    , "width": 1   , "name": "wb_cyc_i"},
+    {"direction": "output"   , "width": 1   , "name": "wb_ack_o"},
+    {"direction": "input"    , "width": 4   , "name": "wb_sel_i"},
+    {"direction": "output"   , "width": 1   , "name": "int_o"},
+    {"direction": "output"   , "width": 1   , "name": "stx_pad_o"},
+    {"direction": "input"    , "width": 1   , "name": "srx_pad_i"},
+    {"direction": "output"   , "width": 1   , "name": "rts_pad_o"},
+    {"direction": "input"    , "width": 1   , "name": "cts_pad_i"},
+    {"direction": "output"   , "width": 1   , "name": "dtr_pad_o"},
+    {"direction": "input"    , "width": 1   , "name": "dsr_pad_i"},
+    {"direction": "input"    , "width": 1   , "name": "ri_pad_i"},
+    {"direction": "input"    , "width": 1   , "name": "dcd_pad_i"}
+  ],
+  "defines": ["DATA_BUS_WIDTH_8"]
+}

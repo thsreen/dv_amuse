@@ -1,0 +1,553 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_modem_irq_ier_dis",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "f_ier_msi",
+        "t_chip_reset_f_ier_disable"
+      ]
+    },
+    {
+      "id": "t_modem_irq_ier_en",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 8,
+      "fact_ids": [
+        "f_ier_msi",
+        "f_ier_enable"
+      ]
+    }
+  ],
+  "registers": [],
+  "facts": [
+    {
+      "id": "f_modem_irq_1",
+      "statement": "CTS DSR RI or DCD change produces 4th Modem Status interrupt cleared by reading Modem status register",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 0 4 th Modem Status CTS, DSR, RI or DCD. Reading the Modem\nstatus register.",
+      "plan_pointer": "/sections/8/entries/10"
+    },
+    {
+      "id": "f_iir_prio_1",
+      "statement": "IIR reports Modem Status as 4th priority 000 below RLS RDA Timeout THRE with reset by MSR read",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "0 0 0 4 th Modem Status CTS, DSR, RI or DCD. Reading the Modem\nstatus register.",
+      "plan_pointer": "/sections/8/entries/4"
+    },
+    {
+      "id": "f_msr_delta_1",
+      "statement": "MSR delta bits set to 1 on corresponding line change and reset on MSR read",
+      "source_id": "CH-0174a058ac",
+      "quote": "These bits are set to\n\u20181\u2019 when a change in corresponding line has been detected and they are reset when the\nregister is being read.",
+      "plan_pointer": "/registers/registers/10"
+    },
+    {
+      "id": "f_msr_dcts_1",
+      "statement": "MSR bit0 DCTS indicates CTS line changed state",
+      "source_id": "CH-0174a058ac",
+      "quote": "\u20181\u2019 \u2013 The CTS line has changed its state.",
+      "plan_pointer": "/registers/registers/10/fields/0"
+    },
+    {
+      "id": "f_msr_ddsr_1",
+      "statement": "MSR bit1 DDSR indicates DSR line changed state",
+      "source_id": "CH-0174a058ac",
+      "quote": " \u20181\u2019 \u2013 The DSR line has changed its state.",
+      "plan_pointer": "/registers/registers/10"
+    },
+    {
+      "id": "f_msr_teri_1",
+      "statement": "MSR bit2 TERI detects RI low to high trailing edge",
+      "source_id": "CH-0174a058ac",
+      "quote": "Trailing Edge of Ring Indicator  (TERI) detector. The RI line has\nchanged its state from low to high state.",
+      "plan_pointer": "/registers/registers/10"
+    },
+    {
+      "id": "f_msr_ddcd_1",
+      "statement": "MSR bit3 DDCD indicates DCD line changed state",
+      "source_id": "CH-0174a058ac",
+      "quote": " \u20181\u2019 \u2013 The DCD line has changed its state.",
+      "plan_pointer": "/registers/registers/10"
+    },
+    {
+      "id": "f_msr_addr_1",
+      "statement": "MSR is 8 bit read only at bus address 6",
+      "source_id": "CH-f88915355b",
+      "quote": "Modem Status 6 8 R Modem Status",
+      "plan_pointer": "/registers/registers/10"
+    },
+    {
+      "id": "f_loopback_1",
+      "statement": "MCR Loopback 0 is normal operation and 1 is loopback with STX held at 1",
+      "source_id": "CH-6abe65aeff",
+      "quote": " \u20180\u2019 \u2013 normal operation\n \u20181\u2019 \u2013 loopback mode. When in loopback mode, the Serial\nOutput Signal (STX_PAD_O) is set to logic \u20181\u2019.",
+      "plan_pointer": "/interfaces/groups/5/property_evidence/function"
+    },
+    {
+      "id": "f_modem_irq_iir_bits_1",
+      "statement": "IIR bits 4 and 5 are 0 and bits 6 and 7 are 1 with reset C1h",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 4 and 5: Logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/4"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "t_modem_irq_wb_bringup_seq",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Directed bringup divisor line FIFO base with LCR DLAB 0 and MCR Loopback 0 normal mode",
+      "operations": [
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 131,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_msb",
+          "address": 1,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_divisor_cov_lsb",
+          "address": 0,
+          "data": 1,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 3,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_fcr",
+          "address": 2,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_traffic_seq_mcr",
+          "address": 4,
+          "data": 0,
+          "mask": 31,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_loopback_1",
+        "t_chip_reset_f_ier_disable",
+        "f_msr_addr_1"
+      ],
+      "extends": "t_wb_init_cfg_init_seq",
+      "controls": []
+    },
+    {
+      "id": "t_modem_irq_modem_toggle_seq",
+      "agent": "modem_control_if",
+      "purpose": "Drive single toggle per CTS DSR RI DCD via custom driver_body",
+      "operations": [
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 1,
+          "mask": 15,
+          "cycles": 2,
+          "count": 1
+        },
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 2,
+          "mask": 15,
+          "cycles": 2,
+          "count": 1
+        },
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 4,
+          "mask": 15,
+          "cycles": 2,
+          "count": 1
+        },
+        {
+          "kind": "custom",
+          "register_id": null,
+          "address": 0,
+          "data": 8,
+          "mask": 15,
+          "cycles": 2,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_function_1",
+        "f_msr_dcts_1",
+        "f_msr_ddsr_1",
+        "f_msr_teri_1",
+        "f_msr_ddcd_1"
+      ],
+      "extends": "t_traffic_seq_modem_normal_seq",
+      "controls": []
+    },
+    {
+      "id": "t_modem_irq_wb_clear_seq",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Read MSR to clear deltas and restore MCR Loopback 0 LCR DLAB 0 bus idle",
+      "operations": [
+        {
+          "kind": "read",
+          "register_id": null,
+          "address": 6,
+          "data": 0,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_traffic_seq_mcr",
+          "address": 4,
+          "data": 0,
+          "mask": 31,
+          "cycles": 0,
+          "count": 1
+        },
+        {
+          "kind": "register_write",
+          "register_id": "t_wb_init_cfg_lcr",
+          "address": 3,
+          "data": 3,
+          "mask": 255,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_msr_delta_1",
+        "f_loopback_1"
+      ],
+      "extends": null,
+      "controls": []
+    },
+    {
+      "id": "t_modem_irq_virt_seq",
+      "agent": "wishbone_slave_interface",
+      "purpose": "Virtual spawn only per agent sequences with no VIFs delays stages in order",
+      "operations": [
+        {
+          "kind": "idle",
+          "register_id": null,
+          "address": 0,
+          "data": 0,
+          "mask": 0,
+          "cycles": 0,
+          "count": 1
+        }
+      ],
+      "fact_ids": [
+        "f_modem_irq_1",
+        "f_ier_enable"
+      ],
+      "extends": "t_traffic_seq_normal_virt",
+      "controls": []
+    }
+  ],
+  "routes": [],
+  "checks": [
+    {
+      "id": "t_modem_irq_chk_iir",
+      "agent": "wishbone_slave_interface",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_iir_prio_1",
+        "f_modem_irq_1",
+        "f_iir_1",
+        "f_modem_irq_iir_bits_1"
+      ]
+    },
+    {
+      "id": "t_modem_irq_chk_e2e",
+      "agent": "wishbone_slave_interface",
+      "kind": "stable_until_ack",
+      "fact_ids": [
+        "f_modem_irq_1",
+        "f_msr_delta_1",
+        "f_iir_1",
+        "f_iir_prio_1",
+        "f_ier_msi"
+      ]
+    }
+  ],
+  "hooks": [
+    {
+      "id": "t_modem_irq_drv_modem",
+      "target": "modem_control_if",
+      "slot": "driver.body",
+      "purpose": "Drive single toggle via modem_handshake_toggle test only infrastructure",
+      "fact_ids": [
+        "f_function_1",
+        "f_msr_dcts_1"
+      ]
+    },
+    {
+      "id": "t_modem_irq_mon_modem",
+      "target": "modem_control_if",
+      "slot": "monitor.body",
+      "purpose": "Observe CTS DSR RI DCD toggles and RTS DTR for scoreboard",
+      "fact_ids": [
+        "f_function_1",
+        "f_msr_delta_1"
+      ]
+    },
+    {
+      "id": "t_modem_irq_mon_int",
+      "target": "interrupt_output",
+      "slot": "monitor.body",
+      "purpose": "Observe int_o assertion negation for interrupt scoreboard",
+      "fact_ids": [
+        "f_iir_1",
+        "f_modem_irq_1"
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "id": "t_modem_irq_cov_delta",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "t_modem_irq_cov_delta_pt",
+          "field": "data",
+          "mask": 15,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "dcts",
+              "values": [
+                1
+              ]
+            },
+            {
+              "name": "ddsr",
+              "values": [
+                2
+              ]
+            },
+            {
+              "name": "teri",
+              "values": [
+                4
+              ]
+            },
+            {
+              "name": "ddcd",
+              "values": [
+                8
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [],
+      "sample_address": 6,
+      "fact_ids": [
+        "f_msr_delta_1",
+        "f_msr_dcts_1",
+        "f_msr_ddsr_1",
+        "f_msr_teri_1",
+        "f_msr_ddcd_1",
+        "f_msr_addr_1"
+      ]
+    },
+    {
+      "id": "t_modem_irq_cov_ier",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "t_modem_irq_cov_ier_pt",
+          "field": "data",
+          "mask": 8,
+          "shift": 3,
+          "bins": [
+            {
+              "name": "disabled",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "enabled",
+              "values": [
+                1
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [],
+      "sample_address": 1,
+      "fact_ids": [
+        "f_ier_msi",
+        "f_ier_enable"
+      ]
+    },
+    {
+      "id": "t_modem_irq_cov_iir",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "t_modem_irq_cov_iir_pt",
+          "field": "data",
+          "mask": 14,
+          "shift": 1,
+          "bins": [
+            {
+              "name": "modem_status",
+              "values": [
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "t_modem_irq_cov_ip_pt",
+          "field": "data",
+          "mask": 1,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "pending",
+              "values": [
+                0
+              ]
+            },
+            {
+              "name": "idle",
+              "values": [
+                1
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [],
+      "sample_address": 2,
+      "fact_ids": [
+        "f_iir_prio_1",
+        "f_iir_1",
+        "f_modem_irq_1"
+      ]
+    }
+  ],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [
+        "t_modem_irq_wb_bringup_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [
+        "t_modem_irq_modem_toggle_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [
+        "t_modem_irq_modem_toggle_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [
+        "t_modem_irq_virt_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [
+        "t_modem_irq_wb_clear_seq"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [],
+      "question": "Deferred: check t_modem_irq_chk_delta is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_irq_chk_status is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_irq_chk_int is a built-in bus check on interrupt_output, which is not a bus agent"
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [],
+      "question": "Deferred: check t_modem_irq_chk_delta is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_irq_chk_status is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_irq_chk_int is a built-in bus check on interrupt_output, which is not a bus agent"
+    },
+    {
+      "step": "check_steps/2",
+      "component_ids": [],
+      "question": "Deferred: check t_modem_irq_chk_delta is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_irq_chk_status is a built-in bus check on modem_control_if, which is not a bus agent; check t_modem_irq_chk_int is a built-in bus check on interrupt_output, which is not a bus agent"
+    },
+    {
+      "step": "check_steps/3",
+      "component_ids": [
+        "t_modem_irq_chk_iir"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/4",
+      "component_ids": [
+        "t_modem_irq_chk_e2e"
+      ],
+      "question": ""
+    }
+  ],
+  "questions": [
+    "What are confirmed wb_adr_i pin values for IER and IIR under DLAB 0 versus divisor under DLAB 1 plus wb_sel_i handling and reset release to first access delay",
+    "What is wb_rst_i polarity and int_o active polarity for assertion versus negation correlation with IIR bit0",
+    "What are inactive drive levels for cts_pad_i dsr_pad_i ri_pad_i dcd_pad_i and tie off for srx_pad_i and idle ownership of wishbone bus during modem toggles",
+    "What exact IIR bits 3 to 1 and bit0 encoding must be observed for isolated Modem Status 000 versus concurrent higher priority RLS RDA Timeout THRE including bits 7 to 4",
+    "What MCR Loopback 0 versus 1 handling applies for normal external modem observation and are external modem inputs ignored in loopback when STX is held at 1",
+    "Deferred (quick testing): check t_modem_irq_chk_delta is a built-in bus check on modem_control_if, which is not a bus agent",
+    "Deferred (quick testing): check t_modem_irq_chk_status is a built-in bus check on modem_control_if, which is not a bus agent",
+    "Deferred (quick testing): check t_modem_irq_chk_int is a built-in bus check on interrupt_output, which is not a bus agent",
+    "Deferred (quick testing): register t_modem_irq_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension",
+    "Deferred (quick testing): sequence t_modem_irq_wb_disabled_seq does not fit the testbench: register_write names 't_modem_irq_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']",
+    "Deferred (quick testing): sequence t_modem_irq_wb_enabled_seq does not fit the testbench: register_write names 't_modem_irq_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']",
+    "Deferred (quick testing): sequence t_modem_irq_int_observe_seq does not fit the testbench: Sequence needs an active agent",
+    "Deferred (quick testing): route t_modem_irq_route_msr does not fit the testbench: Route address filter requires a valid bus address",
+    "Deferred (quick testing): route t_modem_irq_route_int does not fit the testbench: Route address filter requires a valid bus address"
+  ]
+}

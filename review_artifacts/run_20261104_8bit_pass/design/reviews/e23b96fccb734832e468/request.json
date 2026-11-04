@@ -1,0 +1,154 @@
+{
+  "id": "e23b96fccb734832e468",
+  "plan_hash": "1449a79a56a5c24ada3cb8bc5f9c517bc404a4b799083eb2e151b0eafa883ee4",
+  "interface_hash": "2ab01c62b63ade871a3147d4e3c660c500f2b7f1e50b2515c2866d1ee5ced2bd",
+  "unit": "foundation_reset",
+  "blockers": [
+    "Is wb_rst_i asserted high (1) or low (0)? The specification text cited does not state it."
+  ],
+  "review_contract_hash": "e45482c201a5dfcdb9576da5b566c742b13dcef642d3342dbe7fb82fc4f6c4da",
+  "status": "WAITING_HUMAN",
+  "created_at": "2026-11-04T15:40:22.074963+00:00",
+  "nonce": "4409c4deed550ab01332892bd6a13c6d",
+  "ports": [
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "wb_clk_i"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "wb_rst_i"
+    },
+    {
+      "direction": "input",
+      "width": 3,
+      "name": "wb_adr_i"
+    },
+    {
+      "direction": "input",
+      "width": 8,
+      "name": "wb_dat_i"
+    },
+    {
+      "direction": "output",
+      "width": 8,
+      "name": "wb_dat_o"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "wb_we_i"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "wb_stb_i"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "wb_cyc_i"
+    },
+    {
+      "direction": "output",
+      "width": 1,
+      "name": "wb_ack_o"
+    },
+    {
+      "direction": "input",
+      "width": 4,
+      "name": "wb_sel_i"
+    },
+    {
+      "direction": "output",
+      "width": 1,
+      "name": "int_o"
+    },
+    {
+      "direction": "output",
+      "width": 1,
+      "name": "stx_pad_o"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "srx_pad_i"
+    },
+    {
+      "direction": "output",
+      "width": 1,
+      "name": "rts_pad_o"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "cts_pad_i"
+    },
+    {
+      "direction": "output",
+      "width": 1,
+      "name": "dtr_pad_o"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "dsr_pad_i"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "ri_pad_i"
+    },
+    {
+      "direction": "input",
+      "width": 1,
+      "name": "dcd_pad_i"
+    }
+  ],
+  "evidence": {
+    "source_excerpts": [
+      {
+        "source_id": "CH-63ad4d61a5",
+        "start": 0,
+        "end": 35,
+        "text": "WB_RST_I 1 Input Asynchronous Reset"
+      }
+    ],
+    "documented_items": []
+  },
+  "bindings_scope": "infrastructure_only",
+  "question": "Resolve infrastructure ambiguity: Is wb_rst_i asserted high (1) or low (0)? The specification text cited does not state it.",
+  "allowed_fields": [
+    "reset",
+    "reset_active",
+    "reset_cycles"
+  ],
+  "review_brief": {
+    "question": "For wb_rst_i, is reset asserted high (1) or low (0)? Confirm the input name if more than one reset exists.",
+    "why": "The current evidence does not resolve this required binding: Is wb_rst_i asserted high (1) or low (0)? The specification text cited does not state it.",
+    "architecture": "The testbench supplies the reset; only its binding and active level is needed to generate it from the common UVC templates.",
+    "impact": "The reset driver needs the correct asserted level before bring-up. A wrong choice can leave the DUT in reset or prevent initialization.",
+    "ports": [
+      {
+        "direction": "input",
+        "width": 1,
+        "name": "wb_rst_i"
+      }
+    ],
+    "sources": [
+      {
+        "id": "CH-63ad4d61a5",
+        "path": "uart16550/doc/UART_spec.pdf",
+        "location": "page 6",
+        "report_link": "../../dv/testplan_doc.html#reference-CH-63ad4d61a5",
+        "start": 0,
+        "end": 35,
+        "quote": "WB_RST_I 1 Input Asynchronous Reset",
+        "authority": "Specification reference"
+      }
+    ],
+    "scope": "Only this infrastructure clarification is approved; other behavior remains unchanged."
+  }
+}

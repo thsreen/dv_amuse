@@ -1,0 +1,61 @@
+// QUICK TESTING ONLY: inferred auto approvals are not human approval or design sign-off.
+`timescale 1ns/1ps
+module verification_top;
+  import uvm_pkg::*;
+  import uart_top_verification_pkg::*;
+  clock_if clock_bus();
+  reset_if reset_bus();
+  wire [0:0] dut_wb_clk_i;
+  wire [0:0] dut_wb_rst_i;
+  wire [2:0] dut_wb_adr_i;
+  wire [7:0] dut_wb_dat_i;
+  wire [7:0] dut_wb_dat_o;
+  wire [0:0] dut_wb_we_i;
+  wire [0:0] dut_wb_stb_i;
+  wire [0:0] dut_wb_cyc_i;
+  wire [0:0] dut_wb_ack_o;
+  wire [3:0] dut_wb_sel_i;
+  wire [0:0] dut_int_o;
+  wire [0:0] dut_stx_pad_o;
+  wire [0:0] dut_srx_pad_i;
+  wire [0:0] dut_rts_pad_o;
+  wire [0:0] dut_cts_pad_i;
+  wire [0:0] dut_dtr_pad_o;
+  wire [0:0] dut_dsr_pad_i;
+  wire [0:0] dut_ri_pad_i;
+  wire [0:0] dut_dcd_pad_i;
+  interrupt_output_if interrupt_output_bus(clock_bus.clk, reset_bus.reset);
+  assign interrupt_output_bus.INT_O = dut_int_o;
+  uart_serial_data_if uart_serial_data_bus(clock_bus.clk, reset_bus.reset);
+  assign uart_serial_data_bus.tx = dut_stx_pad_o;
+  assign dut_srx_pad_i = uart_serial_data_bus.rx;
+  modem_control_if_if modem_control_if_bus(clock_bus.clk, reset_bus.reset);
+  assign modem_control_if_bus.RTS_PAD_O = dut_rts_pad_o;
+  assign modem_control_if_bus.DTR_PAD_O = dut_dtr_pad_o;
+  assign dut_cts_pad_i = modem_control_if_bus.CTS_PAD_I;
+  assign dut_dsr_pad_i = modem_control_if_bus.DSR_PAD_I;
+  assign dut_ri_pad_i = modem_control_if_bus.RI_PAD_I;
+  assign dut_dcd_pad_i = modem_control_if_bus.DCD_PAD_I;
+  wishbone_slave_interface_if wishbone_slave_interface_bus(clock_bus.clk, reset_bus.reset);
+  assign dut_wb_adr_i = wishbone_slave_interface_bus.addr;
+  assign dut_wb_dat_i = wishbone_slave_interface_bus.wdata;
+  assign wishbone_slave_interface_bus.rdata = dut_wb_dat_o;
+  assign dut_wb_we_i = wishbone_slave_interface_bus.we;
+  assign dut_wb_stb_i = wishbone_slave_interface_bus.stb;
+  assign dut_wb_cyc_i = wishbone_slave_interface_bus.cyc;
+  assign wishbone_slave_interface_bus.ack = dut_wb_ack_o;
+  assign dut_wb_clk_i=clock_bus.clk;
+  assign dut_wb_rst_i=reset_bus.reset;
+  assign dut_wb_sel_i=64'h0;
+  uart_top dut (.wb_clk_i(dut_wb_clk_i), .wb_rst_i(dut_wb_rst_i), .wb_adr_i(dut_wb_adr_i), .wb_dat_i(dut_wb_dat_i), .wb_dat_o(dut_wb_dat_o), .wb_we_i(dut_wb_we_i), .wb_stb_i(dut_wb_stb_i), .wb_cyc_i(dut_wb_cyc_i), .wb_ack_o(dut_wb_ack_o), .wb_sel_i(dut_wb_sel_i), .int_o(dut_int_o), .stx_pad_o(dut_stx_pad_o), .srx_pad_i(dut_srx_pad_i), .rts_pad_o(dut_rts_pad_o), .cts_pad_i(dut_cts_pad_i), .dtr_pad_o(dut_dtr_pad_o), .dsr_pad_i(dut_dsr_pad_i), .ri_pad_i(dut_ri_pad_i), .dcd_pad_i(dut_dcd_pad_i));
+  wishbone_slave_interface_assertions wishbone_slave_interface_checks(wishbone_slave_interface_bus);
+  initial begin
+    uvm_config_db #(virtual clock_if)::set(null,"uvm_test_top","clock_vif",clock_bus);
+    uvm_config_db #(virtual reset_if)::set(null,"uvm_test_top","reset_vif",reset_bus);
+    uvm_config_db #(virtual interrupt_output_if)::set(null,"uvm_test_top","interrupt_output_vif",interrupt_output_bus);
+    uvm_config_db #(virtual uart_serial_data_if)::set(null,"uvm_test_top","uart_serial_data_vif",uart_serial_data_bus);
+    uvm_config_db #(virtual modem_control_if_if)::set(null,"uvm_test_top","modem_control_if_vif",modem_control_if_bus);
+    uvm_config_db #(virtual wishbone_slave_interface_if)::set(null,"uvm_test_top","wishbone_slave_interface_vif",wishbone_slave_interface_bus);
+    run_test("quick_basic");
+  end
+endmodule

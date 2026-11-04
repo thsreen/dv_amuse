@@ -1,0 +1,40 @@
+{
+  "level": "passive_agent",
+  "reason": "DUT sources single 1-bit INT_O output so testbench must only observe without driving; passive_agent is minimum to expose transition events for later correlation with WISHBONE IER/IIR and top-level interrupt handling, with no inputs to own or tie-off and no scoreboard/coverage now; choice is inferred and needs review.",
+  "responsibilities": [
+    "Declare int_o 1-bit DUT-output observation point mapped from INT_O per identity map",
+    "Passively observe INT_O assertion and deassertion edges without driving",
+    "Expose observed events for later-phase correlation with WISHBONE IER/IIR reads and SoC interrupt routing without implementing checks or scoreboards",
+    "Leave clocking, reset control and any tie-offs to owning infrastructures"
+  ],
+  "coverage": false,
+  "facts": [
+    {
+      "id": "f_port_int_o",
+      "statement": "The specification defines INT_O as 1-bit Output Interrupt output",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/signals/0"
+    },
+    {
+      "id": "f_dut_source",
+      "statement": "DUT role for interrupt_output is source with direction out of DUT",
+      "source_id": "CH-8c2c8e9408",
+      "quote": "INT_O 1 Output Interrupt output",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/dut_role"
+    },
+    {
+      "id": "f_core_interrupt",
+      "statement": "The core requires one interrupt",
+      "source_id": "CH-d62a4ba2db",
+      "quote": "The core requires one interrupt.",
+      "plan_pointer": "/interfaces/groups/3/property_evidence/connected_to"
+    }
+  ],
+  "questions": [
+    "What is the asserted active level of int_o and its deasserted state for interpreting observed edges, since sources document INT_O as 1-bit Output Interrupt output but leave active_level unknown?",
+    "Evidence substituted: f_iir_pending could not be proven from the retrieved sources (Fact quote must occur in a retrieved source excerpt); the documented facts of this interface are cited instead. Review the choice that cited them."
+  ],
+  "review_status": "NEEDS_REVIEW",
+  "provenance": "INFERRED_IMPLEMENTATION_CHOICE"
+}

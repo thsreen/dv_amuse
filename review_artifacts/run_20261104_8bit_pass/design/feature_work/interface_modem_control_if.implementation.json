@@ -1,0 +1,56 @@
+{
+  "ports": [
+    "rts_pad_o",
+    "dtr_pad_o",
+    "cts_pad_i",
+    "dsr_pad_i",
+    "ri_pad_i",
+    "dcd_pad_i"
+  ],
+  "roles": {},
+  "facts": [
+    {
+      "id": "port_rts_pad_o",
+      "statement": "The specification defines RTS_PAD_O as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "RTS_PAD_O 1 Output Request To Send",
+      "plan_pointer": "/interfaces/groups/5/signals/0"
+    },
+    {
+      "id": "port_dtr_pad_o",
+      "statement": "The specification defines DTR_PAD_O as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DTR_PAD_O 1 Output Data Terminal Ready",
+      "plan_pointer": "/interfaces/groups/5/signals/1"
+    },
+    {
+      "id": "port_cts_pad_i",
+      "statement": "The specification defines CTS_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "CTS_PAD_I 1 Input Clear To Send",
+      "plan_pointer": "/interfaces/groups/5/signals/2"
+    },
+    {
+      "id": "port_dsr_pad_i",
+      "statement": "The specification defines DSR_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DSR_PAD_I 1 Input Data Set Ready",
+      "plan_pointer": "/interfaces/groups/5/signals/3"
+    },
+    {
+      "id": "port_ri_pad_i",
+      "statement": "The specification defines RI_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "RI_PAD_I 1 Input Ring Indicator",
+      "plan_pointer": "/interfaces/groups/5/signals/4"
+    },
+    {
+      "id": "port_dcd_pad_i",
+      "statement": "The specification defines DCD_PAD_I as a port of this interface",
+      "source_id": "CH-98be4510fb",
+      "quote": "DCD_PAD_I 1 Input Data Carrier Detect",
+      "plan_pointer": "/interfaces/groups/5/signals/5"
+    }
+  ],
+  "questions": []
+}

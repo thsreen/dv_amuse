@@ -1,0 +1,93 @@
+{
+  "sequencer_variables": [],
+  "registers": [],
+  "facts": [],
+  "sequences": [],
+  "routes": [],
+  "checks": [],
+  "hooks": [],
+  "coverage": [
+    {
+      "id": "t_clk_cov_raw_cov",
+      "agent": "wishbone_slave_interface",
+      "points": [
+        {
+          "name": "t_clk_cov_raw_pt",
+          "field": "data",
+          "mask": 0,
+          "shift": 0,
+          "bins": [
+            {
+              "name": "t_clk_cov_raw_bin",
+              "values": [
+                0
+              ]
+            }
+          ]
+        }
+      ],
+      "crosses": [],
+      "sample_kinds": [],
+      "sample_address": null,
+      "fact_ids": [
+        "t_clk_seq_f_clk_1",
+        "t_clk_seq_f_rst_1"
+      ]
+    }
+  ],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "What is nominal CLK frequency and period to use as P_fixed?"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [],
+      "question": "What is active level polarity of wb_rst_i and required reset duration in CLK cycles for scaling to P_fixed?"
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [],
+      "question": "Is dynamic period change during operation permitted or must period stay fixed per test changed only between tests before reset and traffic?"
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [],
+      "question": "What are minimum and maximum operating CLK frequencies periods plus duty-cycle and jitter tolerance?"
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [
+        "t_clk_cov_raw_cov"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [
+        "t_clk_cov_raw_cov"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [],
+      "question": "What are documented CLK period bands and Max Min Resolution meanings for 1258Mhz for 1200 bps and 3.6864 for 115200 bps points?"
+    },
+    {
+      "step": "coverage_steps/3",
+      "component_ids": [
+        "t_clk_cov_raw_cov"
+      ],
+      "question": ""
+    }
+  ],
+  "questions": [
+    "What are documented CLK period bands and Max Min Resolution meanings for 1258Mhz for 1200 bps and 3.6864 for 115200 bps points?",
+    "What is nominal CLK frequency and period to use as P_fixed?",
+    "What are minimum and maximum operating CLK frequencies periods plus duty-cycle and jitter tolerance?",
+    "Is dynamic period change during operation permitted or must period stay fixed per test changed only between tests before reset and traffic?",
+    "What is active level polarity of wb_rst_i and required reset duration in CLK cycles for scaling to P_fixed?"
+  ]
+}

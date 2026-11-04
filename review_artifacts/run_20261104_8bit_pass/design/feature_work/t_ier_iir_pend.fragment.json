@@ -1,0 +1,251 @@
+{
+  "sequencer_variables": [
+    {
+      "id": "t_ier_iir_pend_ier_en",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 0,
+      "fact_ids": [
+        "f_ier_bit0",
+        "f_ier_b1",
+        "f_ier_b2",
+        "f_ier_b3",
+        "f_ier_reserved"
+      ]
+    },
+    {
+      "id": "t_ier_iir_pend_lcr_dlab0",
+      "agent": "wishbone_slave_interface",
+      "width": 8,
+      "default": 3,
+      "fact_ids": [
+        "f_dlab_gate_2"
+      ]
+    }
+  ],
+  "registers": [],
+  "facts": [
+    {
+      "id": "f_ier_b1",
+      "statement": "IER bit1 THRE empty 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "1 RW Transmitter Holding Register empty interrupt",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_b2",
+      "statement": "IER bit2 Receiver Line Status 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "2 RW Receiver Line Status Interrupt",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_ier_b3",
+      "statement": "IER bit3 Modem Status 0 disabled 1 enabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "3 RW Modem Status Interrupt",
+      "plan_pointer": "/registers/registers/4/fields/3"
+    },
+    {
+      "id": "f_ier_reset",
+      "statement": "IER reset value 00h all disabled",
+      "source_id": "CH-de51b2eafc",
+      "quote": "Reset Value: 00h",
+      "plan_pointer": "/sections/8/entries/2"
+    },
+    {
+      "id": "f_dlab_gate_2",
+      "statement": "Addresses 0-1 inaccessible when LCR bit7 DLAB is 1 so need DLAB 0",
+      "source_id": "CH-f88915355b",
+      "quote": "At this time the above registers at addresses 0-1 can\u2019t be accessed.",
+      "plan_pointer": "/registers/registers/4"
+    },
+    {
+      "id": "f_iir_pending",
+      "statement": "IIR bit0 0 means interrupt pending 1 means no interrupt pending",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bit 0 indicates that an interrupt is pending when it\u2019s logic \u20180\u2019. When it\u2019s \u20181\u2019 \u2013 no interrupt",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_iir_zero",
+      "statement": "IIR bits 4 and 5 are logic 0",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 4 and 5: Logic \u20180\u2019.",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_iir_one",
+      "statement": "IIR bits 6 and 7 are logic 1 for compatibility",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Bits 6 and 7: Logic \u20181\u2019 for compatibility reason.",
+      "plan_pointer": "/sections/8/entries/3"
+    },
+    {
+      "id": "f_iir_reset",
+      "statement": "IIR reset C1h implying bit0 1 none pending",
+      "source_id": "CH-f91cbf1c05",
+      "quote": "Reset Value: C1h",
+      "plan_pointer": "/sections/8/entries/3"
+    }
+  ],
+  "sequences": [],
+  "routes": [
+    {
+      "id": "t_ier_iir_pend_route_iir_int",
+      "expected_agent": "wishbone_slave_interface",
+      "expected_event": "read",
+      "actual_agent": "interrupt_output",
+      "actual_event": "transaction",
+      "expected_address": 2,
+      "actual_address": null,
+      "when": [],
+      "mask": 1,
+      "fact_ids": [
+        "f_iir_pending"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "t_ier_iir_pend_chk_ier",
+      "agent": "wishbone_slave_interface",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_ier_bit0",
+        "f_ier_b1",
+        "f_ier_b2",
+        "f_ier_b3",
+        "f_ier_reserved"
+      ]
+    },
+    {
+      "id": "t_ier_iir_pend_chk_reset",
+      "agent": "wishbone_slave_interface",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_ier_reset",
+        "f_iir_reset",
+        "t_chip_reset_f_ier_disable"
+      ]
+    },
+    {
+      "id": "t_ier_iir_pend_chk_iir_mask",
+      "agent": "wishbone_slave_interface",
+      "kind": "known_controls",
+      "fact_ids": [
+        "f_iir_zero",
+        "f_iir_one"
+      ]
+    }
+  ],
+  "hooks": [
+    {
+      "id": "t_ier_iir_pend_hook_mon_int",
+      "target": "interrupt_output",
+      "slot": "monitor.body",
+      "purpose": "Passively observe int_o levels timestamped for pending correlation never drive",
+      "fact_ids": [
+        "f_iir_pending"
+      ]
+    }
+  ],
+  "coverage": [],
+  "step_implementations": [
+    {
+      "step": "stimulus_steps/0",
+      "component_ids": [],
+      "question": "Deferred: register t_ier_iir_pend_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_ier_iir_pend_wb_seq does not fit the testbench: register_write names 't_ier_iir_pend_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']; coverage t_ier_iir_pend_cov_ier_en does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_bit0 does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_int_o does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_reset does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_mask does not fit the testbench: Coverage filter incompatible with monitored events; hook t_ier_iir_pend_hook_mon_wb does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_ier_iir_pend_hook_cov_ier does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "stimulus_steps/1",
+      "component_ids": [],
+      "question": "Deferred: register t_ier_iir_pend_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_ier_iir_pend_wb_seq does not fit the testbench: register_write names 't_ier_iir_pend_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']; coverage t_ier_iir_pend_cov_ier_en does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_bit0 does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_int_o does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_reset does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_mask does not fit the testbench: Coverage filter incompatible with monitored events; hook t_ier_iir_pend_hook_mon_wb does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_ier_iir_pend_hook_cov_ier does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "stimulus_steps/2",
+      "component_ids": [],
+      "question": "Deferred: register t_ier_iir_pend_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_ier_iir_pend_wb_seq does not fit the testbench: register_write names 't_ier_iir_pend_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']; coverage t_ier_iir_pend_cov_ier_en does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_bit0 does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_int_o does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_reset does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_mask does not fit the testbench: Coverage filter incompatible with monitored events; hook t_ier_iir_pend_hook_mon_wb does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_ier_iir_pend_hook_cov_ier does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "stimulus_steps/3",
+      "component_ids": [],
+      "question": "Deferred: register t_ier_iir_pend_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_ier_iir_pend_wb_seq does not fit the testbench: register_write names 't_ier_iir_pend_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']; coverage t_ier_iir_pend_cov_ier_en does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_bit0 does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_int_o does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_reset does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_mask does not fit the testbench: Coverage filter incompatible with monitored events; hook t_ier_iir_pend_hook_mon_wb does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_ier_iir_pend_hook_cov_ier does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "stimulus_steps/4",
+      "component_ids": [],
+      "question": "Deferred: register t_ier_iir_pend_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_ier_iir_pend_wb_seq does not fit the testbench: register_write names 't_ier_iir_pend_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']; coverage t_ier_iir_pend_cov_ier_en does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_bit0 does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_int_o does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_reset does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_mask does not fit the testbench: Coverage filter incompatible with monitored events; hook t_ier_iir_pend_hook_mon_wb does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_ier_iir_pend_hook_cov_ier does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "check_steps/0",
+      "component_ids": [
+        "t_ier_iir_pend_chk_ier"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/1",
+      "component_ids": [
+        "t_ier_iir_pend_chk_reset"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/2",
+      "component_ids": [
+        "t_ier_iir_pend_chk_iir_mask"
+      ],
+      "question": ""
+    },
+    {
+      "step": "check_steps/3",
+      "component_ids": [],
+      "question": "Deferred: check t_ier_iir_pend_chk_pend is a built-in bus check on interrupt_output, which is not a bus agent; scoreboard hook t_ier_iir_pend_hook_cmp_pend targets t_ier_iir_pend_chk_pend, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)"
+    },
+    {
+      "step": "check_steps/4",
+      "component_ids": [
+        "t_ier_iir_pend_route_iir_int"
+      ],
+      "question": ""
+    },
+    {
+      "step": "coverage_steps/0",
+      "component_ids": [],
+      "question": "Deferred: register t_ier_iir_pend_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_ier_iir_pend_wb_seq does not fit the testbench: register_write names 't_ier_iir_pend_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']; coverage t_ier_iir_pend_cov_ier_en does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_bit0 does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_int_o does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_reset does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_mask does not fit the testbench: Coverage filter incompatible with monitored events; hook t_ier_iir_pend_hook_mon_wb does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_ier_iir_pend_hook_cov_ier does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/1",
+      "component_ids": [],
+      "question": "Deferred: register t_ier_iir_pend_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_ier_iir_pend_wb_seq does not fit the testbench: register_write names 't_ier_iir_pend_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']; coverage t_ier_iir_pend_cov_ier_en does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_bit0 does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_int_o does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_reset does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_mask does not fit the testbench: Coverage filter incompatible with monitored events; hook t_ier_iir_pend_hook_mon_wb does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_ier_iir_pend_hook_cov_ier does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/2",
+      "component_ids": [],
+      "question": "Deferred: register t_ier_iir_pend_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_ier_iir_pend_wb_seq does not fit the testbench: register_write names 't_ier_iir_pend_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']; coverage t_ier_iir_pend_cov_ier_en does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_bit0 does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_int_o does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_reset does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_mask does not fit the testbench: Coverage filter incompatible with monitored events; hook t_ier_iir_pend_hook_mon_wb does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_ier_iir_pend_hook_cov_ier does not fit the testbench: Agent hook requires an agent target"
+    },
+    {
+      "step": "coverage_steps/3",
+      "component_ids": [],
+      "question": "Deferred: register t_ier_iir_pend_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension; sequence t_ier_iir_pend_wb_seq does not fit the testbench: register_write names 't_ier_iir_pend_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']; coverage t_ier_iir_pend_cov_ier_en does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_bit0 does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_int_o does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_reset does not fit the testbench: Coverage filter incompatible with monitored events; coverage t_ier_iir_pend_cov_iir_mask does not fit the testbench: Coverage filter incompatible with monitored events; hook t_ier_iir_pend_hook_mon_wb does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned; hook t_ier_iir_pend_hook_cov_ier does not fit the testbench: Agent hook requires an agent target"
+    }
+  ],
+  "questions": [
+    "q_int_o: What is documented INT_O polarity and inactive level for correlating IIR bit0 0 pending versus 1 none with asserted versus negated INT_O?",
+    "q_reset: What is wb_rst_i active polarity, required reset duration in CLK cycles, and deassert-to-first-write delay for IER IIR checks?",
+    "q_addr: What is explicit wb_adr_i pin representation for IER address 1 and IIR reads and required handling of addr 7 illegal for 8-bit use?",
+    "q_bus_drive: What are required wb_sel_i values owners and tie-offs and inactive levels of wb_stb_i wb_cyc_i that must be driven for 8-bit FIFO-only register access?",
+    "Deferred (quick testing): check t_ier_iir_pend_chk_pend is a built-in bus check on interrupt_output, which is not a bus agent",
+    "Deferred (quick testing): scoreboard hook t_ier_iir_pend_hook_cmp_pend targets t_ier_iir_pend_chk_pend, which is not a declared route (comparisons need two observed interface events; internal state is not observable here)",
+    "Deferred (quick testing): register t_ier_iir_pend_ier does not fit the testbench: Banked/aliased register mirrors require an explicit extension",
+    "Deferred (quick testing): sequence t_ier_iir_pend_wb_seq does not fit the testbench: register_write names 't_ier_iir_pend_ier', which is not a declared register: ['t_divisor_cov_lsb', 't_divisor_cov_msb', 't_traffic_seq_mcr', 't_wb_init_cfg_fcr', 't_wb_init_cfg_lcr']",
+    "Deferred (quick testing): coverage t_ier_iir_pend_cov_ier_en does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): coverage t_ier_iir_pend_cov_iir_bit0 does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): coverage t_ier_iir_pend_cov_int_o does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): coverage t_ier_iir_pend_cov_reset does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): coverage t_ier_iir_pend_cov_iir_mask does not fit the testbench: Coverage filter incompatible with monitored events",
+    "Deferred (quick testing): hook t_ier_iir_pend_hook_mon_wb does not fit the testbench: Protocol body hooks require the custom protocol; builtin behavior is template-owned",
+    "Deferred (quick testing): hook t_ier_iir_pend_hook_cov_ier does not fit the testbench: Agent hook requires an agent target"
+  ]
+}
