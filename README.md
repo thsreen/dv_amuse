@@ -90,8 +90,9 @@ Inspect the [saved testplan and logs](review_artifacts/run_20261104_8bit_pass/),
 ## Review artifacts
 
 **Reviewers: start with the [saved 8-bit UART run](review_artifacts/run_20261104_8bit_pass/).**
-This checked-in snapshot contains the plan and execution logs from November 4, 2026, so you can
-inspect the recorded result without API credentials or a simulator installation.
+This checked-in snapshot holds the plan, generated testbench, coverage, waveform and logs from November 4, 2026, so you can
+inspect the recorded result without API credentials or a simulator installation. Its
+[guide](review_artifacts/run_20261104_8bit_pass/README.md) lists the results, the limits and how to reproduce the test.
 
 | Suggested order | Artifact | What to check |
 |---|---|---|
@@ -100,9 +101,10 @@ inspect the recorded result without API credentials or a simulator installation.
 | 3 | [Planning trace](review_artifacts/run_20261104_8bit_pass/logs/plan_trace.jsonl) and [code-generation trace](review_artifacts/run_20261104_8bit_pass/logs/code_trace.jsonl) | Stage progression, retries, approvals, deferrals and recorded completion. |
 | 4 | [Compiler log](review_artifacts/run_20261104_8bit_pass/logs/compile.log) | Parsing/elaboration outcome and compiler warnings. |
 | 5 | [Simulation log](review_artifacts/run_20261104_8bit_pass/logs/simulation.log) | `FUNCTIONAL_TEST_PASS quick_basic`, two scoreboard comparisons and zero UVM errors/fatals. |
+| 6 | [Coverage report](review_artifacts/run_20261104_8bit_pass/results/coverage_report.md) and [waveform](review_artifacts/run_20261104_8bit_pass/results/quick_basic.fst) | What the one test sampled; open the FST in GTKWave or Surfer |
+| 7 | [Generated testbench](review_artifacts/run_20261104_8bit_pass/testbench/) and [design records](review_artifacts/run_20261104_8bit_pass/design/) | SV and UVM sources, review objections, test-only approvals and what was set aside |
 
-The artifact directory currently contains **plans and logs**, not the generated SV source tree or
-simulator binaries. It records one quick-testing configuration and its script-selected test;
+It records one quick-testing configuration and its script-selected test;
 the complete testplan and all model-proposed scenarios have not thereby been verified. Check
 [current status and limitations](docs/CODE_REVIEW_STATUS.md) alongside the logs. Runtime outputs
 from your own runs remain under the ignored `runs/` directory.
